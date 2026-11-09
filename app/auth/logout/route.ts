@@ -1,14 +1,8 @@
-import { createServerClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+import { NextResponse, type NextRequest } from "next/server"
+import { deleteSession } from "@/lib/auth/session"
 
-export async function GET() {
-  const supabase = await createServerClient()
-  await supabase.auth.signOut()
-  redirect("/admin/login")
-}
-
-export async function POST() {
-  const supabase = await createServerClient()
-  await supabase.auth.signOut()
-  redirect("/admin/login")
+// Só POST: um GET permitiria deslogar alguém com um simples link/imagem em outro site.
+export async function POST(request: NextRequest) {
+  await deleteSession()
+  return NextResponse.redirect(new URL("/admin/login", request.url), { status: 303 })
 }

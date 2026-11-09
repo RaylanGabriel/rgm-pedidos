@@ -2,16 +2,10 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ClipboardList, UtensilsCrossed } from "lucide-react"
 import Image from "next/image"
-import { createServerClient } from "@/lib/supabase/server"
 import { ClientHeader } from "@/components/client-header"
 import { ClientFooter } from "@/components/client-footer"
 
-export default async function Home() {
-  const supabase = await createServerClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted">
       <ClientHeader />

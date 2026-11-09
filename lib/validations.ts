@@ -16,11 +16,15 @@ export const loginSchema = z.object({
     .email("Email inválido")
     .max(255, "Email muito longo")
     .transform((val) => val.toLowerCase().trim()),
-  password: z
-    .string()
-    .min(6, "Senha deve ter no mínimo 6 caracteres")
-    .max(128, "Senha muito longa"),
+  // No login só exigimos que exista; a regra de força vale na criação (newPasswordSchema)
+  password: z.string().min(1, "Senha é obrigatória").max(128, "Senha muito longa"),
 })
+
+// Schema para criar/trocar senha
+export const newPasswordSchema = z
+  .string()
+  .min(8, "Senha deve ter no mínimo 8 caracteres")
+  .max(128, "Senha muito longa")
 
 // Schema para nome do cliente
 export const customerNameSchema = z

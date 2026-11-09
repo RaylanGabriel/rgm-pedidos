@@ -3,9 +3,11 @@ import { NewOrderForm } from "@/components/new-order-form"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+import { requireStore } from "@/lib/auth/session"
 
 export default async function NovoPedidoPage() {
-  const supabase = await createClient()
+  await requireStore()
+  const supabase = await createClient() // TODO: migrar consulta para o Neon (filtrando por store.id)
 
   const [menuItemsResult, ingredientsResult] = await Promise.all([
     supabase.from("menu_items").select("*").eq("active", true).order("name"),

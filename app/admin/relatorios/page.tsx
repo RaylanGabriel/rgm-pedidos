@@ -3,9 +3,11 @@ import { ReportsView } from "@/components/reports-view"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+import { requireStore } from "@/lib/auth/session"
 
 export default async function RelatoriosPage() {
-  const supabase = await createClient()
+  await requireStore()
+  const supabase = await createClient() // TODO: migrar consulta para o Neon (filtrando por store.id)
 
   const { data: orders, error } = await supabase
     .from("orders")
