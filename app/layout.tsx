@@ -8,9 +8,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Mr. Smash Street - Sistema de Pedidos",
-  description: "Sistema de gestão de pedidos para hamburgueria",
-  generator: "v0.app",
+  title: { default: "Pedidos", template: "%s" },
+  description: "Cardápio digital e pedidos online",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",

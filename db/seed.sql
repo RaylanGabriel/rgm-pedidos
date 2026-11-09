@@ -12,8 +12,8 @@ BEGIN
     RETURN;
   END IF;
 
-  INSERT INTO stores (slug, name, logo_url, avg_prep_minutes)
-  VALUES ('mr-smash', 'Mr. Smash Street', '/logo.png', 15)
+  INSERT INTO stores (slug, name, logo_url, avg_prep_minutes, primary_color)
+  VALUES ('mr-smash', 'Mr. Smash Street', '/logo.png', 15, '#8d1a1e')
   RETURNING id INTO v_store;
 
   INSERT INTO categories (store_id, name, sort_order)

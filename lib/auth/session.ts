@@ -82,3 +82,16 @@ export const requireStore = cache(async () => {
 
   return { user: session.user, store: row.store, role: row.role ?? ("owner" as const) }
 })
+
+/** Como requireStore(), mas só para o dono da loja (ou superadmin). Funcionário vai para o painel. */
+export async function requireOwner() {
+  const ctx = await requireStore()
+  if (ctx.role !== "owner" && !ctx.user.isSuperadmin) redirect("/admin")
+  return ctx
+}
+
+/** Para server actions: devolve null em vez de redirecionar quando não é dono. */
+export async function isOwner() {
+  const ctx = await requireStore()
+  return ctx.role === "owner" || ctx.user.isSuperadmin ? ctx : null
+}

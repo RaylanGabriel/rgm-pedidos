@@ -1,216 +1,120 @@
-"use client"
-
-import { useState, useMemo } from "react"
-import type { OrderWithItems } from "@/lib/types"
+import { Ban, DollarSign, ShoppingBag, TrendingUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { format, startOfDay, endOfDay, isWithinInterval, parseISO } from "date-fns"
-import { ptBR } from "date-fns/locale"
-import { Calendar, DollarSign, ShoppingBag, TrendingUp } from "lucide-react"
+import { formatDateTimeSP } from "@/lib/dates"
+import { formatBRL, STATUS_LABEL, type OrderWithItemsView } from "@/lib/order-shared"
 
-interface ReportsViewProps {
-  orders: OrderWithItems[]
-}
+/** Relatório do período (componente de servidor: o filtro é um formulário GET). */
+export function ReportsView({
+  orders,
+  de,
+  ate,
+  truncated,
+}: {
+  orders: OrderWithItemsView[]
+  de: string
+  ate: string
+  truncated: boolean
+}) {
+  const valid = orders.filter((o) => o.status !== "cancelled")
+  const cancelled = orders.length - valid.length
+  const revenue = valid.reduce((s, o) => s + o.total, 0)
+  const avg = valid.length ? revenue / valid.length : 0
 
-export function ReportsView({ orders }: ReportsViewProps) {
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-
-  const filteredOrders = useMemo(() => {
-    if (!startDate && !endDate) return orders
-
-    return orders.filter((order) => {
-      const orderDate = parseISO(order.created_at)
-
-      if (startDate && endDate) {
-        return isWithinInterval(orderDate, {
-          start: startOfDay(parseISO(startDate)),
-          end: endOfDay(parseISO(endDate)),
-        })
-      } else if (startDate) {
-        return orderDate >= startOfDay(parseISO(startDate))
-      } else if (endDate) {
-        return orderDate <= endOfDay(parseISO(endDate))
-      }
-
-      return true
-    })
-  }, [orders, startDate, endDate])
-
-  const stats = useMemo(() => {
-    const totalOrders = filteredOrders.length
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + Number(order.total_price), 0)
-    const completedOrders = filteredOrders.filter((o) => o.status === "delivered").length
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-
-    // Itens mais vendidos
-    const itemCounts: Record<string, { name: string; count: number }> = {}
-    filteredOrders.forEach((order) => {
-      order.order_items.forEach((item) => {
-        const itemName = item.menu_items.name
-        if (!itemCounts[itemName]) {
-          itemCounts[itemName] = { name: itemName, count: 0 }
-        }
-        itemCounts[itemName].count += item.quantity
-      })
-    })
-
-    const topItems = Object.values(itemCounts)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-
-    return {
-      totalOrders,
-      totalRevenue,
-      completedOrders,
-      avgOrderValue,
-      topItems,
-    }
-  }, [filteredOrders])
+  const counts = new Map<string, number>()
+  for (const o of valid) for (const i of o.items) counts.set(i.name, (counts.get(i.name) ?? 0) + i.quantity)
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const topMax = top[0]?.[1] ?? 1
 
   return (
     <div className="space-y-6">
-      {/* Filtros */}
       <Card>
         <CardHeader>
-          <CardTitle>Filtrar por Data</CardTitle>
-          <CardDescription>Selecione um período para análise</CardDescription>
+          <CardTitle>Período</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form method="get" className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-4 items-end">
             <div className="space-y-2">
-              <Label htmlFor="startDate">Data Inicial</Label>
-              <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Label htmlFor="de">De</Label>
+              <Input id="de" name="de" type="date" defaultValue={de} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endDate">Data Final</Label>
-              <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <Label htmlFor="ate">Até</Label>
+              <Input id="ate" name="ate" type="date" defaultValue={ate} />
             </div>
-          </div>
+            <Button type="submit">Aplicar</Button>
+          </form>
+          {truncated && <p className="text-xs text-destructive mt-3">Período muito grande: mostrando só os 5.000 pedidos mais recentes.</p>}
         </CardContent>
       </Card>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total de Pedidos</CardTitle>
-            <ShoppingBag className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.totalOrders}</div>
-            <p className="text-xs text-muted-foreground mt-1">{stats.completedOrders} concluídos</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Faturamento Total</CardTitle>
-            <DollarSign className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">R$ {stats.totalRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Período selecionado</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-            <TrendingUp className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-accent">R$ {stats.avgOrderValue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Por pedido</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Taxa de Conclusão</CardTitle>
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-secondary">
-              {stats.totalOrders > 0 ? Math.round((stats.completedOrders / stats.totalOrders) * 100) : 0}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Pedidos entregues</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Stat title="Pedidos" icon={ShoppingBag} value={String(valid.length)} note="sem contar cancelados" />
+        <Stat title="Faturamento" icon={DollarSign} value={formatBRL(revenue)} note="no período" />
+        <Stat title="Ticket médio" icon={TrendingUp} value={formatBRL(avg)} note="por pedido" />
+        <Stat title="Cancelados" icon={Ban} value={String(cancelled)} note={orders.length ? `${Math.round((cancelled / orders.length) * 100)}% do total` : "—"} />
       </div>
 
-      {/* Top Itens */}
       <Card>
         <CardHeader>
-          <CardTitle>Itens Mais Vendidos</CardTitle>
-          <CardDescription>Top 5 do período</CardDescription>
+          <CardTitle>Mais vendidos</CardTitle>
+          <CardDescription>Top 5 do período (unidades)</CardDescription>
         </CardHeader>
         <CardContent>
-          {stats.topItems.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
+          {top.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">Nenhuma venda no período.</p>
           ) : (
-            <div className="space-y-4">
-              {stats.topItems.map((item, index) => (
-                <div key={item.name} className="flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{item.name}</p>
+            <ol className="space-y-4">
+              {top.map(([name, count], i) => (
+                <li key={name} className="flex items-center gap-4">
+                  <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {item.count} {item.count === 1 ? "unidade" : "unidades"}
+                      {count} {count === 1 ? "unidade" : "unidades"}
                     </p>
                   </div>
-                  <div className="w-32 bg-muted rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{
-                        width: `${(item.count / (stats.topItems[0]?.count || 1)) * 100}%`,
-                      }}
-                    />
+                  <div className="w-24 sm:w-32 bg-muted rounded-full h-2 overflow-hidden" aria-hidden>
+                    <div className="h-full bg-primary" style={{ width: `${(count / topMax) * 100}%` }} />
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ol>
           )}
         </CardContent>
       </Card>
 
-      {/* Lista de Pedidos */}
       <Card>
         <CardHeader>
-          <CardTitle>Histórico de Pedidos</CardTitle>
+          <CardTitle>Histórico</CardTitle>
           <CardDescription>
-            {filteredOrders.length} {filteredOrders.length === 1 ? "pedido" : "pedidos"} no período
+            {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} no período
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredOrders.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhum pedido encontrado</p>
+          {orders.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">Nenhum pedido encontrado.</p>
           ) : (
             <div className="space-y-3">
-              {filteredOrders.map((order) => (
-                <div key={order.id} className="p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <div>
-                      <p className="font-semibold">Pedido #{order.order_number}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer_name}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-primary">R$ {order.total_price.toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(order.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+              {orders.map((o) => (
+                <div key={o.id} className={`p-4 rounded-lg border bg-card ${o.status === "cancelled" ? "opacity-60" : ""}`}>
+                  <div className="flex items-start justify-between gap-4 mb-1">
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        #{o.orderNumber} · {o.customerName}
                       </p>
+                      <p className="text-xs text-muted-foreground">{STATUS_LABEL[o.status]}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`font-bold ${o.status === "cancelled" ? "line-through" : "text-primary"}`}>{formatBRL(o.total)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDateTimeSP(o.createdAt)}</p>
                     </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {order.order_items.map((item) => (
-                      <span key={item.id} className="mr-2">
-                        {item.quantity}x {item.menu_items.name}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-sm text-muted-foreground">{o.items.map((i) => `${i.quantity}x ${i.name}`).join(" · ")}</p>
                 </div>
               ))}
             </div>
@@ -218,5 +122,20 @@ export function ReportsView({ orders }: ReportsViewProps) {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function Stat({ title, icon: Icon, value, note }: { title: string; icon: typeof ShoppingBag; value: string; note: string }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="w-4 h-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-3xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground mt-1">{note}</p>
+      </CardContent>
+    </Card>
   )
 }

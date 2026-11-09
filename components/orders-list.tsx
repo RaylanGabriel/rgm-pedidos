@@ -1,418 +1,255 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import type { OrderWithItems } from "@/lib/types"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useEffect, useRef, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
+import { Bike, CheckCircle, ChefHat, Clock, Package, Phone, Printer, User, XCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Clock, User, CheckCircle, Package, Truck, Printer } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { updateOrderStatusAction } from "@/app/admin/actions"
+import { formatTimeSP, formatDateTimeSP } from "@/lib/dates"
+import {
+  formatBRL,
+  lineTotal,
+  NEXT_STATUS,
+  PAYMENT_LABEL,
+  STATUS_LABEL,
+  TYPE_LABEL,
+  type OrderStatus,
+  type OrderWithItemsView,
+} from "@/lib/order-shared"
 
-interface OrdersListProps {
-  initialOrders: OrderWithItems[]
+const STATUS_ICON: Record<OrderStatus, typeof Clock> = {
+  pending: Package,
+  preparing: ChefHat,
+  ready: CheckCircle,
+  delivered: Bike,
+  cancelled: XCircle,
 }
 
-export function OrdersList({ initialOrders }: OrdersListProps) {
-  const [orders, setOrders] = useState<OrderWithItems[]>(initialOrders)
-  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
+const ACTION_LABEL: Partial<Record<OrderStatus, string>> = {
+  preparing: "Começar preparo",
+  ready: "Marcar como pronto",
+  delivered: "Entregue",
+}
 
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
+
+function printOrder(order: OrderWithItemsView, storeName: string) {
+  const w = window.open("", "_blank", "width=400,height=600")
+  if (!w) return
+  const e = escapeHtml
+  const items = order.items
+    .map(
+      (i) => `
+      <div class="item">
+        <div class="row"><strong>${i.quantity}x ${e(i.name)}</strong><span>${formatBRL(lineTotal(i))}</span></div>
+        ${i.extras.map((x) => `<div class="extra">+ ${x.quantity}x ${e(x.name)}</div>`).join("")}
+      </div>`,
+    )
+    .join("")
+
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido #${order.orderNumber}</title>
+    <style>
+      body{font-family:'Courier New',monospace;padding:16px;max-width:300px;margin:0 auto;font-size:13px}
+      h1{font-size:18px;margin:0;text-align:center} .num{font-size:28px;text-align:center;margin:6px 0 12px}
+      .row{display:flex;justify-content:space-between;gap:8px} .item{border-bottom:1px dashed #999;padding:6px 0}
+      .extra{padding-left:12px;font-size:12px} .total{border-top:2px solid #000;margin-top:8px;padding-top:8px;font-size:16px;font-weight:bold}
+      .box{margin-top:10px;padding:8px;border:1px solid #000} p{margin:2px 0}
+      @media print{body{padding:0}}
+    </style></head><body>
+    <h1>${e(storeName)}</h1>
+    <div class="num"><strong>#${order.orderNumber}</strong></div>
+    <p><strong>Cliente:</strong> ${e(order.customerName)}</p>
+    ${order.customerPhone ? `<p><strong>Tel:</strong> ${e(order.customerPhone)}</p>` : ""}
+    <p><strong>${TYPE_LABEL[order.type]}</strong> · ${PAYMENT_LABEL[order.paymentMethod]}</p>
+    <p>${formatDateTimeSP(order.createdAt)}</p>
+    ${order.deliveryAddress ? `<div class="box"><strong>Entrega:</strong><br>${e(order.deliveryAddress)}</div>` : ""}
+    <div>${items}</div>
+    <div class="row total"><span>TOTAL</span><span>${formatBRL(order.total)}</span></div>
+    ${order.notes ? `<div class="box"><strong>Obs.:</strong><br>${e(order.notes)}</div>` : ""}
+    </body></html>`)
+  w.document.close()
+  w.focus()
+  w.print()
+}
+
+/** Bipe curto quando chega pedido novo (navegadores só tocam depois de alguma interação com a página). */
+function beep() {
+  try {
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    osc.frequency.value = 880
+    osc.connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.25)
+  } catch {
+    /* sem áudio: tudo bem */
+  }
+}
+
+export function OrdersList({
+  storeName,
+  active,
+  finished,
+}: {
+  storeName: string
+  active: OrderWithItemsView[]
+  finished: OrderWithItemsView[]
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Avisa quando aparece pedido que não estava na lista
+  const seen = useRef<Set<string> | null>(null)
   useEffect(() => {
-    const supabase = createClient()
+    const ids = new Set(active.map((o) => o.id))
+    if (seen.current && [...ids].some((id) => !seen.current!.has(id))) beep()
+    seen.current = ids
+  }, [active])
 
-    const channel = supabase
-      .channel("orders-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async (payload) => {
-        console.log("[v0] Order update received:", payload)
-
-        if (payload.eventType === "UPDATE") {
-          const { data: updatedOrder } = await supabase
-            .from("orders")
-            .select(`
-                *,
-                order_items (
-                  *,
-                  menu_items (*),
-                  order_item_ingredients (
-                    *,
-                    ingredients (*)
-                  )
-                )
-              `)
-            .eq("id", payload.new.id)
-            .single()
-
-          if (updatedOrder) {
-            setOrders((prevOrders) =>
-              prevOrders.map((order) => (order.id === updatedOrder.id ? (updatedOrder as OrderWithItems) : order)),
-            )
-          }
-        } else if (payload.eventType === "INSERT") {
-          const { data: newOrder } = await supabase
-            .from("orders")
-            .select(`
-                *,
-                order_items (
-                  *,
-                  menu_items (*),
-                  order_item_ingredients (
-                    *,
-                    ingredients (*)
-                  )
-                )
-              `)
-            .eq("id", payload.new.id)
-            .single()
-
-          if (newOrder) {
-            setOrders((prevOrders) => [newOrder as OrderWithItems, ...prevOrders])
-          }
-        }
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  const statusConfig = {
-    pending: { label: "Pendente", icon: Package, variant: "secondary" as const },
-    preparing: { label: "Preparando", icon: Clock, variant: "default" as const },
-    ready: { label: "Pronto", icon: CheckCircle, variant: "default" as const },
-    delivered: { label: "Entregue", icon: Truck, variant: "outline" as const },
+  const changeStatus = (order: OrderWithItemsView, status: OrderStatus) => {
+    if (status === "cancelled" && !confirm(`Cancelar o pedido #${order.orderNumber}?`)) return
+    setBusyId(order.id)
+    setError(null)
+    startTransition(async () => {
+      const res = await updateOrderStatusAction(order.id, status)
+      if (!res.ok) setError(`Não foi possível atualizar o pedido #${order.orderNumber}.`)
+      router.refresh()
+      setBusyId(null)
+    })
   }
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    setUpdatingOrderId(orderId)
-    const supabase = createClient()
-
-    const updateData: any = { status: newStatus }
-    if (newStatus === "delivered") {
-      updateData.completed_at = new Date().toISOString()
-    }
-
-    const { error } = await supabase.from("orders").update(updateData).eq("id", orderId)
-
-    if (!error) {
-      setOrders(
-        orders.map((order) =>
-          order.id === orderId
-            ? { ...order, status: newStatus, completed_at: updateData.completed_at || order.completed_at }
-            : order,
-        ),
-      )
-    }
-
-    setUpdatingOrderId(null)
-  }
-
-  const getNextStatus = (currentStatus: string) => {
-    const statusFlow = ["pending", "preparing", "ready", "delivered"]
-    const currentIndex = statusFlow.indexOf(currentStatus)
-    return currentIndex < statusFlow.length - 1 ? statusFlow[currentIndex + 1] : null
-  }
-
-  const activeOrders = orders.filter((o) => o.status !== "delivered")
-  const completedOrders = orders.filter((o) => o.status === "delivered")
-
-  const printOrder = (order: OrderWithItems) => {
-    const printWindow = window.open("", "_blank", "width=400,height=600")
-    if (!printWindow) return
-
-    const orderDate = format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
-    
-    const itemsHtml = order.order_items.map((item) => {
-      const extrasHtml = item.order_item_ingredients && item.order_item_ingredients.length > 0
-        ? item.order_item_ingredients.map((extra) => 
-            `<div style="padding-left: 15px; font-size: 12px; color: #666;">+ ${extra.quantity}x ${extra.ingredients.name}</div>`
-          ).join("")
-        : ""
-      
-      return `
-        <div style="margin-bottom: 8px; border-bottom: 1px dashed #ccc; padding-bottom: 8px;">
-          <div style="display: flex; justify-content: space-between;">
-            <strong>${item.quantity}x ${item.menu_items.name}</strong>
-            <span>R$ ${(item.price * item.quantity).toFixed(2)}</span>
-          </div>
-          ${extrasHtml}
-        </div>
-      `
-    }).join("")
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Pedido #${order.order_number}</title>
-        <style>
-          body {
-            font-family: 'Courier New', monospace;
-            padding: 20px;
-            max-width: 300px;
-            margin: 0 auto;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 18px;
-          }
-          .header h2 {
-            margin: 5px 0;
-            font-size: 14px;
-            font-weight: normal;
-          }
-          .info {
-            margin-bottom: 15px;
-            font-size: 13px;
-          }
-          .info p {
-            margin: 3px 0;
-          }
-          .items {
-            margin-bottom: 15px;
-          }
-          .total {
-            border-top: 2px solid #000;
-            padding-top: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-          }
-          .notes {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 5px;
-            font-size: 12px;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 11px;
-            color: #666;
-          }
-          @media print {
-            body { padding: 0; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>MR. SMASH STREET</h1>
-          <h2>Burger Joint</h2>
-        </div>
-        
-        <div class="info">
-          <p><strong>Pedido:</strong> #${order.order_number}</p>
-          <p><strong>Cliente:</strong> ${order.customer_name}</p>
-          <p><strong>Data:</strong> ${orderDate}</p>
-          <p><strong>Tempo estimado:</strong> ${order.estimated_wait_time} min</p>
-        </div>
-        
-        <div class="items">
-          ${itemsHtml}
-        </div>
-        
-        <div class="total">
-          <span>TOTAL:</span>
-          <span>R$ ${order.total_price.toFixed(2)}</span>
-        </div>
-        
-        ${order.notes ? `
-          <div class="notes">
-            <strong>Observações:</strong><br/>
-            ${order.notes}
-          </div>
-        ` : ""}
-        
-        <div class="footer">
-          <p>Obrigado pela preferência!</p>
-        </div>
-      </body>
-      </html>
-    `
-
-    printWindow.document.write(html)
-    printWindow.document.close()
-    printWindow.focus()
-    printWindow.print()
-  }
+  // Mais antigos primeiro na cozinha
+  const queue = [...active].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   return (
-    <div className="space-y-8">
-      {/* Pedidos Ativos */}
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Em Andamento</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {activeOrders.length === 0 ? (
-            <p className="text-muted-foreground col-span-full text-center py-8">Nenhum pedido ativo no momento</p>
-          ) : (
-            activeOrders.map((order) => {
-              const config = statusConfig[order.status as keyof typeof statusConfig] || statusConfig.pending
-              const Icon = config.icon
-              const nextStatus = getNextStatus(order.status)
+    <div className="space-y-10">
+      {error && (
+        <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
+      <section>
+        <h2 className="text-2xl font-bold mb-4">Em andamento ({queue.length})</h2>
+        {queue.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">Nenhum pedido em andamento.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {queue.map((order) => {
+              const Icon = STATUS_ICON[order.status]
+              const next = NEXT_STATUS[order.status]
+              const busy = pending && busyId === order.id
               return (
-                <Card key={order.id} className="border-2">
+                <Card key={order.id} className={`border-2 ${order.status === "pending" ? "border-primary" : ""}`}>
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <CardTitle className="text-lg">Pedido #{order.order_number}</CardTitle>
+                        <CardTitle className="text-2xl">#{order.orderNumber}</CardTitle>
                         <CardDescription className="flex items-center gap-1 mt-1">
                           <User className="w-3 h-3" />
-                          {order.customer_name}
+                          {order.customerName}
                         </CardDescription>
+                        {order.customerPhone && (
+                          <CardDescription className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {order.customerPhone}
+                          </CardDescription>
+                        )}
                       </div>
-                      <Badge variant={config.variant} className="flex items-center gap-1">
-                        <Icon className="w-3 h-3" />
-                        {config.label}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant={order.status === "pending" ? "default" : "secondary"}>
+                          <Icon className="w-3 h-3" />
+                          {STATUS_LABEL[order.status]}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{formatTimeSP(order.createdAt)}</span>
+                      </div>
                     </div>
+                    <p className="text-xs font-medium">
+                      {TYPE_LABEL[order.type]} · {PAYMENT_LABEL[order.paymentMethod]}
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      {order.order_items.map((item) => (
+                      {order.items.map((item) => (
                         <div key={item.id} className="text-sm">
-                          <div className="flex justify-between">
+                          <div className="flex justify-between gap-2">
                             <span className="font-medium">
-                              {item.quantity}x {item.menu_items.name}
+                              {item.quantity}x {item.name}
                             </span>
-                            <span className="text-muted-foreground">R$ {(item.price * item.quantity).toFixed(2)}</span>
+                            <span className="text-muted-foreground">{formatBRL(lineTotal(item))}</span>
                           </div>
-                          {item.order_item_ingredients && item.order_item_ingredients.length > 0 && (
-                            <div className="pl-4 text-xs text-muted-foreground">
-                              {item.order_item_ingredients.map((extra) => (
-                                <div key={extra.id}>
-                                  + {extra.quantity}x {extra.ingredients.name}
-                                </div>
-                              ))}
+                          {item.extras.map((x) => (
+                            <div key={x.id} className="pl-4 text-xs text-muted-foreground">
+                              + {x.quantity}x {x.name}
                             </div>
-                          )}
+                          ))}
                         </div>
                       ))}
                     </div>
 
-                    {order.notes && (
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-muted-foreground">Obs: {order.notes}</p>
-                      </div>
-                    )}
+                    {order.deliveryAddress && <p className="text-xs border-t pt-2">Entrega: {order.deliveryAddress}</p>}
+                    {order.notes && <p className="text-xs border-t pt-2 font-medium">Obs.: {order.notes}</p>}
 
-                    <div className="pt-2 border-t space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Tempo estimado:
-                        </span>
-                        <span className="font-semibold">{order.estimated_wait_time} min</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold">Total:</span>
-                        <span className="text-lg font-bold text-primary">R$ {order.total_price.toFixed(2)}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </div>
+                    <div className="flex justify-between items-center border-t pt-2">
+                      <span className="font-bold">Total</span>
+                      <span className="text-lg font-bold text-primary">{formatBRL(order.total)}</span>
                     </div>
 
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => printOrder(order)}
-                      >
-                        <Printer className="w-4 h-4 mr-2" />
-                        Imprimir
+                      <Button variant="outline" size="icon" onClick={() => printOrder(order, storeName)} aria-label={`Imprimir pedido ${order.orderNumber}`}>
+                        <Printer className="w-4 h-4" />
                       </Button>
-                      {nextStatus && (
-                        <Button
-                          className="flex-1"
-                          onClick={() => updateOrderStatus(order.id, nextStatus)}
-                          disabled={updatingOrderId === order.id}
-                        >
-                          {updatingOrderId === order.id
-                            ? "Atualizando..."
-                            : `${statusConfig[nextStatus as keyof typeof statusConfig].label}`}
+                      {next && (
+                        <Button className="flex-1" onClick={() => changeStatus(order, next)} disabled={busy}>
+                          {busy ? "Atualizando…" : ACTION_LABEL[next]}
                         </Button>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      className="w-full text-xs text-muted-foreground hover:text-destructive disabled:opacity-50"
+                      onClick={() => changeStatus(order, "cancelled")}
+                      disabled={busy}
+                    >
+                      Cancelar pedido
+                    </button>
                   </CardContent>
                 </Card>
               )
-            })
-          )}
-        </div>
-      </div>
+            })}
+          </div>
+        )}
+      </section>
 
-      {/* Pedidos Concluídos */}
-      {completedOrders.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Concluídos Hoje</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {completedOrders.map((order) => (
+      {finished.length > 0 && (
+        <section>
+          <h2 className="text-2xl font-bold mb-4">Finalizados hoje ({finished.length})</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {finished.map((order) => (
               <Card key={order.id} className="opacity-75">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-lg">Pedido #{order.order_number}</CardTitle>
-                      <CardDescription className="flex items-center gap-1 mt-1">
-                        <User className="w-3 h-3" />
-                        {order.customer_name}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="outline" className="flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Entregue
-                    </Badge>
+                <CardContent className="py-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      #{order.orderNumber} · {order.customerName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {STATUS_LABEL[order.status]}
+                      {order.completedAt && ` às ${formatTimeSP(order.completedAt)}`} · {formatBRL(order.total)}
+                    </p>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    {order.order_items.map((item) => (
-                      <div key={item.id} className="text-sm">
-                        <div className="flex justify-between">
-                          <span>
-                            {item.quantity}x {item.menu_items.name}
-                          </span>
-                          <span className="text-muted-foreground">R$ {(item.price * item.quantity).toFixed(2)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold">Total:</span>
-                      <span className="text-lg font-bold text-primary">R$ {order.total_price.toFixed(2)}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Entregue:{" "}
-                      {order.completed_at &&
-                        format(new Date(order.completed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-3"
-                      onClick={() => printOrder(order)}
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Imprimir
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => printOrder(order, storeName)} aria-label={`Imprimir pedido ${order.orderNumber}`}>
+                    <Printer className="w-4 h-4" />
+                  </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   )
