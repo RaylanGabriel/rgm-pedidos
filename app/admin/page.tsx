@@ -1,17 +1,28 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ClipboardList, Plus, BarChart3, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings } from "lucide-react"
+import { ClipboardList, Plus, BarChart3, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog } from "lucide-react"
 import { toggleStoreOpenAction } from "./actions"
 import Image from "next/image"
 import { requireStore } from "@/lib/auth/session"
 import { Button } from "@/components/ui/button"
 
 export default async function AdminPage() {
-  const { store, user, role } = await requireStore()
+  const { store, user, role, isSupport } = await requireStore()
   const canManage = role === "owner" || user.isSuperadmin
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
+      {(isSupport || !store.active) && (
+        <div role="status" className="bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100 text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <span>
+            {isSupport ? <>Modo suporte: você está no painel de <strong>{store.name}</strong>.</> : null}
+            {!store.active && <> Loja <strong>suspensa</strong>: fora do ar para clientes e equipe.</>}
+          </span>
+          <Link href="/admin/lojas" className="font-semibold underline underline-offset-2">
+            Voltar para Lojas
+          </Link>
+        </div>
+      )}
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col items-center justify-center mb-12 pt-8">
           {store.logoUrl && (
@@ -28,12 +39,20 @@ export default async function AdminPage() {
             <Flame className="w-6 h-6 text-primary" />
             Área Administrativa
           </h2>
-          <form action="/auth/logout" method="post">
-            <Button type="submit" variant="outline" size="sm">
-              <LogOut className="w-4 h-4 mr-2" />
-              Sair
+          <div className="flex gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/admin/conta">
+                <UserCog className="w-4 h-4 mr-2" />
+                Minha conta
+              </Link>
             </Button>
-          </form>
+            <form action="/auth/logout" method="post">
+              <Button type="submit" variant="outline" size="sm">
+                <LogOut className="w-4 h-4 mr-2" />
+                Sair
+              </Button>
+            </form>
+          </div>
         </div>
 
         <Card className="max-w-6xl mx-auto mb-6 border-2">
@@ -147,6 +166,23 @@ export default async function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Personalize a loja e baixe o QR code do cardápio</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {user.isSuperadmin && (
+            <Link href="/admin/lojas" className="group">
+              <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 border-dashed hover:border-primary">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
+                    <Building2 className="w-6 h-6 text-secondary-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Lojas</CardTitle>
+                  <CardDescription>Plataforma · só você vê</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Crie lojas para clientes, entre no painel delas e suspenda ou reative</p>
                 </CardContent>
               </Card>
             </Link>

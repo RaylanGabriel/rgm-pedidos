@@ -1,8 +1,8 @@
 "use client"
 
-import { useActionState, useEffect, useId, useRef, type ReactNode } from "react"
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { useFormStatus } from "react-dom"
-import { Loader2 } from "lucide-react"
+import { Check, Copy, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,7 +50,30 @@ export function ActionForm({
           {state.message}
         </p>
       )}
+      {state.ok && state.secret && <SecretBox key={state.secret} value={state.secret} />}
     </form>
+  )
+}
+
+/** Mostra um valor sensível uma única vez (some ao recarregar a página). */
+function SecretBox({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="mt-3 rounded-lg border-2 border-dashed border-primary p-3">
+      <div className="flex items-center justify-between gap-3">
+        <code className="text-lg font-bold tracking-wider select-all">{value}</code>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => navigator.clipboard?.writeText(value).then(() => setCopied(true), () => {})}
+        >
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied ? "Copiado" : "Copiar"}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">Anote agora: por segurança ela não é mostrada de novo.</p>
+    </div>
   )
 }
 

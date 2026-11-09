@@ -1,4 +1,4 @@
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto"
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto"
 
 /**
  * Hash de senha com scrypt (nativo do Node, sem dependências).
@@ -15,6 +15,13 @@ function scryptAsync(password: string, salt: Buffer, n: number, r: number, p: nu
       err ? reject(err) : resolve(key),
     )
   })
+}
+
+/** Senha provisória fácil de ditar/digitar (sem 0/o, 1/l/i): ex. "k7mq-x3vt-9pbe" (~62 bits). */
+export function generateTempPassword() {
+  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
+  const chars = Array.from({ length: 12 }, () => alphabet[randomInt(alphabet.length)])
+  return [0, 4, 8].map((i) => chars.slice(i, i + 4).join("")).join("-")
 }
 
 export async function hashPassword(password: string): Promise<string> {

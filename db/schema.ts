@@ -43,6 +43,7 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     name: text("name").notNull(),
     isSuperadmin: boolean("is_superadmin").notNull().default(false), // você, dono da plataforma
+    mustChangePassword: boolean("must_change_password").notNull().default(false), // senha provisória
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`)],

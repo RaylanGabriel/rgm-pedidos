@@ -6,6 +6,8 @@ export type FormState = {
   message?: string
   error?: string
   fieldErrors?: Record<string, string | undefined>
+  /** Valor a mostrar uma única vez (ex.: senha provisória). */
+  secret?: string
 }
 
 export function zodErrorState(error: z.ZodError): FormState {

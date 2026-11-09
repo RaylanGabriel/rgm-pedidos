@@ -1,22 +1,13 @@
 import Link from "next/link"
-import { headers } from "next/headers"
 import QRCode from "qrcode"
 import { ArrowLeft, Download, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { requireOwner } from "@/lib/auth/session"
+import { siteUrl } from "@/lib/site-url"
 import { SettingsForm } from "./settings-form"
 
 export const metadata = { title: "Configurações" }
-
-/** Endereço público do site (variável de ambiente em produção; senão, o host da requisição). */
-async function siteUrl() {
-  if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/$/, "")
-  const h = await headers()
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")
-  return `${proto}://${host}`
-}
 
 export default async function ConfiguracoesPage() {
   const { store } = await requireOwner()

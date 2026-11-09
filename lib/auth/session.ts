@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { cache } from "react"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import { and, eq, gt } from "drizzle-orm"
+import { and, eq, gt, ne } from "drizzle-orm"
 import { db } from "@/db"
 import { sessions, storeMembers, stores, users } from "@/db/schema"
 
@@ -45,7 +45,13 @@ export const getSession = cache(async () => {
     .select({
       sessionId: sessions.id,
       activeStoreId: sessions.activeStoreId,
-      user: { id: users.id, email: users.email, name: users.name, isSuperadmin: users.isSuperadmin },
+      user: {
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        isSuperadmin: users.isSuperadmin,
+        mustChangePassword: users.mustChangePassword,
+      },
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
@@ -62,13 +68,38 @@ export async function requireSession() {
   return session
 }
 
+/** Como requireSession(), mas manda trocar a senha provisória antes de usar o painel. */
+async function requireReadySession() {
+  const session = await requireSession()
+  if (session.user.mustChangePassword) redirect("/admin/conta")
+  return session
+}
+
+/** Só para o dono da plataforma (você). */
+export async function requireSuperadmin() {
+  const session = await requireReadySession()
+  if (!session.user.isSuperadmin) redirect("/admin")
+  return session
+}
+
+/** Troca a loja ativa da sessão atual (o acesso é conferido de novo em requireStore). */
+export async function setActiveStore(storeId: string) {
+  const session = await requireSession()
+  await db.update(sessions).set({ activeStoreId: storeId }).where(eq(sessions.id, session.sessionId))
+}
+
+/** Encerra as outras sessões do usuário (ex.: depois de trocar a senha). */
+export async function deleteOtherSessions(userId: string, keepSessionId: string) {
+  await db.delete(sessions).where(and(eq(sessions.userId, userId), ne(sessions.id, keepSessionId)))
+}
+
 /**
  * Exige usuário logado E com acesso à loja ativa da sessão.
  * Use em toda página/ação do painel: o `store.id` retornado é o filtro de todas as consultas.
  */
 export const requireStore = cache(async () => {
-  const session = await requireSession()
-  if (!session.activeStoreId) redirect("/admin/sem-loja")
+  const session = await requireReadySession()
+  if (!session.activeStoreId) redirect(session.user.isSuperadmin ? "/admin/lojas" : "/admin/sem-loja")
 
   const [row] = await db
     .select({ store: stores, role: storeMembers.role })
@@ -79,8 +110,16 @@ export const requireStore = cache(async () => {
 
   // Precisa ser membro da loja, ou superadmin da plataforma
   if (!row || (!row.role && !session.user.isSuperadmin)) redirect("/admin/sem-loja")
+  // Loja suspensa pela plataforma: só o superadmin entra
+  if (!row.store.active && !session.user.isSuperadmin) redirect("/admin/sem-loja?suspensa=1")
 
-  return { user: session.user, store: row.store, role: row.role ?? ("owner" as const) }
+  return {
+    user: session.user,
+    store: row.store,
+    role: row.role ?? ("owner" as const),
+    /** Superadmin dentro de uma loja da qual não é membro (modo suporte). */
+    isSupport: !row.role,
+  }
 })
 
 /** Como requireStore(), mas só para o dono da loja (ou superadmin). Funcionário vai para o painel. */

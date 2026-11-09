@@ -22,6 +22,13 @@
       "when": 1794245103078,
       "tag": "0002_create_order_fn",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794266582528,
+      "tag": "0003_must_change_password",
+      "breakpoints": true
     }
   ]
 }

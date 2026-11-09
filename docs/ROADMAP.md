@@ -14,14 +14,14 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - Acompanhamento público por token, painel da cozinha, relatórios, editor de cardápio, configurações + QR code.
 - Deploy: Vercel (`main` = produção, branches = preview).
 
-## 🔨 1. Lembrar os dados do cliente no aparelho
+## ✅ 1. Lembrar os dados do cliente no aparelho
 **Objetivo:** quem já pediu não digita tudo de novo. Sem login.
 - Salva nome, WhatsApp, forma de receber, endereço e pagamento no `localStorage` (chave `customer:v1`),
   só depois de um pedido bem-sucedido e se "Lembrar meus dados" estiver marcado (padrão: marcado).
 - Checkout já abre preenchido, com "Não é você? Apagar dados" (celular compartilhado).
 - Nada vai para o servidor além do que já ia no pedido.
 
-## ⏳ 2. Painel do super admin (criar lojas para clientes)
+## 🔨 2. Painel do super admin (criar lojas para clientes)
 **Objetivo:** criar a loja de um cliente sem terminal/SQL.
 - `/admin/lojas` (só `is_superadmin`): lista de lojas, criar loja + dono num formulário,
   ativar/desativar loja, "entrar como" (trocar `active_store_id` da sessão) para dar suporte.
