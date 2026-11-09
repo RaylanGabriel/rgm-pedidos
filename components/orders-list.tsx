@@ -37,7 +37,7 @@ const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
 
 function printOrder(order: OrderWithItemsView, storeName: string) {
-  const w = window.open("", "_blank", "width=400,height=600")
+  const w = window.open("", "_blank", "width=260,height=500")
   if (!w) return
   const e = escapeHtml
   const items = order.items
@@ -52,12 +52,15 @@ function printOrder(order: OrderWithItemsView, storeName: string) {
 
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido #${order.orderNumber}</title>
     <style>
-      body{font-family:'Courier New',monospace;padding:16px;max-width:300px;margin:0 auto;font-size:13px}
-      h1{font-size:18px;margin:0;text-align:center} .num{font-size:28px;text-align:center;margin:6px 0 12px}
-      .row{display:flex;justify-content:space-between;gap:8px} .item{border-bottom:1px dashed #999;padding:6px 0}
-      .extra{padding-left:12px;font-size:12px} .total{border-top:2px solid #000;margin-top:8px;padding-top:8px;font-size:16px;font-weight:bold}
-      .box{margin-top:10px;padding:8px;border:1px solid #000} p{margin:2px 0}
-      @media print{body{padding:0}}
+      /* Impressora térmica 58mm (área útil ~48mm) */
+      *{margin:0;padding:0;box-sizing:border-box}
+      @page{size:58mm auto;margin:0}
+      body{font-family:'Courier New','Lucida Console',monospace;width:48mm;padding:2mm;font-size:10px;line-height:1.25;color:#000;background:#fff}
+      h1{font-size:12px;text-align:center} .num{font-size:20px;text-align:center;margin:1mm 0 2mm}
+      .row{display:flex;justify-content:space-between;gap:2mm} .item{border-bottom:1px dashed #000;padding:1mm 0}
+      .extra{padding-left:2mm;font-size:9px} .total{border-top:1px dashed #000;margin-top:2mm;padding-top:2mm;font-size:12px;font-weight:bold}
+      .box{margin-top:2mm;padding:1mm;border:1px dashed #000;font-size:9px} p{margin:1px 0}
+      @media print{body{padding:1mm}}
     </style></head><body>
     <h1>${e(storeName)}</h1>
     <div class="num"><strong>#${order.orderNumber}</strong></div>
