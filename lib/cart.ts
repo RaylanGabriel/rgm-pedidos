@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { PAYMENT_LABEL, TYPE_LABEL, type OrderType, type PaymentMethod } from "@/lib/order-shared"
 
 /**
  * Carrinho do cliente, guardado no localStorage por loja (chave cart:<slug>).
@@ -91,6 +92,57 @@ export function useCart(slug: string, menu: MenuLike) {
     setQuantity: (index: number, quantity: number) =>
       update((p) => p.map((l, i) => (i === index ? { ...l, quantity: Math.min(20, Math.max(1, quantity)) } : l))),
     clear: () => update(() => []),
+  }
+}
+
+// ---------- Dados do cliente lembrados no aparelho ----------
+/**
+ * Nome, WhatsApp, forma de receber, endereço e pagamento do último pedido.
+ * Fica só neste navegador (vale para todas as lojas) e o cliente pode apagar a qualquer momento.
+ */
+export interface SavedCustomer {
+  customerName: string
+  customerPhone: string
+  type: OrderType
+  deliveryAddress: string
+  paymentMethod: PaymentMethod
+}
+
+const CUSTOMER_KEY = "customer:v1"
+
+const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "")
+
+export function loadCustomer(): SavedCustomer | null {
+  const raw = read<Record<string, unknown> | null>(CUSTOMER_KEY, null)
+  if (!raw || typeof raw !== "object") return null
+  const customerName = str(raw.customerName, 100).trim()
+  if (!customerName) return null
+  const type = str(raw.type, 20)
+  const paymentMethod = str(raw.paymentMethod, 20)
+  return {
+    customerName,
+    customerPhone: str(raw.customerPhone, 20),
+    type: (type in TYPE_LABEL ? type : "pickup") as OrderType,
+    deliveryAddress: str(raw.deliveryAddress, 300),
+    paymentMethod: (paymentMethod in PAYMENT_LABEL ? paymentMethod : "pix") as PaymentMethod,
+  }
+}
+
+export function saveCustomer(c: SavedCustomer) {
+  write(CUSTOMER_KEY, {
+    customerName: c.customerName.trim(),
+    customerPhone: c.customerPhone.trim(),
+    type: c.type,
+    deliveryAddress: c.deliveryAddress.trim(),
+    paymentMethod: c.paymentMethod,
+  })
+}
+
+export function forgetCustomer() {
+  try {
+    localStorage.removeItem(CUSTOMER_KEY)
+  } catch {
+    /* sem armazenamento: nada a apagar */
   }
 }
 

@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, UserCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CartSummary } from "@/components/order/cart-summary"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
-import { saveRecentOrder, useCart } from "@/lib/cart"
+import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, useCart } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
 import { placeOrder } from "./actions"
 
@@ -20,6 +20,22 @@ export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuVi
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const placed = useRef(false) // pedido enviado: não redirecionar para o cardápio ao esvaziar o carrinho
+  const [remember, setRemember] = useState(true)
+  const [usingSaved, setUsingSaved] = useState(false)
+
+  // Preenche com os dados lembrados neste aparelho
+  useEffect(() => {
+    const saved = loadCustomer()
+    if (!saved) return
+    setFields((f) => ({ ...f, ...saved }))
+    setUsingSaved(true)
+  }, [])
+
+  const forget = () => {
+    forgetCustomer()
+    setFields(emptyOrderFields)
+    setUsingSaved(false)
+  }
 
   // Carrinho vazio (ou itens que saíram do cardápio) → volta para o cardápio
   useEffect(() => {
@@ -48,6 +64,8 @@ export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuVi
         return
       }
       placed.current = true
+      if (remember) saveCustomer(fields)
+      else forgetCustomer()
       saveRecentOrder(store.slug, { token: result.publicToken, number: result.orderNumber, createdAt: new Date().toISOString() })
       router.push(`/pedido/${result.publicToken}`)
       cart.clear()
@@ -83,8 +101,33 @@ export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuVi
           <CardDescription>Usamos só para identificar e avisar sobre o seu pedido.</CardDescription>
         </CardHeader>
         <CardContent>
+          {usingSaved && (
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-primary" aria-hidden />
+                Preenchemos com os dados do seu último pedido.
+              </span>
+              <button type="button" onClick={forget} disabled={pending} className="font-medium underline underline-offset-2 hover:text-primary">
+                Não é você? Apagar dados
+              </button>
+            </div>
+          )}
           <form onSubmit={submit} className="space-y-6">
             <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} />
+
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                disabled={pending}
+                className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+              />
+              <span>
+                <span className="font-medium">Lembrar meus dados neste aparelho</span>
+                <span className="block text-muted-foreground">Na próxima compra o formulário já vem preenchido. Desmarque em celular compartilhado.</span>
+              </span>
+            </label>
 
             {error && (
               <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive">
