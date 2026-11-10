@@ -2,9 +2,10 @@
  * Preenche uma loja com o cardápio de demonstração (categorias, itens e ilustrações no Vercel Blob).
  *
  * Uso:
- *   npm run demo:seed -- --store mr-smash [--cover]
+ *   npm run demo:seed -- --store mr-smash [--cover | --only-cover]
  *
- * --cover  também coloca uma capa ilustrada na loja (troca a atual)
+ * --cover       também coloca uma capa ilustrada na loja (troca a atual)
+ * --only-cover  só coloca a capa (não mexe no cardápio)
  *
  * - Categorias e itens são encontrados pelo nome: os que já existem são atualizados (descrição, preço,
  *   ordem e imagem), os que faltam são criados. Nada é apagado.
@@ -23,7 +24,11 @@ import { DEMO_FEATURED, DEMO_MENU } from "./demo-menu"
 const isOurBlob = (url: string | null) => !!url && URL.canParse(url) && new URL(url).hostname.endsWith(".public.blob.vercel-storage.com")
 
 async function main() {
-  const { values } = parseArgs({ options: { store: { type: "string" }, cover: { type: "boolean", default: false } } })
+  const { values } = parseArgs({ options: {
+      store: { type: "string" },
+      cover: { type: "boolean", default: false },
+      "only-cover": { type: "boolean", default: false },
+    }, })
   if (!values.store) throw new Error("Informe --store <slug>")
   if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("BLOB_READ_WRITE_TOKEN ausente no .env.local")
 
@@ -40,6 +45,14 @@ async function main() {
     })
     return { url: blob.url, kb: Math.round(webp.length / 1024) }
   }
+
+  const setCover = async () => {
+    const c = await upload(cover(store.primaryColor), "cover", 1800, 560)
+    await db.update(stores).set({ coverUrl: c.url }).where(eq(stores.id, store.id))
+    if (isOurBlob(store.coverUrl)) await del(store.coverUrl!)
+    console.log(`capa        ${c.kb} KB`)
+  }
+  if (values["only-cover"]) return setCover()
 
   // Categoria de destaque fica em primeiro; as do cardápio vêm depois
   const findCategory = (name: string) =>
@@ -101,12 +114,7 @@ async function main() {
   }
   console.log(`destaque    ${DEMO_FEATURED.name}: ${DEMO_FEATURED.items.join(", ")}`)
 
-  if (values.cover) {
-    const c = await upload(cover(store.primaryColor), "cover", 1800, 560)
-    await db.update(stores).set({ coverUrl: c.url }).where(eq(stores.id, store.id))
-    if (isOurBlob(store.coverUrl)) await del(store.coverUrl!)
-    console.log(`capa        ${c.kb} KB`)
-  }
+  if (values.cover) await setCover()
 }
 
 main().catch((err) => {
