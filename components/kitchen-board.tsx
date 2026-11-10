@@ -261,15 +261,7 @@ export function KitchenBoard({
         </div>
       </header>
 
-      {awaitingPayment.length > 0 && (
-        <div role="status" className="border-b bg-sky-50 px-3 py-2 text-sm text-sky-950 dark:bg-sky-950 dark:text-sky-100 sm:px-4">
-          <span className="font-semibold">💳 Aguardando Pix ({awaitingPayment.length}):</span>{" "}
-          {awaitingPayment
-            .map((o) => `#${o.orderNumber} ${o.customerName.split(" ")[0]} ${formatBRL(o.total)}${o.pixExpiresAt ? ` (vence ${formatTimeSP(o.pixExpiresAt)})` : ""}`)
-            .join(" · ")}
-          <span className="block text-xs opacity-80">Entram em Novos sozinhos quando o pagamento cair. Se vencer, são cancelados.</span>
-        </div>
-      )}
+      {awaitingPayment.length > 0 && <AwaitingPix orders={awaitingPayment} now={now} />}
 
       {error && (
         <div role="alert" className="mx-3 mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive sm:mx-4">
@@ -489,5 +481,56 @@ function OrderCard({
         </div>
       </div>
     </article>
+  )
+}
+
+/**
+ * Pix gerado e ainda não pago: uma linha só (quantidade + valor + o que vence primeiro), que abre a lista ao tocar.
+ * Não ocupa o quadro — são pedidos que talvez nem sejam pagos.
+ */
+const itemCount = (o: OrderWithItemsView) => o.items.reduce((n, i) => n + i.quantity, 0)
+
+function AwaitingPix({ orders, now }: { orders: OrderWithItemsView[]; now: number }) {
+  const [open, setOpen] = useState(false)
+  const list = [...orders].sort((a, b) => (a.pixExpiresAt ?? "").localeCompare(b.pixExpiresAt ?? ""))
+  const total = list.reduce((s, o) => s + o.total, 0)
+  const next = list[0]?.pixExpiresAt
+  const minsLeft = (iso: string | null) => (iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - now) / 60_000)) : null)
+  return (
+    <div className="border-b bg-sky-50 text-sky-950 dark:bg-sky-950 dark:text-sky-100">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm sm:px-4"
+      >
+        <span aria-hidden>💳</span>
+        <span className="min-w-0 flex-1 truncate">
+          <strong>
+            {list.length} aguardando Pix
+          </strong>{" "}
+          · {formatBRL(total)}
+          {next && <span className="opacity-80"> · próximo vence em {minsLeft(next)} min</span>}
+        </span>
+        <span className="shrink-0 text-xs font-semibold underline underline-offset-2">{open ? "Esconder" : "Ver"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 sm:px-4">
+          <ul className="max-h-60 divide-y divide-sky-200 overflow-y-auto rounded-lg bg-white/70 text-sm dark:divide-sky-900 dark:bg-black/20">
+            {list.map((o) => (
+              <li key={o.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="min-w-0 truncate">
+                  <strong>#{o.orderNumber}</strong> {o.customerName} · {itemCount(o)} {itemCount(o) === 1 ? "item" : "itens"}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {formatBRL(o.total)} <span className="text-xs opacity-75">· {minsLeft(o.pixExpiresAt)} min</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs opacity-80">Entram em Novos sozinhos quando o pagamento cair. Se vencer, são cancelados.</p>
+        </div>
+      )}
+    </div>
   )
 }
