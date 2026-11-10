@@ -136,6 +136,28 @@ export function changeText(o: { paymentMethod: PaymentMethod; changeFor: number 
   return back > 0 ? `Troco para ${formatBRL(o.changeFor)} (levar ${formatBRL(back)})` : null
 }
 
+// ---------- Campos do cliente ----------
+/**
+ * Telefone enquanto digita: só números, no formato (42) 98434-7835 (celular) ou (42) 3434-7835 (fixo).
+ * Aceita colar "+55 42 98434-7835" (tira o 55 do país).
+ */
+export function maskPhone(v: string) {
+  let d = v.replace(/\D/g, "")
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2)
+  d = d.slice(0, 11)
+  if (d.length === 0) return ""
+  if (d.length <= 2) return `(${d}`
+  const ddd = d.slice(0, 2)
+  const rest = d.slice(2)
+  const split = rest[0] === "9" ? 5 : 4 // celular (começa com 9) tem 9 dígitos; fixo tem 8
+  if (rest.length <= split) return `(${ddd}) ${rest}` // sem traço sobrando: apagar funciona normal
+  return `(${ddd}) ${rest.slice(0, split)}-${rest.slice(split)}`
+}
+
+/** Nome: só letras (com acento), espaço, apóstrofo, hífen e ponto — ex.: "Ana-Maria D'Ávila Jr." */
+export const NAME_ALLOWED = /^[\p{L}\s'.-]+$/u
+export const cleanName = (v: string) => v.replace(/[^\p{L}\s'.-]/gu, "").replace(/\s{2,}/g, " ").replace(/^\s+/, "")
+
 // ---------- Entrega ----------
 /** Regras de entrega da loja (públicas: vão para o navegador montar o checkout). */
 export interface DeliveryConfig {
@@ -194,7 +216,13 @@ export const orderInputSchema = z
     customerName: z
       .string()
       .transform(sanitizeString)
-      .pipe(z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(100, "Nome muito longo")),
+      .pipe(
+        z
+          .string()
+          .min(2, "Nome deve ter no mínimo 2 caracteres")
+          .max(100, "Nome muito longo")
+          .regex(NAME_ALLOWED, "Use só letras no nome"),
+      ),
     customerPhone: z
       .string()
       .optional()

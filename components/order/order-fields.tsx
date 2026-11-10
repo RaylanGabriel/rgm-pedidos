@@ -6,7 +6,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
   deliveryAvailable,
+  cleanName,
   formatBRL,
+  maskPhone,
   parseMoneyBR,
   PAYMENT_LABEL,
   TYPE_LABEL,
@@ -232,7 +234,7 @@ export function OrderFields({
           <Input
             id="customerName"
             value={value.customerName}
-            onChange={(e) => set("customerName", e.target.value)}
+            onChange={(e) => set("customerName", cleanName(e.target.value))}
             maxLength={100}
             autoComplete="name"
             placeholder="Como chamamos você no balcão"
@@ -252,10 +254,10 @@ export function OrderFields({
             id="customerPhone"
             type="tel"
             inputMode="tel"
-            placeholder="(11) 98765-4321"
-            value={value.customerPhone}
-            onChange={(e) => set("customerPhone", e.target.value)}
-            maxLength={20}
+            placeholder="(42) 98434-7835"
+            value={maskPhone(value.customerPhone)}
+            onChange={(e) => set("customerPhone", maskPhone(e.target.value))}
+            maxLength={16}
             autoComplete="tel"
             required={phoneRequired}
             disabled={disabled}
