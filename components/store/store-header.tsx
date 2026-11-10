@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
-import { Bike, Clock, MessageCircle, ShoppingBag, Store as StoreIcon } from "lucide-react"
+import { Bike, Clock, MapPin, MessageCircle, ShoppingBag, Store as StoreIcon } from "lucide-react"
+import { formatPhone, mapsLink, whatsappLink } from "@/lib/links"
 import type { PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, type DeliveryConfig } from "@/lib/order-shared"
 
@@ -14,7 +15,8 @@ function deliveryLabel(d: DeliveryConfig) {
 
 /** Topo do cardápio: capa na cor da loja, logo, nome, status e informações rápidas. */
 export function StoreHero({ store, delivery }: { store: PublicStore; delivery: DeliveryConfig }) {
-  const phoneDigits = store.phone?.replace(/\D/g, "")
+  const whats = whatsappLink(store.phone)
+  const map = mapsLink(store.address)
   const chips = [
     { icon: Clock, text: `~${store.avgPrepMinutes} min` },
     { icon: deliveryAvailable(delivery) ? Bike : ShoppingBag, text: deliveryLabel(delivery) },
@@ -67,10 +69,18 @@ export function StoreHero({ store, delivery }: { store: PublicStore; delivery: D
               {text}
             </li>
           ))}
-          {phoneDigits && (
+          {map && (
+            <li>
+              <a href={map} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-foreground hover:underline">
+                <MapPin className="h-4 w-4" aria-hidden />
+                {store.address}
+              </a>
+            </li>
+          )}
+          {whats && (
             <li>
               <a
-                href={`https://wa.me/55${phoneDigits}`}
+                href={whats}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 font-medium text-primary hover:underline"
@@ -86,23 +96,27 @@ export function StoreHero({ store, delivery }: { store: PublicStore; delivery: D
   )
 }
 
+/** Cabeçalho compacto (checkout, acompanhamento): logo + nome, volta para o cardápio. */
 export function StoreHeader({ store }: { store: Pick<PublicStore, "slug" | "name" | "logoUrl" | "isOpen"> }) {
   return (
-    <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-        <Link href={`/loja/${store.slug}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity min-w-0">
-          {store.logoUrl && (
-            <div className="relative w-14 h-14 md:w-16 md:h-16 shrink-0">
-              <Image src={store.logoUrl} alt={`Logo ${store.name}`} fill className="object-contain" />
-            </div>
-          )}
-          <span className="text-xl font-bold text-foreground truncate">{store.name}</span>
+    <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+      <div className="container mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+        <Link href={`/loja/${store.slug}`} className="flex min-w-0 items-center gap-3 rounded-xl transition hover:opacity-80">
+          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border bg-white">
+            {store.logoUrl ? (
+              <Image src={store.logoUrl} alt="" fill sizes="40px" className="object-contain p-0.5" />
+            ) : (
+              <StoreIcon className="absolute inset-0 m-auto h-5 w-5 text-muted-foreground" aria-hidden />
+            )}
+          </span>
+          <span className="truncate font-bold">{store.name}</span>
         </Link>
         <span
-          className={`text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${
-            store.isOpen ? "bg-green-500/15 text-green-700 dark:text-green-400" : "bg-muted text-muted-foreground"
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+            store.isOpen ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-muted text-muted-foreground"
           }`}
         >
+          <span className={`h-2 w-2 rounded-full ${store.isOpen ? "bg-green-600" : "bg-muted-foreground"}`} aria-hidden />
           {store.isOpen ? "Aberto" : "Fechado"}
         </span>
       </div>
@@ -111,15 +125,15 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "slug" | "name
 }
 
 export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phone"> }) {
-  const phoneDigits = store.phone?.replace(/\D/g, "")
+  const whats = whatsappLink(store.phone)
   return (
-    <footer className="mt-16 border-t border-border/40 bg-card">
-      <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground space-y-2">
-        {phoneDigits && (
+    <footer className="mt-16 border-t bg-card">
+      <div className="container mx-auto space-y-2 px-4 py-8 text-center text-sm text-muted-foreground">
+        {whats && (
           <p>
             Dúvidas? Fale com a loja:{" "}
-            <a className="text-primary font-medium hover:underline" href={`https://wa.me/55${phoneDigits}`} target="_blank" rel="noopener noreferrer">
-              WhatsApp {store.phone}
+            <a className="font-medium text-primary hover:underline" href={whats} target="_blank" rel="noopener noreferrer">
+              WhatsApp {formatPhone(store.phone)}
             </a>
           </p>
         )}

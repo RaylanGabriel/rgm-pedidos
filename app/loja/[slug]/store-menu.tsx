@@ -6,6 +6,7 @@ import { ChevronRight, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BottomSheet } from "@/components/order/bottom-sheet"
 import { CartSummary, cartTotal } from "@/components/order/cart-summary"
+import { CartSuggestions } from "@/components/order/cart-suggestions"
 import { ItemPicker } from "@/components/order/item-picker"
 import { useCart, useRecentOrders } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
@@ -75,6 +76,7 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
           ) : (
             <div className="space-y-4">
               <CartSummary lines={cart.lines} onQuantity={cart.setQuantity} onRemove={cart.remove} />
+              <CartSuggestions menu={menu} lines={cart.lines} onAdd={cart.add} max={4} />
               {checkoutButton}
             </div>
           )}
@@ -105,8 +107,9 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
         title="Seu pedido"
         footer={checkoutButton}
       >
-        <div className="px-5 pb-5">
+        <div className="space-y-5 px-5 pb-5">
           <CartSummary lines={cart.lines} onQuantity={cart.setQuantity} onRemove={cart.remove} />
+          <CartSuggestions menu={menu} lines={cart.lines} onAdd={cart.add} />
         </div>
       </BottomSheet>
     </div>

@@ -17,6 +17,10 @@ const settingsSchema = z.object({
     .transform((v) => v.replace(/\D/g, ""))
     .pipe(z.string().refine((v) => v === "" || (v.length >= 10 && v.length <= 13), "Telefone inválido (com DDD)"))
     .transform((v) => (v === "" ? null : v)),
+  address: z
+    .string()
+    .max(200, "Endereço muito longo")
+    .transform((v) => v.replace(/\s+/g, " ").trim() || null),
   primaryColor: z.string().refine(isHexColor, "Cor inválida"),
   avgPrepMinutes: z.coerce.number().int("Use minutos inteiros").min(1, "Mínimo 1 minuto").max(120, "Máximo 120 minutos"),
 })
@@ -28,6 +32,7 @@ export async function saveSettingsAction(_prev: FormState, fd: FormData): Promis
   const parsed = settingsSchema.safeParse({
     name: formText(fd, "name"),
     phone: formText(fd, "phone"),
+    address: formText(fd, "address"),
     primaryColor: formText(fd, "primaryColor").toLowerCase(),
     avgPrepMinutes: formText(fd, "avgPrepMinutes"),
   })

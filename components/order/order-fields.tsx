@@ -1,5 +1,6 @@
 "use client"
 
+import { Check } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,47 +35,67 @@ export const emptyOrderFields: OrderFieldsValue = {
 }
 
 const selectClass =
-  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:border-destructive dark:bg-input/30"
+  "h-11 w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:border-destructive dark:bg-input/30"
 
+/** Grupo de opções em botões (melhor que lista quando são poucas: tudo fica visível). */
 function Choice<T extends string>({
   name,
   value,
   options,
+  hints = {},
   onChange,
   disabled,
+  label,
 }: {
   name: string
   value: T
   options: Record<T, string>
+  hints?: Partial<Record<T, string>>
   onChange: (v: T) => void
   disabled?: boolean
+  label: string
 }) {
   return (
-    <div className="flex flex-wrap gap-2" role="radiogroup">
-      {(Object.keys(options) as T[]).map((opt) => (
-        <label
-          key={opt}
-          className={`cursor-pointer rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
-            value === opt ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-          }`}
-        >
-          <input
-            type="radio"
-            name={name}
-            value={opt}
-            checked={value === opt}
-            onChange={() => onChange(opt)}
-            disabled={disabled}
-            className="sr-only"
-          />
-          {options[opt]}
-        </label>
-      ))}
+    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={label}>
+      {(Object.keys(options) as T[]).map((opt) => {
+        const on = value === opt
+        return (
+          <label
+            key={opt}
+            className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 px-3.5 py-2 text-sm font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 ${
+              on ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/40"
+            }`}
+          >
+            <input type="radio" name={name} value={opt} checked={on} onChange={() => onChange(opt)} disabled={disabled} className="sr-only" />
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                on ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"
+              }`}
+              aria-hidden
+            >
+              {on && <Check className="h-3 w-3" strokeWidth={3.5} />}
+            </span>
+            <span>
+              {options[opt]}
+              {hints[opt] && <span className="block text-xs font-normal text-muted-foreground">{hints[opt]}</span>}
+            </span>
+          </label>
+        )
+      })}
     </div>
   )
 }
 
-/** Campos de dados do pedido (cliente, tipo, pagamento, observações). */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="space-y-4">
+      <legend className="mb-3 text-base font-bold">{title}</legend>
+      {children}
+    </fieldset>
+  )
+}
+
+/** Campos do pedido em blocos: como vai receber (define a taxa) → seus dados → pagamento → observações. */
 export function OrderFields({
   value,
   onChange,
@@ -91,133 +112,184 @@ export function OrderFields({
   delivery: DeliveryConfig
 }) {
   const canDeliver = deliveryAvailable(delivery)
-  const typeOptions = canDeliver
+  const typeLabels = canDeliver
     ? TYPE_LABEL
     : (Object.fromEntries(Object.entries(TYPE_LABEL).filter(([k]) => k !== "delivery")) as Record<OrderType, string>)
-  const typeLabels = { ...typeOptions }
-  if (canDeliver && delivery.pricing === "fixed" && delivery.fixedFee > 0) typeLabels.delivery = `Entrega (+ ${formatBRL(delivery.fixedFee)})`
+  const typeHints: Partial<Record<OrderType, string>> = {}
+  if (canDeliver) {
+    const minZone = Math.min(...delivery.zones.map((z) => z.fee))
+    typeHints.delivery =
+      delivery.pricing === "fixed"
+        ? delivery.fixedFee > 0
+          ? `+ ${formatBRL(delivery.fixedFee)}`
+          : "grátis"
+        : minZone > 0
+          ? `a partir de ${formatBRL(minZone)}`
+          : "conforme o bairro"
+  }
   const set = <K extends keyof OrderFieldsValue>(k: K, v: OrderFieldsValue[K]) => onChange({ ...value, [k]: v })
   const err = (k: string) =>
     errors[k] ? (
-      <p id={`${k}-error`} className="text-sm text-destructive mt-1">
+      <p id={`${k}-error`} className="mt-1 text-sm text-destructive">
         {errors[k]}
       </p>
     ) : null
+  const input = "h-11 text-base"
+  // Poucos bairros: botões (mostram tudo de uma vez); muitos: lista
+  const zonesAsButtons = delivery.zones.length > 0 && delivery.zones.length <= 6
 
   return (
-    <div className="space-y-5">
-      <div>
-        <Label htmlFor="customerName">Nome *</Label>
-        <Input
-          id="customerName"
-          value={value.customerName}
-          onChange={(e) => set("customerName", e.target.value)}
-          maxLength={100}
-          autoComplete="name"
-          required
-          disabled={disabled}
-          aria-invalid={!!errors.customerName}
-          aria-describedby={errors.customerName ? "customerName-error" : undefined}
-        />
-        {err("customerName")}
-      </div>
-
-      <div>
-        <Label htmlFor="customerPhone">WhatsApp{phoneRequired ? " *" : " (opcional)"}</Label>
-        <Input
-          id="customerPhone"
-          type="tel"
-          inputMode="tel"
-          placeholder="(11) 98765-4321"
-          value={value.customerPhone}
-          onChange={(e) => set("customerPhone", e.target.value)}
-          maxLength={20}
-          autoComplete="tel"
-          required={phoneRequired}
-          disabled={disabled}
-          aria-invalid={!!errors.customerPhone}
-          aria-describedby={errors.customerPhone ? "customerPhone-error" : undefined}
-        />
-        {err("customerPhone")}
-      </div>
-
-      <div>
-        <p className="text-sm font-medium mb-2">Como vai receber?</p>
-        <Choice name="type" value={value.type} options={typeLabels} onChange={(v) => set("type", v)} disabled={disabled} />
-        {!canDeliver && <p className="text-xs text-muted-foreground mt-2">Esta loja não está fazendo entregas no momento.</p>}
+    <div className="space-y-8">
+      <Section title="Como você quer receber?">
+        <Choice label="Como vai receber" name="type" value={value.type} options={typeLabels} hints={typeHints} onChange={(v) => set("type", v)} disabled={disabled} />
+        {!canDeliver && <p className="text-sm text-muted-foreground">Esta loja não está fazendo entregas no momento.</p>}
         {canDeliver && value.type === "delivery" && delivery.minOrder > 0 && (
-          <p className="text-xs text-muted-foreground mt-2">Pedido mínimo para entrega: {formatBRL(delivery.minOrder)}</p>
+          <p className="text-sm text-muted-foreground">Pedido mínimo para entrega: {formatBRL(delivery.minOrder)}</p>
         )}
-      </div>
 
-      {value.type === "delivery" && delivery.pricing === "zones" && (
+        {value.type === "delivery" && delivery.pricing === "zones" && (
+          <div>
+            <Label htmlFor="deliveryZoneId" className="mb-2">
+              Bairro *
+            </Label>
+            {zonesAsButtons ? (
+              <Choice
+                label="Bairro"
+                name="deliveryZoneId"
+                value={value.deliveryZoneId}
+                options={Object.fromEntries(delivery.zones.map((z) => [z.id, z.name]))}
+                hints={Object.fromEntries(delivery.zones.map((z) => [z.id, z.fee > 0 ? formatBRL(z.fee) : "grátis"]))}
+                onChange={(v) => set("deliveryZoneId", v)}
+                disabled={disabled}
+              />
+            ) : (
+              <select
+                id="deliveryZoneId"
+                value={value.deliveryZoneId}
+                onChange={(e) => set("deliveryZoneId", e.target.value)}
+                required
+                disabled={disabled}
+                className={selectClass}
+                aria-invalid={!!errors.deliveryZoneId}
+                aria-describedby={errors.deliveryZoneId ? "deliveryZoneId-error" : "deliveryZoneId-hint"}
+              >
+                <option value="">Selecione o seu bairro</option>
+                {delivery.zones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.name} — {z.fee > 0 ? formatBRL(z.fee) : "grátis"}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.deliveryZoneId ? (
+              err("deliveryZoneId")
+            ) : (
+              <p id="deliveryZoneId-hint" className="mt-2 text-xs text-muted-foreground">
+                Não achou seu bairro? A loja ainda não entrega aí: escolha retirada.
+              </p>
+            )}
+          </div>
+        )}
+
+        {value.type === "delivery" && (
+          <div>
+            <Label htmlFor="deliveryAddress" className="mb-1.5">
+              Endereço de entrega *
+            </Label>
+            <Textarea
+              id="deliveryAddress"
+              rows={2}
+              value={value.deliveryAddress}
+              onChange={(e) => set("deliveryAddress", e.target.value)}
+              maxLength={300}
+              autoComplete="street-address"
+              placeholder={delivery.pricing === "zones" ? "Rua, número, complemento e ponto de referência" : "Rua, número, bairro e ponto de referência"}
+              disabled={disabled}
+              className="text-base"
+              aria-invalid={!!errors.deliveryAddress}
+              aria-describedby={errors.deliveryAddress ? "deliveryAddress-error" : undefined}
+            />
+            {err("deliveryAddress")}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Seus dados">
         <div>
-          <Label htmlFor="deliveryZoneId">Bairro *</Label>
-          <select
-            id="deliveryZoneId"
-            value={value.deliveryZoneId}
-            onChange={(e) => set("deliveryZoneId", e.target.value)}
+          <Label htmlFor="customerName" className="mb-1.5">
+            Nome *
+          </Label>
+          <Input
+            id="customerName"
+            value={value.customerName}
+            onChange={(e) => set("customerName", e.target.value)}
+            maxLength={100}
+            autoComplete="name"
+            placeholder="Como chamamos você no balcão"
             required
             disabled={disabled}
-            className={selectClass}
-            aria-invalid={!!errors.deliveryZoneId}
-            aria-describedby={errors.deliveryZoneId ? "deliveryZoneId-error" : "deliveryZoneId-hint"}
-          >
-            <option value="">Selecione o seu bairro</option>
-            {delivery.zones.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.name} — {z.fee > 0 ? formatBRL(z.fee) : "grátis"}
-              </option>
-            ))}
-          </select>
-          {errors.deliveryZoneId ? (
-            err("deliveryZoneId")
+            className={input}
+            aria-invalid={!!errors.customerName}
+            aria-describedby={errors.customerName ? "customerName-error" : undefined}
+          />
+          {err("customerName")}
+        </div>
+        <div>
+          <Label htmlFor="customerPhone" className="mb-1.5">
+            WhatsApp{phoneRequired ? " *" : <span className="font-normal text-muted-foreground"> (opcional)</span>}
+          </Label>
+          <Input
+            id="customerPhone"
+            type="tel"
+            inputMode="tel"
+            placeholder="(11) 98765-4321"
+            value={value.customerPhone}
+            onChange={(e) => set("customerPhone", e.target.value)}
+            maxLength={20}
+            autoComplete="tel"
+            required={phoneRequired}
+            disabled={disabled}
+            className={input}
+            aria-invalid={!!errors.customerPhone}
+            aria-describedby={errors.customerPhone ? "customerPhone-error" : "customerPhone-hint"}
+          />
+          {errors.customerPhone ? (
+            err("customerPhone")
           ) : (
-            <p id="deliveryZoneId-hint" className="text-xs text-muted-foreground mt-1">
-              Não achou seu bairro? A loja ainda não entrega aí: escolha retirada.
+            <p id="customerPhone-hint" className="mt-1 text-xs text-muted-foreground">
+              Para a loja falar com você se precisar.
             </p>
           )}
         </div>
-      )}
+      </Section>
 
-      {value.type === "delivery" && (
-        <div>
-          <Label htmlFor="deliveryAddress">Endereço de entrega *</Label>
-          <Textarea
-            id="deliveryAddress"
-            rows={2}
-            value={value.deliveryAddress}
-            onChange={(e) => set("deliveryAddress", e.target.value)}
-            maxLength={300}
-            autoComplete="street-address"
-            placeholder={delivery.pricing === "zones" ? "Rua, número, complemento e ponto de referência" : "Rua, número, bairro e ponto de referência"}
-            disabled={disabled}
-            aria-invalid={!!errors.deliveryAddress}
-            aria-describedby={errors.deliveryAddress ? "deliveryAddress-error" : undefined}
-          />
-          {err("deliveryAddress")}
-        </div>
-      )}
+      <Section title="Pagamento">
+        <Choice
+          label="Forma de pagamento"
+          name="paymentMethod"
+          value={value.paymentMethod}
+          options={PAYMENT_LABEL}
+          onChange={(v) => set("paymentMethod", v)}
+          disabled={disabled}
+        />
+        <p className="text-xs text-muted-foreground">O pagamento é feito direto com a loja.</p>
+      </Section>
 
-      <div>
-        <p className="text-sm font-medium mb-2">Pagamento</p>
-        <Choice name="paymentMethod" value={value.paymentMethod} options={PAYMENT_LABEL} onChange={(v) => set("paymentMethod", v)} disabled={disabled} />
-      </div>
-
-      <div>
-        <Label htmlFor="notes">Observações</Label>
+      <Section title="Observações">
         <Textarea
           id="notes"
+          aria-label="Observações"
           rows={3}
           value={value.notes}
           onChange={(e) => set("notes", e.target.value)}
           maxLength={500}
-          placeholder="Ex.: sem cebola, ponto da carne… (opcional)"
+          placeholder="Ex.: sem cebola, ponto da carne, troco para R$ 50… (opcional)"
           disabled={disabled}
+          className="text-base"
           aria-invalid={!!errors.notes}
         />
         {err("notes")}
-      </div>
+      </Section>
     </div>
   )
 }

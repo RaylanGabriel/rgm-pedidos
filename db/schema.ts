@@ -64,6 +64,7 @@ export const stores = pgTable(
     coverUrl: text("cover_url"), // capa do topo do cardápio
     primaryColor: text("primary_color").notNull().default("#f97316"),
     phone: text("phone"),
+    address: text("address"), // endereço para retirada (mostrado ao cliente)
     isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja
     active: boolean("active").notNull().default(true), // plataforma suspende (inadimplência)
     suspendedReason: text("suspended_reason"), // mensagem mostrada ao dono/equipe quando suspensa

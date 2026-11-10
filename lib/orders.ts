@@ -47,6 +47,7 @@ export function publicStore(s: StoreRow) {
     coverUrl: s.coverUrl,
     primaryColor: s.primaryColor,
     phone: s.phone,
+    address: s.address,
     isOpen: s.isOpen,
     avgPrepMinutes: s.avgPrepMinutes,
   }

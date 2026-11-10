@@ -1,13 +1,15 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { CheckCircle2, ChefHat, Clock, Package, XCircle } from "lucide-react"
+import { Bike, CheckCircle2, ChefHat, Clock, MapPin, MessageCircle, Package, ShoppingBag, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AutoRefresh } from "@/components/auto-refresh"
 import { StoreFooter, StoreHeader } from "@/components/store/store-header"
 import { brandStyle } from "@/lib/color"
+import { formatDateTimeSP, formatTimeSP } from "@/lib/dates"
+import { mapsLink, whatsappLink } from "@/lib/links"
 import { getOrderByToken } from "@/lib/orders"
 import { formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
+import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Acompanhar pedido", robots: { index: false } }
 
@@ -19,78 +21,132 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
   if (!data) notFound()
   const { order, store } = data
   const finished = order.status === "delivered" || order.status === "cancelled"
-  const currentStep = STEPS.indexOf(order.status)
+  const step = STEPS.indexOf(order.status)
+  const isDelivery = order.type === "delivery"
+  const eta = formatTimeSP(new Date(new Date(order.createdAt).getTime() + order.estimatedWaitMinutes * 60_000).toISOString())
+
+  const headline: Record<OrderStatus, { title: string; text: string }> = {
+    pending: { title: "Recebemos seu pedido!", text: `A loja já foi avisada. Previsão: por volta das ${eta}.` },
+    preparing: { title: "Seu pedido está sendo preparado", text: `Previsão: por volta das ${eta}.` },
+    ready: isDelivery
+      ? { title: "Saiu para entrega!", text: "Seu pedido está a caminho." }
+      : { title: "Pronto! Pode retirar", text: `Diga o número #${order.orderNumber} no balcão.` },
+    delivered: { title: "Pedido entregue", text: "Bom apetite! Obrigado pela preferência." },
+    cancelled: { title: "Pedido cancelado", text: "Em caso de dúvida, fale com a loja." },
+  }
+  const { title, text } = headline[order.status]
+  const Icon = order.status === "ready" && isDelivery ? Bike : STEP_ICON[order.status]
+
+  const whats = whatsappLink(store.phone, `Olá! Sobre o meu pedido #${order.orderNumber} (${order.customerName}).`)
+  const map = !isDelivery ? mapsLink(store.address) : null
 
   return (
-    <div style={brandStyle(store.primaryColor)} className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted">
+    <div style={brandStyle(store.primaryColor)} className="flex min-h-screen flex-col bg-background">
       {!finished && <AutoRefresh seconds={10} />}
       <StoreHeader store={store} />
 
       <main className="flex-1">
-        <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">Pedido</p>
-            <h1 className="text-5xl font-bold">#{order.orderNumber}</h1>
-            <p className="text-muted-foreground mt-1">{order.customerName}</p>
-          </div>
-
+        <div className="container mx-auto max-w-xl space-y-4 px-4 py-6">
           {/* Status */}
-          <Card>
-            <CardContent className="py-6">
-              {order.status === "cancelled" ? (
-                <div className="flex flex-col items-center gap-2 text-destructive" role="status">
-                  <XCircle className="w-10 h-10" />
-                  <p className="font-semibold text-lg">Pedido cancelado</p>
-                  <p className="text-sm text-muted-foreground text-center">Em caso de dúvida, fale com a loja.</p>
+          <section
+            className={cn(
+              "overflow-hidden rounded-3xl border shadow-sm",
+              order.status === "ready" ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950" : "bg-card",
+              order.status === "cancelled" && "border-destructive/30 bg-destructive/5",
+            )}
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-4 p-5">
+              <span
+                className={cn(
+                  "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
+                  order.status === "ready" ? "bg-green-600 text-white" : order.status === "cancelled" ? "bg-destructive text-white" : "bg-primary text-primary-foreground",
+                )}
+                aria-hidden
+              >
+                <Icon className="h-7 w-7" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Pedido #{order.orderNumber}</p>
+                <h1 className="text-xl font-extrabold leading-tight sm:text-2xl">{title}</h1>
+                <p className="mt-1 text-muted-foreground">{text}</p>
+              </div>
+            </div>
+
+            {order.status !== "cancelled" && (
+              <div className="px-5 pb-5">
+                <ol className="grid grid-cols-4 gap-1.5" aria-label="Andamento do pedido">
+                  {STEPS.map((s, i) => (
+                    <li key={s} aria-current={i === step ? "step" : undefined}>
+                      <span className={cn("block h-1.5 rounded-full", i <= step ? (order.status === "ready" ? "bg-green-600" : "bg-primary") : "bg-muted")} />
+                      <span className={cn("mt-1.5 block text-xs", i === step ? "font-bold" : "text-muted-foreground")}>
+                        {s === "ready" && isDelivery ? "A caminho" : STATUS_LABEL[s]}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                {!finished && <p className="mt-3 text-xs text-muted-foreground">Esta página se atualiza sozinha.</p>}
+              </div>
+            )}
+          </section>
+
+          {/* Ações: falar com a loja / onde retirar */}
+          {(whats || map || (isDelivery && order.deliveryAddress)) && (
+            <section className="space-y-3 rounded-3xl border bg-card p-5 shadow-sm">
+              {isDelivery ? (
+                <div className="flex items-start gap-3">
+                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <p className="text-sm font-semibold">Entrega em</p>
+                    <p className="text-sm text-muted-foreground">{fullAddress(order)}</p>
+                  </div>
                 </div>
               ) : (
-                <>
-                  <ol className="grid grid-cols-4 gap-2" aria-label="Andamento do pedido">
-                    {STEPS.map((step, i) => {
-                      const Icon = STEP_ICON[step]
-                      const done = i <= currentStep
-                      return (
-                        <li key={step} className="flex flex-col items-center gap-2 text-center" aria-current={i === currentStep ? "step" : undefined}>
-                          <span
-                            className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition-colors ${
-                              done ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
-                            }`}
-                          >
-                            <Icon className="w-5 h-5" />
-                          </span>
-                          <span className={`text-xs ${i === currentStep ? "font-bold" : "text-muted-foreground"}`}>{STATUS_LABEL[step]}</span>
-                        </li>
-                      )
-                    })}
-                  </ol>
-                  <p className="text-center mt-6 font-semibold" role="status">
-                    {order.status === "pending" && `Pedido recebido! Tempo estimado: ~${order.estimatedWaitMinutes} min.`}
-                    {order.status === "preparing" && "Seu pedido está sendo preparado."}
-                    {order.status === "ready" &&
-                      (order.type === "delivery" ? "Pedido pronto, saindo para entrega!" : "Pedido pronto! Pode retirar no balcão.")}
-                    {order.status === "delivered" && "Pedido entregue. Bom apetite!"}
-                  </p>
-                  {!finished && <p className="text-center text-xs text-muted-foreground mt-1">Esta página se atualiza sozinha.</p>}
-                </>
+                store.address && (
+                  <div className="flex items-start gap-3">
+                    <ShoppingBag className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{order.type === "dine_in" ? "Onde fica a loja" : "Retirar em"}</p>
+                      <p className="text-sm text-muted-foreground">{store.address}</p>
+                    </div>
+                  </div>
+                )
               )}
-            </CardContent>
-          </Card>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {whats && (
+                  <Button asChild size="lg" className="h-12 rounded-full bg-[#177a40] sm:flex-1 text-white hover:bg-[#12663a]">
+                    <a href={whats} target="_blank" rel="noopener noreferrer">
+                      <MessageCircle className="h-5 w-5" aria-hidden />
+                      Falar com a loja
+                    </a>
+                  </Button>
+                )}
+                {map && (
+                  <Button asChild size="lg" variant="outline" className="h-12 rounded-full sm:flex-1">
+                    <a href={map} target="_blank" rel="noopener noreferrer">
+                      <MapPin className="h-5 w-5" aria-hidden />
+                      Ver no mapa
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Itens */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Itens</CardTitle>
-              <CardDescription>
-                {TYPE_LABEL[order.type]} · {PAYMENT_LABEL[order.paymentMethod]} ·{" "}
-                {new Date(order.createdAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+          <section className="rounded-3xl border bg-card p-5 shadow-sm" aria-labelledby="itens-titulo">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h2 id="itens-titulo" className="text-lg font-bold">
+                Itens
+              </h2>
+              <p className="text-xs text-muted-foreground">{formatDateTimeSP(order.createdAt)}</p>
+            </div>
+            <ul className="divide-y">
               {order.items.map((item) => (
-                <div key={item.id} className="flex justify-between gap-4 border-b pb-3 last:border-0">
-                  <div>
+                <li key={item.id} className="flex justify-between gap-4 py-3 first:pt-0">
+                  <div className="min-w-0">
                     <p className="font-semibold">
-                      {item.quantity}x {item.name}
+                      <span className="text-primary">{item.quantity}x</span> {item.name}
                     </p>
                     {item.extras.length > 0 && (
                       <p className="text-sm text-muted-foreground">
@@ -98,26 +154,36 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
                       </p>
                     )}
                   </div>
-                  <p className="font-semibold shrink-0">{formatBRL(lineTotal(item))}</p>
-                </div>
+                  <p className="shrink-0 font-semibold tabular-nums">{formatBRL(lineTotal(item))}</p>
+                </li>
               ))}
+            </ul>
+            <div className="mt-2 space-y-1 border-t pt-3 text-sm">
               {order.deliveryFee > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Taxa de entrega</span>
-                  <span>{formatBRL(order.deliveryFee)}</span>
-                </div>
+                <>
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">{formatBRL(order.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Entrega</span>
+                    <span className="tabular-nums">{formatBRL(order.deliveryFee)}</span>
+                  </div>
+                </>
               )}
-              <div className="flex justify-between text-lg font-bold pt-2">
+              <div className="flex justify-between pt-1 text-lg font-bold">
                 <span>Total</span>
-                <span className="text-primary">{formatBRL(order.total)}</span>
+                <span className="tabular-nums">{formatBRL(order.total)}</span>
               </div>
-              {order.type === "delivery" && <p className="text-sm text-muted-foreground">Entrega em: {fullAddress(order)}</p>}
-              {order.notes && <p className="text-sm text-muted-foreground">Obs.: {order.notes}</p>}
-            </CardContent>
-          </Card>
+              <p className="text-muted-foreground">
+                {TYPE_LABEL[order.type]} · {PAYMENT_LABEL[order.paymentMethod]} · pagamento direto com a loja
+              </p>
+              {order.notes && <p className="pt-1 text-muted-foreground">Obs.: {order.notes}</p>}
+            </div>
+          </section>
 
-          <div className="text-center">
-            <Button asChild variant="outline">
+          <div className="pt-2 text-center">
+            <Button asChild variant="outline" className="h-11 rounded-full px-6">
               <Link href={`/loja/${store.slug}`}>Fazer outro pedido</Link>
             </Button>
           </div>

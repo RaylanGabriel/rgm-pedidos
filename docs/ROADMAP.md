@@ -46,7 +46,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
   (ViaCEP → endereço; geocodificação via Nominatim/OpenStreetMap, gratuito com limite).
 - Distância em linha reta (Haversine) calculada no banco → faixa de preço.
 
-## 🔨 4. Cardápio mais completo + novo design
+## ✅ 4. Cardápio mais completo + novo design
 Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`).
 
 **Etapas 1–2 ✅ (experiência no celular + base visual)**
@@ -62,8 +62,13 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
 
 - Ordem própria dos itens "também mostrados" numa categoria (`menu_item_categories.sort_order`, setas no painel).
 
-**Etapa 3 ⏳** sugestão de bebida no carrinho.
-**Etapa 4 ⏳** checkout (botão fixo com total, confiança) e acompanhamento (WhatsApp, endereço).
+**Etapas 3–4 ✅**
+- "Para acompanhar" no carrinho e no checkout (itens de categorias sem adicionais, prioriza o que falta no carrinho).
+- Checkout: duas colunas no computador, botão fixo "Confirmar pedido · total" no celular, blocos
+  (receber → dados → pagamento → observações), bairros em botões quando são até 6, aviso de pedido mínimo, selo de confiança.
+- Acompanhamento: status em destaque com previsão de horário, barra de progresso, "Falar com a loja" (WhatsApp com
+  mensagem pronta), endereço de retirada com mapa (`stores.address`), resumo com subtotal/entrega.
+- Página 404 em português.
 **Depois:** painel da cozinha (quadro Novos / Preparando / Prontos).
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)

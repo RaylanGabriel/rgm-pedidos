@@ -37,6 +37,7 @@ export default async function ConfiguracoesPage() {
               values={{
                 name: store.name,
                 phone: store.phone,
+                address: store.address,
                 logoUrl: store.logoUrl,
                 coverUrl: store.coverUrl,
                 primaryColor: store.primaryColor,

@@ -11,6 +11,7 @@ import { saveSettingsAction } from "./actions"
 export interface SettingsValues {
   name: string
   phone: string | null
+  address: string | null
   logoUrl: string | null
   coverUrl: string | null
   primaryColor: string
@@ -43,7 +44,18 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             defaultValue={formatPhone(values.phone)}
             maxLength={20}
             error={s.fieldErrors?.phone}
-            hint="Aparece no rodapé do cardápio para o cliente tirar dúvidas"
+            hint="Aparece no cardápio e no acompanhamento do pedido para o cliente tirar dúvidas"
+          />
+
+          <Field
+            label="Endereço da loja"
+            name="address"
+            placeholder="Rua das Flores, 123 — Centro"
+            defaultValue={values.address ?? ""}
+            maxLength={200}
+            autoComplete="street-address"
+            error={s.fieldErrors?.address}
+            hint="Para quem vai retirar: aparece no cardápio e no acompanhamento, com link para o mapa"
           />
 
           <Field
