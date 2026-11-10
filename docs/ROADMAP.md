@@ -47,11 +47,31 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - A taxa é calculada dentro de `create_order()` no banco (o navegador só manda o id do bairro).
 - ✅ Versão antiga de `create_order` removida (migration 0007).
 
-**3b. ⏳ Por distância (depois)**
-- `stores.lat/lng` + `delivery_distance_tiers` (`up_to_km`, `fee`): ex. até 2 km R$ 4, até 5 km R$ 8, além disso não entrega.
-- Cliente toca "Usar minha localização" (GPS do navegador, grátis) ou digita o CEP
-  (ViaCEP → endereço; geocodificação via Nominatim/OpenStreetMap, gratuito com limite).
-- Distância em linha reta (Haversine) calculada no banco → faixa de preço.
+**3b. ⏳ Por distância em km (depois)**
+**Ideia:** o cliente informa o endereço completo, o site calcula a distância até o **endereço da loja** e cobra
+pela faixa que o dono configurou. Exemplo do dono:
+
+| Distância | Frete |
+|---|---|
+| até 3 km | grátis |
+| até 8 km | R$ 5,00 |
+| até 12 km | R$ 10,00 |
+| acima disso | não entrega |
+
+- Faixas sempre no formato **"até X km"**, em ordem — assim não sobra buraco (ex.: entre 8 e 10 km) sem preço.
+  A última faixa define o raio máximo de entrega.
+- Nova opção em `/admin/entrega`: `delivery_pricing = 'distance'` + tabela `delivery_distance_tiers` (`up_to_km`, `fee`),
+  ao lado de "fixa" e "por bairro" (continuam existindo).
+- **Endereço da loja vira coordenada** uma vez, ao salvar em Configurações (`stores.lat/lng`), com mapa para o dono
+  conferir o ponto.
+- **Endereço do cliente:** CEP → ViaCEP preenche rua/bairro/cidade (grátis) → cliente completa o número →
+  geocodificação (Nominatim/OpenStreetMap, grátis com limite de 1 consulta/s; alternativa paga: Google Maps).
+  Atalho "Usar minha localização" (GPS do navegador).
+- **Distância:** linha reta (Haversine) é grátis mas fica menor que o caminho real; aplicar um fator (~1,3×) ou usar
+  rota real (OSRM/Google) se precisar de precisão. Decidir na hora de implementar.
+- Segurança: o servidor recalcula a distância e a taxa dentro de `create_order()` (o navegador nunca manda o valor),
+  e o pedido guarda a distância e o endereço usados.
+- Se não achar o endereço: mostrar aviso e deixar o cliente escolher retirada (ou a loja combina pelo WhatsApp).
 
 ## ✅ 4. Cardápio mais completo + novo design
 Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`). Cor da marca: `#8d1a1e`.
@@ -109,6 +129,29 @@ Revisão de bugs, lógica e design com o plugin de design + skill de gráficos (
 - **Tempo médio** (até ficar pronto, entrega, total) com alerta quando passa do tempo prometido; novo `orders.ready_at`
   (só conta pedidos a partir de nov/2026).
 - **Pouca saída**: itens abaixo de 30% da média do cardápio, com dica (promoção, combo, tirar do cardápio).
+
+## ⏳ 4c. Domínio da plataforma (fazer ANTES do Mercado Pago)
+**Problema:** hoje o endereço é `mr-smash-street.vercel.app/loja/<slug>` — o nome "Mr. Smash" não faz sentido para
+as outras lojas, mesmo com o nome delas depois da `/`.
+
+**Por que antes do Mercado Pago:** o app do Mercado Pago guarda a **URL de retorno do login (OAuth)** e a **URL do
+webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tudo e reconectar as contas.
+
+**Proposta (em camadas):**
+1. **Domínio neutro da plataforma** (comprar um `.com.br` no registro.br, ~R$ 40/ano), com nome de produto e não de loja.
+   O painel fica em `app.<dominio>` (ou `<dominio>/admin`).
+2. **Subdomínio por loja:** `mrsmash.<dominio>`, `dogaodoze.<dominio>` — domínio curinga `*.<dominio>` na Vercel
+   (grátis) + `proxy.ts` lendo o host e mostrando a loja certa. `/loja/<slug>` continua funcionando.
+3. **Domínio próprio da loja (opcional, plano pago):** `www.lanchonetedoze.com.br` apontando para a plataforma,
+   cadastrado pela API de domínios da Vercel. Tabela `store_domains`.
+
+**Cuidados:**
+- **QR codes já impressos** apontam para o endereço atual: manter `mr-smash-street.vercel.app` redirecionando (301)
+  para o novo endereço, para não quebrar nenhum.
+- Login do painel (cookie `sid`) no domínio do painel; Mercado Pago usa sempre o domínio da plataforma (uma URL fixa
+  para todas as lojas), mesmo quando a loja tiver domínio próprio.
+- Atualizar `SITE_URL`, os links do QR code em Configurações e o nome do projeto na Vercel.
+- **Decisão pendente:** nome/domínio da plataforma.
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.
