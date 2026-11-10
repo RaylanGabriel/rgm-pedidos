@@ -156,7 +156,7 @@ export function CheckoutForm({ store, menu, delivery }: { store: PublicStore; me
           )}
 
           <div className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={total} />
 
             <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm">
               <input

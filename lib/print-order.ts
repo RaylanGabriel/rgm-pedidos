@@ -1,6 +1,6 @@
 /** Impressão do pedido para impressora térmica de 58mm (abre uma janela e chama o print do navegador). */
 import { formatDateTimeSP } from "@/lib/dates"
-import { formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, TYPE_LABEL, type OrderWithItemsView } from "@/lib/order-shared"
+import { changeText, formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, TYPE_LABEL, type OrderWithItemsView } from "@/lib/order-shared"
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
@@ -36,6 +36,7 @@ export function printOrder(order: OrderWithItemsView, storeName: string) {
     <p><strong>Cliente:</strong> ${e(order.customerName)}</p>
     ${order.customerPhone ? `<p><strong>Tel:</strong> ${e(order.customerPhone)}</p>` : ""}
     <p><strong>${TYPE_LABEL[order.type]}</strong> · ${PAYMENT_LABEL[order.paymentMethod]}</p>
+    ${changeText(order) ? `<div class="box"><strong>${e(changeText(order)!)}</strong></div>` : ""}
     <p>${formatDateTimeSP(order.createdAt)}</p>
     ${order.type === "delivery" ? `<div class="box"><strong>Entrega:</strong><br>${e(fullAddress(order))}</div>` : ""}
     <div>${items}</div>

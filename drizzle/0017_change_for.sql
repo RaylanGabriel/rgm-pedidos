@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "change_for" numeric(10, 2);

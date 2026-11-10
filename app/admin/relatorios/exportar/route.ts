@@ -75,6 +75,7 @@ export async function GET(req: Request) {
         { header: "Subtotal", type: "brl", width: 13 },
         { header: "Taxa de entrega", type: "brl", width: 15 },
         { header: "Total", type: "brl", width: 13 },
+        { header: "Troco para", type: "brl", width: 13 },
         { header: "Observações", width: 32 },
       ],
       rows: orders.map((o) => [
@@ -91,6 +92,7 @@ export async function GET(req: Request) {
         o.subtotal,
         o.deliveryFee,
         o.total,
+        o.paymentMethod === "cash" ? o.changeFor : null,
         o.notes,
       ]),
     },
