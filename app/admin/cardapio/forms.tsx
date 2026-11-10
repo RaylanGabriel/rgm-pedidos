@@ -4,6 +4,7 @@ import { createContext, useContext, useState } from "react"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
+import { ImageInput } from "@/components/admin/image-input"
 import { saveCategoryAction, saveIngredientAction, saveItemAction } from "./actions"
 
 const selectClass =
@@ -18,6 +19,7 @@ export interface ItemFormData {
   price: string
   categoryId: string | null
   active: boolean
+  imageUrl: string | null
 }
 
 /** Criar (sem `item`) ou editar um lanche. */
@@ -62,6 +64,7 @@ export function ItemForm({
             />
             {s.fieldErrors?.description && <p className="text-sm text-destructive mt-1">{s.fieldErrors.description}</p>}
           </div>
+          <ImageInput currentUrl={item?.imageUrl} error={s.fieldErrors?.image} />
           <div className="grid sm:grid-cols-2 gap-4 items-end">
             <div>
               <Label htmlFor={`cat-${item?.id ?? "novo"}`} className="mb-1.5">

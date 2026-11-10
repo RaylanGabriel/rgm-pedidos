@@ -74,14 +74,21 @@ export function ItemPicker({ menu, onAdd, disabled }: { menu: MenuView; onAdd: (
                   }`}
                 >
                   <div className="flex justify-between gap-4">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <h3 className="font-semibold text-lg">{item.name}</h3>
-                      {item.description && <p className="text-sm text-muted-foreground mt-1">{item.description}</p>}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-primary">{formatBRL(item.price)}</p>
+                      {item.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{item.description}</p>}
+                      <p className="text-lg font-bold text-primary mt-2">{formatBRL(item.price)}</p>
                       {!item.available && <p className="text-xs font-semibold text-destructive">Esgotado</p>}
                     </div>
+                    {item.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        loading="lazy"
+                        className="w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-lg object-cover bg-muted"
+                      />
+                    )}
                   </div>
                 </button>
               )

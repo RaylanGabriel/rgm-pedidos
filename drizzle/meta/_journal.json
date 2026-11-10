@@ -29,6 +29,13 @@
       "when": 1794266582528,
       "tag": "0003_must_change_password",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794311327832,
+      "tag": "0004_store_suspension",
+      "breakpoints": true
     }
   ]
 }

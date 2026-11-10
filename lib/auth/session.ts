@@ -111,7 +111,7 @@ export const requireStore = cache(async () => {
   // Precisa ser membro da loja, ou superadmin da plataforma
   if (!row || (!row.role && !session.user.isSuperadmin)) redirect("/admin/sem-loja")
   // Loja suspensa pela plataforma: só o superadmin entra
-  if (!row.store.active && !session.user.isSuperadmin) redirect("/admin/sem-loja?suspensa=1")
+  if (!row.store.active && !session.user.isSuperadmin) redirect("/admin/sem-loja")
 
   return {
     user: session.user,

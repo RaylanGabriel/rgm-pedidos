@@ -25,6 +25,16 @@ export const getStoreBySlug = cache(async (slug: string) => {
   return store ?? null
 })
 
+/** Nome de uma loja suspensa (para mostrar "indisponível" em vez de 404). O motivo nunca é público. */
+export async function getSuspendedStoreName(slug: string) {
+  const [store] = await db
+    .select({ name: stores.name })
+    .from(stores)
+    .where(and(eq(stores.slug, slug), eq(stores.active, false)))
+    .limit(1)
+  return store?.name ?? null
+}
+
 /** Dados públicos da loja (sem contador interno etc.) para mandar ao navegador. */
 export function publicStore(s: StoreRow) {
   return {

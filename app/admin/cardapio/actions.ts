@@ -7,6 +7,7 @@ import { db } from "@/db"
 import { categories, ingredients, menuItems } from "@/db/schema"
 import { isOwner, requireStore } from "@/lib/auth/session"
 import { formText, optional, priceSchema, zodErrorState, type FormState } from "@/lib/form-state"
+import { deleteImage, fileFrom, uploadImage } from "@/lib/storage"
 
 /*
  * Edição do cardápio. Regras:
@@ -56,21 +57,44 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
   }
 
   const id = formText(fd, "id")
+  let previous: { imageUrl: string | null } | undefined
   if (id) {
     if (!uuid.safeParse(id).success) return { error: "Item inválido." }
-    const updated = await db
-      .update(menuItems)
-      .set(data)
-      .where(and(eq(menuItems.id, id), eq(menuItems.storeId, store.id)))
-      .returning({ id: menuItems.id })
-    if (!updated.length) return { error: "Item não encontrado." }
-  } else {
-    const [{ n }] = await db
-      .select({ n: count() })
+    ;[previous] = await db
+      .select({ imageUrl: menuItems.imageUrl })
       .from(menuItems)
-      .where(and(eq(menuItems.storeId, store.id), data.categoryId ? eq(menuItems.categoryId, data.categoryId) : isNull(menuItems.categoryId)))
-    await db.insert(menuItems).values({ ...data, storeId: store.id, sortOrder: n })
+      .where(and(eq(menuItems.id, id), eq(menuItems.storeId, store.id)))
+    if (!previous) return { error: "Item não encontrado." }
   }
+
+  // Foto: nova (substitui), removida, ou mantém a atual
+  const file = fileFrom(fd, "image")
+  let imageUrl: string | null | undefined
+  if (file) {
+    const up = await uploadImage(file, `stores/${store.id}/items`)
+    if ("error" in up) return { fieldErrors: { image: up.error }, error: up.error }
+    imageUrl = up.url
+  } else if (fd.get("removeImage") === "on") imageUrl = null
+
+  const values = imageUrl === undefined ? data : { ...data, imageUrl }
+  try {
+    if (id) {
+      await db
+        .update(menuItems)
+        .set(values)
+        .where(and(eq(menuItems.id, id), eq(menuItems.storeId, store.id)))
+    } else {
+      const [{ n }] = await db
+        .select({ n: count() })
+        .from(menuItems)
+        .where(and(eq(menuItems.storeId, store.id), data.categoryId ? eq(menuItems.categoryId, data.categoryId) : isNull(menuItems.categoryId)))
+      await db.insert(menuItems).values({ ...values, storeId: store.id, sortOrder: n })
+    }
+  } catch (e) {
+    if (imageUrl) await deleteImage(imageUrl) // não deixa foto órfã
+    throw e
+  }
+  if (imageUrl !== undefined && previous?.imageUrl) await deleteImage(previous.imageUrl)
 
   refresh(store.slug)
   return { ok: true, message: id ? "Item atualizado." : "Item adicionado." }
@@ -91,7 +115,11 @@ export async function deleteItemAction(id: string) {
   const ctx = await isOwner()
   if (!ctx || !uuid.safeParse(id).success) return
   // Pedidos antigos guardam nome/preço próprios, então apagar não altera o histórico
-  await db.delete(menuItems).where(and(eq(menuItems.id, id), eq(menuItems.storeId, ctx.store.id)))
+  const [gone] = await db
+    .delete(menuItems)
+    .where(and(eq(menuItems.id, id), eq(menuItems.storeId, ctx.store.id)))
+    .returning({ imageUrl: menuItems.imageUrl })
+  await deleteImage(gone?.imageUrl)
   refresh(ctx.store.slug)
 }
 

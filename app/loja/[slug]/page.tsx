@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { brandStyle } from "@/lib/color"
-import { getMenu, getStoreBySlug, publicStore } from "@/lib/orders"
+import { Store } from "lucide-react"
+import { getMenu, getStoreBySlug, getSuspendedStoreName, publicStore } from "@/lib/orders"
 import { StoreFooter, StoreHeader } from "@/components/store/store-header"
 import { StoreMenu } from "./store-menu"
 
@@ -13,8 +14,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function LojaPage({ params }: Props) {
-  const store = await getStoreBySlug((await params).slug)
-  if (!store) notFound()
+  const { slug } = await params
+  const store = await getStoreBySlug(slug)
+  if (!store) {
+    const suspendedName = await getSuspendedStoreName(slug)
+    if (!suspendedName) notFound()
+    return (
+      <main className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background via-background to-muted">
+        <div className="max-w-sm text-center space-y-2">
+          <Store className="w-10 h-10 mx-auto text-muted-foreground" aria-hidden />
+          <h1 className="text-2xl font-bold">{suspendedName}</h1>
+          <p className="text-muted-foreground">O cardápio online está indisponível no momento. Volte mais tarde!</p>
+        </div>
+      </main>
+    )
+  }
   const menu = await getMenu(store.id)
   const pub = publicStore(store)
 

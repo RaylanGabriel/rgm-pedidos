@@ -16,7 +16,12 @@ export default async function AdminPage() {
         <div role="status" className="bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100 text-sm px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
           <span>
             {isSupport ? <>Modo suporte: você está no painel de <strong>{store.name}</strong>.</> : null}
-            {!store.active && <> Loja <strong>suspensa</strong>: fora do ar para clientes e equipe.</>}
+            {!store.active && (
+              <>
+                {" "}Loja <strong>suspensa</strong>
+                {store.suspendedReason && <> (“{store.suspendedReason}”)</>}: fora do ar para clientes e equipe.
+              </>
+            )}
           </span>
           <Link href="/admin/lojas" className="font-semibold underline underline-offset-2">
             Voltar para Lojas

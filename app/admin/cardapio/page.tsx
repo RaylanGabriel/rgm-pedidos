@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, ImageOff, Trash2 } from "lucide-react"
 import { asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { categories, ingredients, menuItems } from "@/db/schema"
@@ -101,6 +101,14 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                     {list.map((item, idx) => (
                       <div key={item.id} className="py-4 first:pt-0 last:pb-0">
                         <div className="flex flex-wrap items-center gap-3">
+                          <div className="w-14 h-14 shrink-0 overflow-hidden rounded-md bg-muted flex items-center justify-center">
+                            {item.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={item.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                            ) : (
+                              <ImageOff className="w-5 h-5 text-muted-foreground" aria-label="Sem foto" />
+                            )}
+                          </div>
                           <div className="flex-1 min-w-40">
                             <p className="font-semibold">
                               {item.name}{" "}
@@ -134,6 +142,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                                   price: item.price,
                                   categoryId: item.categoryId,
                                   active: item.active,
+                                  imageUrl: item.imageUrl,
                                 }}
                                 categories={catOptions}
                               />

@@ -101,14 +101,29 @@ export async function enterStoreAction(storeId: string) {
   redirect("/admin")
 }
 
-/** Suspende/reativa a loja: suspensa some do site, não aceita pedidos e o painel fica bloqueado para a equipe. */
-export async function toggleStoreActiveAction(storeId: string) {
+const reasonSchema = z.string().min(3, "Escreva o motivo (aparece para o dono da loja).").max(300, "Máximo 300 caracteres")
+
+/** Suspende a loja: some do site, não aceita pedidos e o painel da equipe mostra o motivo. */
+export async function suspendStoreAction(_prev: FormState, fd: FormData): Promise<FormState> {
   await requireSuperadmin()
-  if (!uuidSchema.safeParse(storeId).success) return
+  const storeId = formText(fd, "storeId")
+  if (!uuidSchema.safeParse(storeId).success) return { error: "Loja inválida." }
+  const reason = reasonSchema.safeParse(formText(fd, "reason"))
+  if (!reason.success) return { fieldErrors: { reason: reason.error.issues[0].message } }
+
   await db
     .update(stores)
-    .set({ active: sql`NOT ${stores.active}` })
+    .set({ active: false, suspendedReason: reason.data, suspendedAt: new Date() })
     .where(eq(stores.id, storeId))
+  revalidatePath("/admin/lojas")
+  revalidatePath("/loja", "layout")
+  return { ok: true }
+}
+
+export async function reactivateStoreAction(storeId: string) {
+  await requireSuperadmin()
+  if (!uuidSchema.safeParse(storeId).success) return
+  await db.update(stores).set({ active: true, suspendedReason: null, suspendedAt: null }).where(eq(stores.id, storeId))
   revalidatePath("/admin/lojas")
   revalidatePath("/loja", "layout")
 }

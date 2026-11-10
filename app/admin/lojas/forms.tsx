@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { KeyRound } from "lucide-react"
+import { KeyRound, Power } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
 import { slugify } from "@/lib/slug"
-import { createStoreAction, resetPasswordAction } from "./actions"
+import { createStoreAction, resetPasswordAction, suspendStoreAction } from "./actions"
 
 export function NewStoreForm({ siteUrl }: { siteUrl: string }) {
   const [name, setName] = useState("")
@@ -68,6 +69,60 @@ export function NewStoreForm({ siteUrl }: { siteUrl: string }) {
             Criar categorias iniciais (Lanches, Porções, Bebidas, Sobremesas)
           </label>
           <SubmitButton>Criar loja</SubmitButton>
+        </>
+      )}
+    </ActionForm>
+  )
+}
+
+const REASON_SUGGESTIONS = ["Pagamento em atraso", "Contrato encerrado", "Loja em manutenção", "Solicitado pelo dono"]
+
+/** Botão "Suspender" que abre um campo para escrever o motivo (mostrado ao dono). */
+export function SuspendForm({ storeId, storeName }: { storeId: string; storeName: string }) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState("")
+  const listId = `motivos-${storeId}`
+
+  if (!open)
+    return (
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Power className="w-4 h-4" />
+        Suspender
+      </Button>
+    )
+
+  return (
+    <ActionForm action={suspendStoreAction} onSuccess={() => setOpen(false)} className="w-full sm:w-80 space-y-2 rounded-lg border-2 border-destructive/40 p-3">
+      {(s) => (
+        <>
+          <input type="hidden" name="storeId" value={storeId} />
+          <Field
+            label={`Motivo da suspensão de ${storeName}`}
+            name="reason"
+            list={listId}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Ex.: Pagamento em atraso"
+            maxLength={300}
+            required
+            autoFocus
+            hint="Aparece para o dono e a equipe ao abrir o painel."
+            error={s.fieldErrors?.reason}
+          />
+          <datalist id={listId}>
+            {REASON_SUGGESTIONS.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
+          <p className="text-xs text-muted-foreground">O cardápio sai do ar e a loja para de receber pedidos.</p>
+          <div className="flex gap-2">
+            <SubmitButton size="sm" variant="destructive">
+              Suspender loja
+            </SubmitButton>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
         </>
       )}
     </ActionForm>

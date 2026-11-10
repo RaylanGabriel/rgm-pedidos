@@ -24,7 +24,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 ## 🔨 2. Painel do super admin (criar lojas para clientes)
 **Objetivo:** criar a loja de um cliente sem terminal/SQL.
 - `/admin/lojas` (só `is_superadmin`): lista de lojas, criar loja + dono num formulário,
-  ativar/desativar loja, "entrar como" (trocar `active_store_id` da sessão) para dar suporte.
+  suspender (com motivo mostrado ao dono) / reativar loja, "entrar como" (trocar `active_store_id` da sessão) para dar suporte.
 - Senha provisória + troca obrigatória no primeiro acesso (`users.must_change_password`).
 - "Minha conta → trocar senha" para todos.
 - Opcional: cardápio inicial modelo ao criar a loja.
@@ -48,7 +48,7 @@ Fluxo:
 
 ## ⏳ 4. Cardápio mais completo + novo design
 - Seed de teste com várias categorias: lanches, porções, bebidas, sobremesas, combos.
-- Foto por item (upload via Vercel Blob, plano grátis) em vez de só URL.
+- ✅ Foto por item e logo (upload via Vercel Blob, reduzida no navegador) — entregue junto com o item 2.
 - Design do site do cliente: capa/banner da loja, navegação por categorias fixa no topo,
   cards com foto, carrinho flutuante no celular, estados vazios/esgotado mais claros.
 - Painel da cozinha: visual de "quadro" (Novos / Preparando / Prontos), modo tela cheia.

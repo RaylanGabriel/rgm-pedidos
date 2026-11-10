@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
+import { ImageInput } from "@/components/admin/image-input"
 import { brandStyle, isHexColor, textContrast } from "@/lib/color"
 import { saveSettingsAction } from "./actions"
 
@@ -56,14 +57,14 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             hint="A estimativa para o cliente soma 3 min para cada pedido já na fila"
           />
 
-          <Field
-            label="Logo (endereço da imagem)"
-            name="logoUrl"
-            placeholder="https://… ou /logo.png"
-            defaultValue={values.logoUrl ?? ""}
-            maxLength={500}
-            error={s.fieldErrors?.logoUrl}
-            hint="Deixe vazio para não mostrar logo"
+          <ImageInput
+            label="Logo"
+            name="logo"
+            removeName="removeLogo"
+            currentUrl={values.logoUrl}
+            aspect="aspect-square"
+            hint="De preferência quadrada, com fundo transparente ou branco."
+            error={s.fieldErrors?.logo}
           />
 
           <div>

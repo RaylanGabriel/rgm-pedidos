@@ -60,6 +60,8 @@ export const stores = pgTable(
     phone: text("phone"),
     isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja
     active: boolean("active").notNull().default(true), // plataforma suspende (inadimplência)
+    suspendedReason: text("suspended_reason"), // mensagem mostrada ao dono/equipe quando suspensa
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     avgPrepMinutes: integer("avg_prep_minutes").notNull().default(15),
     nextOrderNumber: integer("next_order_number").notNull().default(1), // contador por loja
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

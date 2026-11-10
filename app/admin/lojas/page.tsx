@@ -8,8 +8,8 @@ import { ActionButton } from "@/components/admin/form-ui"
 import { db } from "@/db"
 import { requireSuperadmin } from "@/lib/auth/session"
 import { siteUrl } from "@/lib/site-url"
-import { enterStoreAction, toggleStoreActiveAction } from "./actions"
-import { NewStoreForm, ResetPasswordForm } from "./forms"
+import { enterStoreAction, reactivateStoreAction } from "./actions"
+import { NewStoreForm, ResetPasswordForm, SuspendForm } from "./forms"
 
 export const metadata = { title: "Lojas" }
 
@@ -21,6 +21,8 @@ type StoreRow = {
   active: boolean
   is_open: boolean
   created_at: string
+  suspended_reason: string | null
+  suspended_at: string | null
   members: Member[]
   orders_30d: number
   items: number
@@ -31,7 +33,7 @@ export default async function LojasPage() {
   const base = await siteUrl()
 
   const { rows } = await db.execute<StoreRow>(sql`
-    SELECT s.id, s.name, s.slug, s.active, s.is_open, s.created_at,
+    SELECT s.id, s.name, s.slug, s.active, s.is_open, s.created_at, s.suspended_reason, s.suspended_at,
       COALESCE(
         (SELECT json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'role', m.role,
                                            'mustChangePassword', u.must_change_password) ORDER BY m.role, u.name)
@@ -91,6 +93,12 @@ export default async function LojasPage() {
                         /loja/{s.slug} · {s.items} {s.items === 1 ? "item" : "itens"} no cardápio · {s.orders_30d} pedidos em 30 dias · desde{" "}
                         {new Date(s.created_at).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                       </p>
+                      {!s.active && (
+                        <p className="text-sm text-destructive mt-1">
+                          Suspensa{s.suspended_at && ` em ${new Date(s.suspended_at).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`}
+                          {s.suspended_reason && <>: “{s.suspended_reason}”</>}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2 shrink-0">
                       <ActionButton action={enterStoreAction.bind(null, s.id)} size="sm" disabled={current}>
@@ -105,19 +113,14 @@ export default async function LojasPage() {
                           </Link>
                         </Button>
                       )}
-                      <ActionButton
-                        action={toggleStoreActiveAction.bind(null, s.id)}
-                        size="sm"
-                        variant="outline"
-                        confirmText={
-                          s.active
-                            ? `Suspender "${s.name}"? O cardápio sai do ar, não recebe pedidos e a equipe não acessa o painel.`
-                            : `Reativar "${s.name}"?`
-                        }
-                      >
-                        <Power className="w-4 h-4" />
-                        {s.active ? "Suspender" : "Reativar"}
-                      </ActionButton>
+                      {s.active ? (
+                        <SuspendForm storeId={s.id} storeName={s.name} />
+                      ) : (
+                        <ActionButton action={reactivateStoreAction.bind(null, s.id)} size="sm" confirmText={`Reativar "${s.name}"? O cardápio volta ao ar.`}>
+                          <Power className="w-4 h-4" />
+                          Reativar
+                        </ActionButton>
+                      )}
                     </div>
                   </div>
 
