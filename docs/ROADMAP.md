@@ -223,7 +223,7 @@ conseguir explicar sozinho numa entrevista:
 
 ## Notas técnicas
 - Repositório: **github.com/RaylanGabriel/rgm-pedidos** (antes `v0-mr-smash-street-website`; o GitHub redireciona o nome antigo).
-- **Dois bancos (branches do Neon, projeto "Hamburguerias")**:
+- **Dois bancos (branches do Neon, projeto "rgm-pedidos", antes "Hamburguerias")**:
   - `production` → só o site no ar (variável `DATABASE_URL` de Production na Vercel; local em `.env.prod-db`).
   - `preview` → previews da Vercel e testes locais (`.env.local`). É uma cópia da produção: testes não sujam o site no ar.
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
