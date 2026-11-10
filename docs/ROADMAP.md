@@ -29,7 +29,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - "Minha conta → trocar senha" para todos.
 - Opcional: cardápio inicial modelo ao criar a loja.
 
-## 🔨 3. Taxa de entrega por localização
+## ✅ 3. Taxa de entrega por localização
 **Objetivo:** cobrar a entrega certa sem depender de API paga.
 
 **3a. ✅ Taxa fixa ou por bairro (feito)**
@@ -38,7 +38,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - Tela `/admin/entrega`: regras, bairros (um a um ou vários de uma vez), pausar/apagar.
 - Checkout e balcão: lista de bairros, subtotal + entrega + total, pedido mínimo.
 - A taxa é calculada dentro de `create_order()` no banco (o navegador só manda o id do bairro).
-- Pendente: remover a versão antiga de `create_order` (10 parâmetros) depois que a nova estiver em produção.
+- ✅ Versão antiga de `create_order` removida (migration 0007).
 
 **3b. ⏳ Por distância (depois)**
 - `stores.lat/lng` + `delivery_distance_tiers` (`up_to_km`, `fee`): ex. até 2 km R$ 4, até 5 km R$ 8, além disso não entrega.
