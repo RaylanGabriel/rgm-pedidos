@@ -3,7 +3,7 @@
 Plano do produto (cardápio digital + pedidos para lanchonetes e carrinhos, multi-loja).
 Cada item é entregue sozinho: branch → implementa → testa → commit → preview → aprovado → `main`.
 
-Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
+Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia · 📚 estudo
 
 ---
 
@@ -196,6 +196,19 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - Endereços salvos, histórico de pedidos, base para fidelidade.
 - Exige política de privacidade (LGPD) e opção de apagar a conta.
 
+## 📚 Estudo: entender o que foi construído (depois das demandas atuais)
+Quando terminarmos o domínio e o Pix em produção, o Claude explica passo a passo, com o código aberto, para o Raylan
+conseguir explicar sozinho numa entrevista:
+- **Pix ponta a ponta:** do botão "Confirmar e pagar com Pix" até o pedido entrar na cozinha (`createPixCharge`,
+  `X-Idempotency-Key`, `expiration_time`, por que o valor vem do banco).
+- **Webhook:** o que é, por que o Mercado Pago chama a gente, como a assinatura `x-signature` (HMAC-SHA256) é conferida,
+  por que nunca confiamos no conteúdo do aviso e consultamos a API (`syncPixOrder`), por que responder 500 faz ele tentar de novo.
+- **OAuth:** como o dono conecta a conta sem passar a senha, o `state` anti-CSRF, access token × refresh token.
+- **Criptografia dos tokens:** AES-256-GCM, IV, tag de autenticação, por que a chave fica fora do banco.
+- **Segurança geral:** preço calculado no servidor (`create_order()`), sessão com hash, rate limit, `store_id` em tudo.
+- **Banco e deploy:** migrations, branches `production`/`preview` do Neon, preview da Vercel.
+- Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
+
 ## 💭 Depois
 - Horário de funcionamento automático (abre/fecha sozinho).
 - Notificação no WhatsApp quando o pedido fica pronto.
@@ -216,6 +229,6 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0017): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0018): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).
