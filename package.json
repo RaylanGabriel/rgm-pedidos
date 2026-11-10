@@ -9,6 +9,8 @@
     "start": "next start",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate",
+    "db:migrate:prod": "node --env-file=.env.prod-db node_modules/drizzle-kit/bin.cjs migrate",
+    "db:preview:reset": "npx neonctl branches reset preview --parent --project-id billowing-morning-46392635",
     "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio",
     "db:sql": "node --env-file=.env.local db/run-sql.mjs",
     "user:create": "tsx --env-file=.env.local scripts/create-user.ts",

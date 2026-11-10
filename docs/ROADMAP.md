@@ -164,6 +164,11 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - Escolha justificada: o cliente chega pelo QR code da mesa/carrinho, então o nome do domínio pesa pouco; projetos de
   risco (ex.: rifa) ficam **fora** deste domínio para não dividir reputação.
 
+## ✅ 4d. Pequenas melhorias
+- **Troco para R$ ___** no pagamento em dinheiro (`orders.change_for`): atalhos com as notas acima do total, mostra quanto
+  levar; aparece na cozinha, impressão, acompanhamento, fechamento de caixa e planilha.
+- **Banco separado para testes** (branch `preview` do Neon) — ver Notas técnicas.
+
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.
 - Pedido Pix → cobrança na conta do dono → QR + copia e cola → webhook confirma (revalidando na API) → "Pago".
@@ -178,8 +183,6 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - Horário de funcionamento automático (abre/fecha sozinho).
 - Notificação no WhatsApp quando o pedido fica pronto.
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
-- Campo "Troco para R$ ___" no checkout quando o pagamento é dinheiro (hoje vai nas observações).
-- Banco separado para preview (branch do Neon) para testes não sujarem a produção.
 - Cobrança das lojas (plano mensal) quando houver clientes.
 
 ---
@@ -189,8 +192,12 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - Categorias de teste ("Teste 1/2/3", "Teste") podem ser apagadas quando quiser.
 
 ## Notas técnicas
-- **Banco único** para dev, preview e produção: toda migration vale na hora para todos — só mudanças compatíveis
-  (colunas novas opcionais) antes do merge.
-- Migrations em `drizzle/` (0003 → 0016): `npm run db:generate -- --name x` e `npm run db:migrate`.
+- **Dois bancos (branches do Neon, projeto "Hamburguerias")**:
+  - `production` → só o site no ar (variável `DATABASE_URL` de Production na Vercel; local em `.env.prod-db`).
+  - `preview` → previews da Vercel e testes locais (`.env.local`). É uma cópia da produção: testes não sujam o site no ar.
+- **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
+  (aplica na produção) **antes** de juntar na `main`.
+- Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
+- Migrations em `drizzle/` (0003 → 0017): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).
