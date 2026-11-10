@@ -43,6 +43,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: S
 
         <ReportsView
           storeName={store.name}
+          promisedMinutes={store.avgPrepMinutes}
           report={report}
           orders={orders}
           de={de}

@@ -350,6 +350,8 @@ export async function setOrderStatus(storeId: string, orderId: string, status: O
       autoDelivered: false,
       // marca quando saiu (conta a 1h do fechamento automático); voltar etapa limpa
       ...(status === "out_for_delivery" ? { outForDeliveryAt: new Date() } : done ? {} : { outForDeliveryAt: null }),
+      // marca quando ficou pronto (tempo de preparo nos relatórios); voltar para antes de "pronto" limpa
+      ...(status === "ready" ? { readyAt: new Date() } : status === "pending" || status === "preparing" ? { readyAt: null } : {}),
     })
     .where(
       and(

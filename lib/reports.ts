@@ -29,6 +29,24 @@ export interface Report {
   byZone: { zone: string; orders: number; fees: number }[]
   topItems: { name: string; qty: number; revenue: number }[]
   topExtras: { name: string; qty: number; revenue: number }[]
+  /** Médias em minutos (null = sem pedidos com esse horário registrado) */
+  times: {
+    prep: number | null
+    prepN: number
+    ride: number | null
+    rideN: number
+    deliveryTotal: number | null
+    deliveryTotalN: number
+    pickupTotal: number | null
+    pickupTotalN: number
+  }
+  customers: {
+    unique: number
+    returning: number
+    top: { phone: string; name: string; orders: number; revenue: number; lastAt: string }[]
+  }
+  /** Itens ativos do cardápio que menos venderam (só itens que já existiam no início do período) */
+  slowItems: { name: string; price: number; qty: number; available: boolean }[]
 }
 
 const EMPTY: Totals = { orders: 0, revenue: 0, deliveryFees: 0, cancelled: 0, cancelledTotal: 0 }
@@ -48,7 +66,8 @@ export async function getReport(storeId: string, de: string, ate: string): Promi
   const inRange = sql`o.store_id = ${storeId} and o.created_at >= ${from} and o.created_at < ${to}`
   const sold = sql`${inRange} and o.status <> 'cancelled'`
 
-  const [totals, series, byHour, byPayment, byType, byZone, topItems, topExtras] = await Promise.all([
+  const mins = (a: ReturnType<typeof sql>, b: ReturnType<typeof sql>) => sql`extract(epoch from (${a} - ${b})) / 60`
+  const [totals, series, byHour, byPayment, byType, byZone, topItems, topExtras, times, customers, topCustomers, slowItems] = await Promise.all([
     db.execute<Totals & { current: boolean }>(sql`
       select o.created_at >= ${from} as current,
         count(*) filter (where o.status <> 'cancelled')::int as orders,
@@ -94,6 +113,41 @@ export async function getReport(storeId: string, de: string, ate: string): Promi
       join orders o on o.id = oi.order_id
       where ${sold}
       group by 1 order by 2 desc, 3 desc limit 5`),
+    // Tempos: ignora valores absurdos (pedido esquecido aberto) e entregas fechadas sozinhas (1h automática)
+    db.execute<Report["times"]>(sql`
+      with t as (
+        select o.type,
+          case when o.ready_at is not null then ${mins(sql`o.ready_at`, sql`o.created_at`)} end as prep,
+          case when o.type = 'delivery' and o.status = 'delivered' and not o.auto_delivered and o.out_for_delivery_at is not null
+            then ${mins(sql`o.completed_at`, sql`o.out_for_delivery_at`)} end as ride,
+          case when o.status = 'delivered' and not o.auto_delivered and o.completed_at is not null
+            then ${mins(sql`o.completed_at`, sql`o.created_at`)} end as total
+        from orders o where ${sold}
+      )
+      select
+        avg(prep) filter (where prep between 0 and 240)::float8 as prep,
+        count(prep) filter (where prep between 0 and 240)::int as "prepN",
+        avg(ride) filter (where ride between 0 and 180)::float8 as ride,
+        count(ride) filter (where ride between 0 and 180)::int as "rideN",
+        avg(total) filter (where type = 'delivery' and total between 0 and 300)::float8 as "deliveryTotal",
+        count(total) filter (where type = 'delivery' and total between 0 and 300)::int as "deliveryTotalN",
+        avg(total) filter (where type <> 'delivery' and total between 0 and 300)::float8 as "pickupTotal",
+        count(total) filter (where type <> 'delivery' and total between 0 and 300)::int as "pickupTotalN"
+      from t`),
+    db.execute<{ unique: number; returning: number }>(sql`
+      select count(*)::int as "unique", count(*) filter (where n > 1)::int as "returning"
+      from (select count(*) as n from orders o where ${sold} and o.customer_phone is not null group by o.customer_phone) c`),
+    getCustomers(storeId, de, ate, 10),
+    db.execute<{ name: string; price: number; qty: number; available: boolean }>(sql`
+      select mi.name, mi.price::float8 as price, coalesce(s.qty, 0)::int as qty, mi.available
+      from menu_items mi
+      left join (
+        select oi.menu_item_id, sum(oi.quantity) as qty
+        from order_items oi join orders o on o.id = oi.order_id
+        where ${sold} group by 1
+      ) s on s.menu_item_id = mi.id
+      where mi.store_id = ${storeId} and mi.active and mi.created_at < ${from}
+      order by 3 asc, mi.name`),
   ])
 
   const pick = (current: boolean) => {
@@ -112,7 +166,34 @@ export async function getReport(storeId: string, de: string, ate: string): Promi
     byZone: byZone.rows,
     topItems: topItems.rows,
     topExtras: topExtras.rows,
+    times: times.rows[0],
+    customers: { ...(customers.rows[0] ?? { unique: 0, returning: 0 }), top: topCustomers },
+    slowItems: pickSlow(slowItems.rows),
   }
+}
+
+/**
+ * "Pouca saída" = vendeu menos de 30% da média dos itens do cardápio (lista já vem do menor para o maior).
+ * Assim um item com 60 vendas não aparece só por ser o último de um cardápio que vende bem.
+ */
+function pickSlow<T extends { qty: number }>(rows: T[]) {
+  if (rows.length < 2) return []
+  const avg = rows.reduce((s, r) => s + r.qty, 0) / rows.length
+  return rows.filter((r) => r.qty <= avg * 0.3).slice(0, 5)
+}
+
+/** Clientes do período agrupados pelo telefone (quem mais pede primeiro). */
+export async function getCustomers(storeId: string, de: string, ate: string, limit: number) {
+  const { rows } = await db.execute<{ phone: string; name: string; orders: number; revenue: number; lastAt: string }>(sql`
+    select o.customer_phone as phone,
+      (array_agg(o.customer_name order by o.created_at desc))[1] as name,
+      count(*)::int as orders, sum(o.total)::float8 as revenue,
+      to_char(max(o.created_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "lastAt"
+    from orders o
+    where o.store_id = ${storeId} and o.created_at >= ${startOfDaySP(de)} and o.created_at < ${startOfDaySP(addDaysYmd(ate, 1))}
+      and o.status <> 'cancelled' and o.customer_phone is not null
+    group by 1 order by 3 desc, 4 desc limit ${limit}`)
+  return rows
 }
 
 /** Completa os dias (ou meses) sem venda com zero, para o gráfico não pular datas. */

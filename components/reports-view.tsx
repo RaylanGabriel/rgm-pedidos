@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { ArrowDownRight, ArrowUpRight, Download, FileSpreadsheet, Minus } from "lucide-react"
+import { ArrowDownRight, ArrowUpRight, Clock, FileSpreadsheet, MessageCircle, Minus, TrendingDown, Wallet } from "lucide-react"
+import { formatPhone, whatsappLink } from "@/lib/links"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,6 +29,7 @@ const seriesLabel = (key: string) => (key.length === 7 ? monthFmt.format(asDate(
 /** Relatório do período (componente de servidor: filtros são links/formulário GET). */
 export function ReportsView({
   storeName,
+  promisedMinutes,
   report,
   orders,
   de,
@@ -37,6 +39,8 @@ export function ReportsView({
   pageSize,
 }: {
   storeName: string
+  /** Tempo de preparo que a loja promete ao cliente (configurações) */
+  promisedMinutes: number
   report: Report
   orders: OrderWithItemsView[]
   de: string
@@ -66,16 +70,16 @@ export function ReportsView({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm">
-            <a href={`/admin/relatorios/exportar?${qs({ tipo: "pedidos" })}`} download>
-              <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden />
-              Planilha de pedidos
-            </a>
+          <Button asChild size="sm">
+            <Link href={`/admin/relatorios/caixa?dia=${ate}`}>
+              <Wallet className="mr-2 h-4 w-4" aria-hidden />
+              Fechamento de caixa
+            </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <a href={`/admin/relatorios/exportar?${qs({ tipo: "itens" })}`} download>
-              <Download className="mr-2 h-4 w-4" aria-hidden />
-              Planilha de itens
+            <a href={`/admin/relatorios/exportar?${qs()}`} download>
+              <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden />
+              Baixar planilha (Excel)
             </a>
           </Button>
         </div>
@@ -113,7 +117,10 @@ export function ReportsView({
           <SalesChart report={report} />
 
           <div className="grid items-start gap-6 lg:grid-cols-2">
-            <TopItems items={report.topItems} extras={report.topExtras} />
+            <div className="space-y-6">
+              <TopItems items={report.topItems} extras={report.topExtras} />
+              <SlowItems items={report.slowItems} days={days} soldOrders={cur.orders} />
+            </div>
             <div className="space-y-6">
               <PeakHours hours={report.byHour} />
               <Breakdown
@@ -137,6 +144,11 @@ export function ReportsView({
                 />
               )}
             </div>
+          </div>
+
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <Times times={report.times} promised={promisedMinutes} />
+            <TopCustomers customers={report.customers} storeName={storeName} />
           </div>
         </>
       )}
@@ -468,6 +480,168 @@ function TopItems({ items, extras }: { items: Report["topItems"]; extras: Report
               ))}
             </ul>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Itens com pouca saída ----------
+function SlowItems({ items, days, soldOrders }: { items: Report["slowItems"]; days: number; soldOrders: number }) {
+  // Com pouco tempo ou poucos pedidos, "vendeu pouco" é só acaso
+  const enough = days >= 7 && soldOrders >= 10
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingDown className="h-5 w-5 text-muted-foreground" aria-hidden />
+          Pouca saída
+        </CardTitle>
+        <CardDescription>Itens do cardápio que menos venderam no período</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!enough ? (
+          <p className="text-sm text-muted-foreground">
+            Escolha um período de pelo menos 7 dias (com 10 pedidos ou mais) para ver quais itens estão vendendo pouco.
+          </p>
+        ) : items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Todos os itens do cardápio estão vendendo bem neste período. 👏</p>
+        ) : (
+          <>
+            <ul className="divide-y text-sm">
+              {items.map((it) => (
+                <li key={it.name} className="flex items-center justify-between gap-3 py-2">
+                  <span className="min-w-0">
+                    <span className="font-medium">{it.name}</span>
+                    <span className="text-muted-foreground"> · {formatBRL(it.price)}</span>
+                    {!it.available && <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[11px]">esgotado</span>}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+                      it.qty === 0 ? "bg-amber-100 text-amber-950 dark:bg-amber-950 dark:text-amber-100" : "bg-muted"
+                    }`}
+                  >
+                    {it.qty === 0 ? "nenhuma venda" : `${it.qty} ${it.qty === 1 ? "venda" : "vendas"}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
+              <strong className="text-foreground">Dica:</strong> faça uma promoção, coloque em ⭐ Mais pedidos ou monte um combo. Se continuar
+              parado, vale tirar do cardápio — menos opções deixam a escolha mais rápida.
+            </p>
+            <Link href="/admin/cardapio" className="mt-2 inline-block text-sm font-medium text-primary underline-offset-2 hover:underline">
+              Abrir cardápio →
+            </Link>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Tempos ----------
+const fmtMin = (m: number | null) => {
+  if (m === null) return "—"
+  const r = Math.round(m)
+  return r >= 60 ? `${Math.floor(r / 60)}h${String(r % 60).padStart(2, "0")}` : `${r} min`
+}
+
+function Times({ times, promised }: { times: Report["times"]; promised: number }) {
+  const late = times.prep !== null && times.prep > promised + 2
+  const rows = [
+    { label: "Até ficar pronto", value: times.prep, n: times.prepN, hint: `você informa ${promised} min ao cliente` },
+    { label: "Entrega (saiu → entregue)", value: times.ride, n: times.rideN, hint: "tempo do entregador" },
+    { label: "Entrega: do pedido até o cliente", value: times.deliveryTotal, n: times.deliveryTotalN, hint: "o que o cliente sente" },
+    { label: "Retirada/local: do pedido até entregar", value: times.pickupTotal, n: times.pickupTotalN, hint: "no balcão" },
+  ]
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5 text-muted-foreground" aria-hidden />
+          Tempo médio
+        </CardTitle>
+        <CardDescription>Calculado pelos horários marcados no painel da cozinha</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <dl className="grid grid-cols-2 gap-3">
+          {rows.map((r) => (
+            <div key={r.label} className="rounded-lg border p-3">
+              <dt className="text-xs text-muted-foreground">{r.label}</dt>
+              <dd className="mt-0.5 text-xl font-bold tabular-nums">{fmtMin(r.value)}</dd>
+              <dd className="text-[11px] text-muted-foreground">
+                {r.n ? `${r.hint} · ${r.n} ${r.n === 1 ? "pedido" : "pedidos"}` : "sem dados ainda"}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {late && (
+          <p role="status" className="rounded-lg bg-amber-100 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+            O preparo está levando em média <strong>{fmtMin(times.prep)}</strong>, mais que os {promised} min avisados ao cliente. Ajuste o tempo em{" "}
+            <Link href="/admin/configuracoes" className="font-semibold underline underline-offset-2">
+              Configurações
+            </Link>{" "}
+            para não gerar reclamação.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Só conta pedidos em que a cozinha tocou nos botões (Pronto, Saiu, Entregue). Entregas fechadas sozinhas depois de 1h ficam de fora.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Melhores clientes ----------
+function TopCustomers({ customers, storeName }: { customers: Report["customers"]; storeName: string }) {
+  const { unique, returning, top } = customers
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Melhores clientes</CardTitle>
+        <CardDescription>
+          {unique === 0
+            ? "Pelo telefone informado no pedido"
+            : `${unique} ${unique === 1 ? "cliente" : "clientes"} com telefone · ${returning} ${returning === 1 ? "voltou" : "voltaram"} a pedir (${pct(returning / unique)})`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {top.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum pedido com telefone no período.</p>
+        ) : (
+          <>
+            <ol className="divide-y">
+              {top.map((c, i) => {
+                const first = c.name.split(" ")[0]
+                const wa = whatsappLink(c.phone, `Oi, ${first}! Aqui é do ${storeName}. `)
+                return (
+                  <li key={c.phone} className="flex items-center gap-3 py-2.5">
+                    <span className="w-5 shrink-0 text-right text-sm font-semibold tabular-nums text-muted-foreground">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{c.name}</p>
+                      <p className="text-xs tabular-nums text-muted-foreground">
+                        {formatPhone(c.phone)} · {c.orders} {c.orders === 1 ? "pedido" : "pedidos"} · {formatBRL(c.revenue)}
+                      </p>
+                    </div>
+                    {wa && (
+                      <a
+                        href={wa}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Chamar ${c.name} no WhatsApp`}
+                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold text-[#177a40] hover:bg-muted dark:text-green-400"
+                      >
+                        <MessageCircle className="h-4 w-4" aria-hidden />
+                        <span className="hidden sm:inline">WhatsApp</span>
+                      </a>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+            <p className="mt-3 text-xs text-muted-foreground">Ideia: mande um cupom para quem mais pede ou para quem sumiu. A lista completa está na planilha (aba Clientes).</p>
+          </>
         )}
       </CardContent>
     </Card>
