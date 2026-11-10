@@ -69,7 +69,10 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
 - Acompanhamento: status em destaque com previsão de horário, barra de progresso, "Falar com a loja" (WhatsApp com
   mensagem pronta), endereço de retirada com mapa (`stores.address`), resumo com subtotal/entrega.
 - Página 404 em português.
-**Depois:** painel da cozinha (quadro Novos / Preparando / Prontos).
+**Painel da cozinha ✅** quadro Novos / Preparando / Prontos (abas no celular), mais antigo primeiro, tempo de espera
+com alerta de atraso (laranja ≥ previsão, vermelho ≥ previsão + 10 min), observação em destaque, um botão por etapa
+com resposta imediata (useOptimistic), voltar etapa, cancelar, imprimir; som de pedido novo (liga/desliga), tela cheia
+com tela sempre acesa (Wake Lock) e contagem de novos no título da aba.
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.

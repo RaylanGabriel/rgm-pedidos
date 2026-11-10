@@ -114,12 +114,12 @@ export default async function AdminPage() {
                 <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
                   <ClipboardList className="w-6 h-6 text-accent-foreground" />
                 </div>
-                <CardTitle className="text-2xl">Pedidos Ativos</CardTitle>
-                <CardDescription>Gerenciar pedidos em andamento</CardDescription>
+                <CardTitle className="text-2xl">Cozinha</CardTitle>
+                <CardDescription>Pedidos novos, em preparo e prontos</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Visualize status, tempo de espera e atualize pedidos em tempo real
+                  Quadro com tempo de espera, alerta de atraso, som de pedido novo e tela cheia para tablet
                 </p>
               </CardContent>
             </Card>
