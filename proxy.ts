@@ -21,7 +21,7 @@ export function proxy(request: NextRequest) {
     const store = m && storeOrigin(m[1])
     if (store) return redirect(`${store}${m[2] ?? ""}${search}`)
     // raiz antiga abria o cardápio da loja padrão: continua abrindo, no endereço novo
-    const home = pathname === "/" && storeOrigin(process.env.DEFAULT_STORE_SLUG || "mr-smash")
+    const home = pathname === "/" && storeOrigin(process.env.DEFAULT_STORE_SLUG || "mrsmash")
     if (home) return redirect(`${home}/`)
     const panel = panelOrigin()
     if (panel && pathname.startsWith("/admin")) return redirect(`${panel}${pathname}${search}`)

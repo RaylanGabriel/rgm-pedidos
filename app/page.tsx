@@ -5,5 +5,5 @@ import { redirect } from "next/navigation"
  * Quando a plataforma tiver uma página própria (apresentação para novos carrinhos), ela entra aqui.
  */
 export default function Home() {
-  redirect(`/loja/${process.env.DEFAULT_STORE_SLUG || "mr-smash"}`)
+  redirect(`/loja/${process.env.DEFAULT_STORE_SLUG || "mrsmash"}`)
 }
