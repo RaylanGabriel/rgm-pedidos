@@ -45,6 +45,9 @@ export interface OrderView {
   completedAt: string | null
   /** Cliente confirmou o recebimento pelo celular */
   customerConfirmedAt: string | null
+  outForDeliveryAt: string | null
+  /** Fechado sozinho 1h depois de sair para entrega */
+  autoDelivered: boolean
 }
 
 export type OrderWithItemsView = OrderView & { items: OrderItemView[] }

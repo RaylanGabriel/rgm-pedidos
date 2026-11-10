@@ -73,6 +73,9 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
 com alerta de atraso (laranja ≥ previsão, vermelho ≥ previsão + 10 min), observação em destaque, um botão por etapa
 com resposta imediata (useOptimistic), voltar etapa, cancelar, imprimir; som de pedido novo (liga/desliga), tela cheia
 com tela sempre acesa (Wake Lock) e contagem de novos no título da aba.
+Etapa "Saiu para entrega" (só entregas) com a mesma sequência na cozinha e no cliente (`orderSteps`); cliente
+confirma "Recebi meu pedido"; se ninguém confirmar, fecha sozinho 1h após a saída (`autoCompleteDeliveries`,
+roda ao ler pedidos — sem tarefa agendada).
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.

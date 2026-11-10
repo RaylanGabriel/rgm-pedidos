@@ -102,7 +102,11 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
                   <div className="mt-4 space-y-2 rounded-2xl bg-background/80 p-4">
                     <p className="text-sm font-semibold">Já chegou? Avise a loja com um toque:</p>
                     <ConfirmDelivery token={order.publicToken} />
+                    <p className="text-xs text-muted-foreground">Se você não confirmar, marcamos como entregue 1 hora depois da saída.</p>
                   </div>
+                )}
+                {order.status === "delivered" && order.autoDelivered && (
+                  <p className="mt-3 text-sm text-muted-foreground">Marcado como entregue automaticamente. Algum problema? Fale com a loja.</p>
                 )}
                 {order.status === "delivered" && order.customerConfirmedAt && (
                   <p className="mt-3 text-sm text-muted-foreground">

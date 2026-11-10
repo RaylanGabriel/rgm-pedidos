@@ -235,6 +235,8 @@ export const orders = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     customerConfirmedAt: timestamp("customer_confirmed_at", { withTimezone: true }), // cliente tocou "Recebi meu pedido"
+    outForDeliveryAt: timestamp("out_for_delivery_at", { withTimezone: true }), // quando saiu para entrega
+    autoDelivered: boolean("auto_delivered").notNull().default(false), // fechado sozinho 1h depois de sair
   },
   (t) => [
     uniqueIndex("orders_store_number_unique").on(t.storeId, t.orderNumber),

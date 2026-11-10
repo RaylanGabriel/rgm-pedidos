@@ -311,6 +311,7 @@ export function KitchenBoard({
                     {STATUS_LABEL[o.status]}
                     {o.completedAt && ` ${formatTimeSP(o.completedAt)}`}
                     {o.customerConfirmedAt && <span className="ml-1 text-green-700 dark:text-green-400">✓ confirmado pelo cliente</span>}
+                    {o.autoDelivered && <span className="ml-1">· automático (1h)</span>}
                   </span>
                   <span className="w-20 text-right tabular-nums">{formatBRL(o.total)}</span>
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => printOrder(o, storeName)} aria-label={`Imprimir pedido ${o.orderNumber}`}>
@@ -429,7 +430,8 @@ function OrderCard({
       {isDelivery && <p className="mx-4 mt-3 rounded-xl bg-muted px-3 py-2 text-sm">Entrega: {fullAddress(order)}</p>}
       {onTheWay && (
         <p className="mx-4 mt-2 text-xs text-muted-foreground">
-          Quando o cliente tocar “Recebi meu pedido”, ele sai daqui sozinho. Ou marque abaixo.
+          Sai daqui quando o cliente tocar “Recebi meu pedido”, quando você marcar abaixo ou, sozinho,
+          {order.outForDeliveryAt && ` às ${formatTimeSP(new Date(new Date(order.outForDeliveryAt).getTime() + 60 * 60_000).toISOString())}`} (1h após a saída).
         </p>
       )}
 

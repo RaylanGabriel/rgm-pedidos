@@ -246,6 +246,8 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     createdAt: o.createdAt.toISOString(),
     completedAt: o.completedAt?.toISOString() ?? null,
     customerConfirmedAt: o.customerConfirmedAt?.toISOString() ?? null,
+    outForDeliveryAt: o.outForDeliveryAt?.toISOString() ?? null,
+    autoDelivered: o.autoDelivered,
     items: o.items.map((i) => ({
       id: i.id,
       name: i.nameSnapshot,
@@ -266,19 +268,48 @@ const withItems = {
 /** Pedido pelo token público (link de acompanhamento do cliente). */
 export async function getOrderByToken(token: string) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null
-  const row = await db.query.orders.findFirst({
-    where: eq(orders.publicToken, token),
-    with: { ...withItems, store: true },
-  })
+  const find = () =>
+    db.query.orders.findFirst({
+      where: eq(orders.publicToken, token),
+      with: { ...withItems, store: true },
+    })
+  let row = await find()
+  if (row?.status === "out_for_delivery") {
+    await autoCompleteDeliveries(row.storeId)
+    row = await find()
+  }
   if (!row) return null
   return { order: toView(row), store: publicStore(row.store) }
 }
 
 /** Pedidos da loja, com filtros opcionais de período e status. */
+/** Depois de quanto tempo "saiu para entrega" vira "entregue" sozinho (se ninguém confirmar). */
+export const AUTO_DELIVER_MINUTES = 60
+
+/**
+ * Fecha as entregas que saíram há mais de AUTO_DELIVER_MINUTES e ninguém confirmou.
+ * Roda ao ler pedidos (cozinha atualiza a cada 8s, cliente a cada 10s): não precisa de tarefa agendada.
+ * Pedidos antigos sem `out_for_delivery_at` usam o horário do pedido.
+ */
+export async function autoCompleteDeliveries(storeId: string) {
+  const since = sql`coalesce(${orders.outForDeliveryAt}, ${orders.createdAt})`
+  await db
+    .update(orders)
+    .set({ status: "delivered", autoDelivered: true, completedAt: sql`${since} + make_interval(mins => ${AUTO_DELIVER_MINUTES})` })
+    .where(
+      and(
+        eq(orders.storeId, storeId),
+        eq(orders.status, "out_for_delivery"),
+        sql`${since} < now() - make_interval(mins => ${AUTO_DELIVER_MINUTES})`,
+      ),
+    )
+}
+
 export async function listOrders(
   storeId: string,
   filter: { from?: Date; to?: Date; statuses?: OrderStatus[]; limit?: number } = {},
 ) {
+  await autoCompleteDeliveries(storeId)
   const rows = await db.query.orders.findMany({
     where: and(
       eq(orders.storeId, storeId),
@@ -312,7 +343,13 @@ export async function setOrderStatus(storeId: string, orderId: string, status: O
   const done = status === "delivered" || status === "cancelled"
   const updated = await db
     .update(orders)
-    .set({ status, completedAt: done ? new Date() : null })
+    .set({
+      status,
+      completedAt: done ? new Date() : null,
+      autoDelivered: false,
+      // marca quando saiu (conta a 1h do fechamento automático); voltar etapa limpa
+      ...(status === "out_for_delivery" ? { outForDeliveryAt: new Date() } : done ? {} : { outForDeliveryAt: null }),
+    })
     .where(
       and(
         eq(orders.id, orderId),
