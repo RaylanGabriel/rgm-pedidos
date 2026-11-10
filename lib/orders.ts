@@ -298,7 +298,14 @@ export async function setOrderStatus(storeId: string, orderId: string, status: O
   const updated = await db
     .update(orders)
     .set({ status, completedAt: done ? new Date() : null })
-    .where(and(eq(orders.id, orderId), eq(orders.storeId, storeId)))
+    .where(
+      and(
+        eq(orders.id, orderId),
+        eq(orders.storeId, storeId),
+        // "saiu para entrega" só existe para pedidos de entrega
+        status === "out_for_delivery" ? eq(orders.type, "delivery") : undefined,
+      ),
+    )
     .returning({ id: orders.id })
   return updated.length > 0
 }

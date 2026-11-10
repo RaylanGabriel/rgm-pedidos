@@ -26,20 +26,30 @@ import { Button } from "@/components/ui/button"
 import { updateOrderStatusAction } from "@/app/admin/actions"
 import { formatTimeSP } from "@/lib/dates"
 import { formatPhone } from "@/lib/links"
-import { formatBRL, fullAddress, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus, type OrderWithItemsView } from "@/lib/order-shared"
+import {
+  formatBRL,
+  fullAddress,
+  nextStatus,
+  PAYMENT_LABEL,
+  prevStatus,
+  STATUS_LABEL,
+  TYPE_LABEL,
+  type OrderStatus,
+  type OrderWithItemsView,
+} from "@/lib/order-shared"
 import { printOrder } from "@/lib/print-order"
 import { cn } from "@/lib/utils"
 
-type ActiveStatus = "pending" | "preparing" | "ready"
+/** Colunas do quadro ("Prontos" também mostra os pedidos que saíram para entrega) */
+type Column = "pending" | "preparing" | "ready"
+const COLUMN_OF: Partial<Record<OrderStatus, Column>> = { pending: "pending", preparing: "preparing", ready: "ready", out_for_delivery: "ready" }
 
-const COLUMNS: { status: ActiveStatus; title: string; icon: typeof Clock; dot: string }[] = [
+const COLUMNS: { status: Column; title: string; icon: typeof Clock; dot: string }[] = [
   { status: "pending", title: "Novos", icon: Clock, dot: "bg-primary" },
   { status: "preparing", title: "Preparando", icon: ChefHat, dot: "bg-amber-500" },
   { status: "ready", title: "Prontos", icon: CheckCircle2, dot: "bg-green-600" },
 ]
 
-const NEXT: Record<ActiveStatus, OrderStatus> = { pending: "preparing", preparing: "ready", ready: "delivered" }
-const PREV: Partial<Record<ActiveStatus, OrderStatus>> = { preparing: "pending", ready: "preparing" }
 const TYPE_ICON = { pickup: ShoppingBag, delivery: Bike, dine_in: UtensilsCrossed }
 
 const minutesSince = (iso: string, now: number) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60_000))
@@ -89,7 +99,7 @@ export function KitchenBoard({
   const now = useNow()
   const [, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<ActiveStatus>("pending")
+  const [tab, setTab] = useState<Column>("pending")
   const [sound, setSound] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [showFinished, setShowFinished] = useState(false)
@@ -99,9 +109,12 @@ export function KitchenBoard({
     state.map((o) => (o.id === id ? { ...o, status } : o)),
   )
   const byStatus = useMemo(() => {
-    const g: Record<ActiveStatus, OrderWithItemsView[]> = { pending: [], preparing: [], ready: [] }
-    for (const o of orders) if (o.status in g) g[o.status as ActiveStatus].push(o)
-    for (const k of Object.keys(g) as ActiveStatus[]) g[k].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) // mais antigo primeiro
+    const g: Record<Column, OrderWithItemsView[]> = { pending: [], preparing: [], ready: [] }
+    for (const o of orders) {
+      const col = COLUMN_OF[o.status]
+      if (col) g[col].push(o)
+    }
+    for (const k of Object.keys(g) as Column[]) g[k].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) // mais antigo primeiro
     return g
   }, [orders])
 
@@ -323,7 +336,7 @@ function OrderCard({
   storeName: string
   onMove: (order: OrderWithItemsView, status: OrderStatus) => void
 }) {
-  const status = order.status as ActiveStatus
+  const status = order.status
   const waited = minutesSince(order.createdAt, now)
   const cooking = status === "pending" || status === "preparing"
   const late = cooking && waited >= order.estimatedWaitMinutes
@@ -331,14 +344,19 @@ function OrderCard({
   const isNew = status === "pending" && waited < 2
   const TypeIcon = TYPE_ICON[order.type]
   const isDelivery = order.type === "delivery"
-  const prev = PREV[status]
+  // Mesma sequência de etapas que o cliente vê (lib/order-shared → orderSteps)
+  const next = nextStatus(status, order.type)
+  const prev = prevStatus(status, order.type)
+  const onTheWay = status === "out_for_delivery"
 
   const primary =
-    status === "pending"
+    next === "preparing"
       ? { label: "Começar preparo", icon: ChefHat, cls: "" }
-      : status === "preparing"
+      : next === "ready"
         ? { label: "Pronto", icon: CheckCircle2, cls: "bg-green-700 text-white hover:bg-green-800" }
-        : { label: isDelivery ? "Saiu para entrega" : "Entregue ao cliente", icon: isDelivery ? Bike : ShoppingBag, cls: "bg-foreground text-background hover:bg-foreground/90" }
+        : next === "out_for_delivery"
+          ? { label: "Saiu para entrega", icon: Bike, cls: "bg-foreground text-background hover:bg-foreground/90" }
+          : { label: isDelivery ? "Entregue ao cliente" : "Retirado / entregue", icon: isDelivery ? CheckCircle2 : ShoppingBag, cls: "bg-foreground text-background hover:bg-foreground/90" }
 
   return (
     <article
@@ -353,6 +371,14 @@ function OrderCard({
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-3xl font-black leading-none tabular-nums">#{order.orderNumber}</span>
             {isNew && <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">NOVO</span>}
+            {status === "ready" && isDelivery && (
+              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-900 dark:bg-green-950 dark:text-green-200">Aguardando entregador</span>
+            )}
+            {onTheWay && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-900 dark:bg-blue-950 dark:text-blue-200">
+                <Bike className="h-3 w-3" aria-hidden />A caminho
+              </span>
+            )}
           </div>
           <p className="mt-1.5 truncate font-semibold">{order.customerName}</p>
           {order.customerPhone && (
@@ -407,7 +433,7 @@ function OrderCard({
       </div>
 
       <div className="space-y-2 p-4 pt-3">
-        <Button className={cn("h-12 w-full rounded-xl text-base font-bold", primary.cls)} onClick={() => onMove(order, NEXT[status])}>
+        <Button className={cn("h-12 w-full rounded-xl text-base font-bold", primary.cls)} onClick={() => next && onMove(order, next)}>
           <primary.icon className="h-5 w-5" aria-hidden />
           {primary.label}
         </Button>

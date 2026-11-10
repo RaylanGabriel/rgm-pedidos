@@ -8,7 +8,7 @@ import { stores } from "@/db/schema"
 import { requireStore } from "@/lib/auth/session"
 import { createOrder, setOrderStatus, type CreateOrderResult } from "@/lib/orders"
 
-const statusSchema = z.enum(["pending", "preparing", "ready", "delivered", "cancelled"])
+const statusSchema = z.enum(["pending", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"])
 
 /** Muda o status de um pedido da loja ativa. */
 export async function updateOrderStatusAction(orderId: string, status: string) {

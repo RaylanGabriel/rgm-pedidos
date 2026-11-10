@@ -21,7 +21,8 @@ import {
 export const orderStatus = pgEnum("order_status", [
   "pending", // recebido, aguardando confirmação
   "preparing",
-  "ready",
+  "ready", // pronto (retirada: no balcão; entrega: aguardando o entregador)
+  "out_for_delivery", // saiu para entrega (só pedidos de entrega)
   "delivered",
   "cancelled",
 ])

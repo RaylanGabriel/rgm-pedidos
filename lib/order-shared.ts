@@ -5,7 +5,7 @@
 import { z } from "zod"
 import { sanitizeString } from "@/lib/validations"
 
-export type OrderStatus = "pending" | "preparing" | "ready" | "delivered" | "cancelled"
+export type OrderStatus = "pending" | "preparing" | "ready" | "out_for_delivery" | "delivered" | "cancelled"
 export type OrderType = "pickup" | "delivery" | "dine_in"
 export type PaymentMethod = "pix" | "cash" | "card_on_delivery"
 
@@ -52,18 +52,37 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: "Recebido",
   preparing: "Preparando",
   ready: "Pronto",
+  out_for_delivery: "Saiu para entrega",
   delivered: "Entregue",
   cancelled: "Cancelado",
 }
 
-/** Próximo passo no fluxo da cozinha (null = fim). */
-export const NEXT_STATUS: Record<OrderStatus, OrderStatus | null> = {
-  pending: "preparing",
-  preparing: "ready",
-  ready: "delivered",
-  delivered: null,
-  cancelled: null,
+/**
+ * Etapas do pedido — a MESMA sequência para a cozinha e para o cliente.
+ * Entrega tem a etapa "saiu para entrega" entre "pronto" (aguardando o entregador) e "entregue".
+ */
+export function orderSteps(type: OrderType): OrderStatus[] {
+  return type === "delivery"
+    ? ["pending", "preparing", "ready", "out_for_delivery", "delivered"]
+    : ["pending", "preparing", "ready", "delivered"]
 }
+
+/** Próxima etapa (null = fim ou cancelado). */
+export function nextStatus(status: OrderStatus, type: OrderType): OrderStatus | null {
+  const steps = orderSteps(type)
+  const i = steps.indexOf(status)
+  return i >= 0 && i < steps.length - 1 ? steps[i + 1] : null
+}
+
+/** Etapa anterior, para desfazer um toque errado (só antes de finalizar). */
+export function prevStatus(status: OrderStatus, type: OrderType): OrderStatus | null {
+  const steps = orderSteps(type)
+  const i = steps.indexOf(status)
+  return i > 0 && status !== "delivered" ? steps[i - 1] : null
+}
+
+/** Pedido ainda em andamento (aparece no quadro da cozinha). */
+export const ACTIVE_STATUSES: OrderStatus[] = ["pending", "preparing", "ready", "out_for_delivery"]
 
 export const TYPE_LABEL: Record<OrderType, string> = {
   pickup: "Retirada",

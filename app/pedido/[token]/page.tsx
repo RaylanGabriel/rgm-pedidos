@@ -8,34 +8,46 @@ import { brandStyle } from "@/lib/color"
 import { formatDateTimeSP, formatTimeSP } from "@/lib/dates"
 import { mapsLink, whatsappLink } from "@/lib/links"
 import { getOrderByToken } from "@/lib/orders"
-import { formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
+import { formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Acompanhar pedido", robots: { index: false } }
 
-const STEPS: OrderStatus[] = ["pending", "preparing", "ready", "delivered"]
-const STEP_ICON = { pending: Clock, preparing: ChefHat, ready: CheckCircle2, delivered: Package, cancelled: XCircle }
+const STEP_ICON: Record<OrderStatus, typeof Clock> = {
+  pending: Clock,
+  preparing: ChefHat,
+  ready: CheckCircle2,
+  out_for_delivery: Bike,
+  delivered: Package,
+  cancelled: XCircle,
+}
+/** Rótulo curto da barra de progresso */
+const SHORT_LABEL: Partial<Record<OrderStatus, string>> = { out_for_delivery: "A caminho" }
 
 export default async function PedidoPage({ params }: { params: Promise<{ token: string }> }) {
   const data = await getOrderByToken((await params).token)
   if (!data) notFound()
   const { order, store } = data
   const finished = order.status === "delivered" || order.status === "cancelled"
-  const step = STEPS.indexOf(order.status)
+  const steps = orderSteps(order.type) // mesma sequência do quadro da cozinha
+  const step = steps.indexOf(order.status)
   const isDelivery = order.type === "delivery"
+  // Momento de agir: retirar no balcão, ou o pedido está chegando
+  const highlight = (order.status === "ready" && !isDelivery) || order.status === "out_for_delivery"
   const eta = formatTimeSP(new Date(new Date(order.createdAt).getTime() + order.estimatedWaitMinutes * 60_000).toISOString())
 
   const headline: Record<OrderStatus, { title: string; text: string }> = {
     pending: { title: "Recebemos seu pedido!", text: `A loja já foi avisada. Previsão: por volta das ${eta}.` },
     preparing: { title: "Seu pedido está sendo preparado", text: `Previsão: por volta das ${eta}.` },
     ready: isDelivery
-      ? { title: "Saiu para entrega!", text: "Seu pedido está a caminho." }
+      ? { title: "Pedido pronto!", text: "Aguardando o entregador sair com o seu pedido." }
       : { title: "Pronto! Pode retirar", text: `Diga o número #${order.orderNumber} no balcão.` },
+    out_for_delivery: { title: "Saiu para entrega!", text: "Seu pedido está a caminho. Fique de olho no interfone." },
     delivered: { title: "Pedido entregue", text: "Bom apetite! Obrigado pela preferência." },
     cancelled: { title: "Pedido cancelado", text: "Em caso de dúvida, fale com a loja." },
   }
   const { title, text } = headline[order.status]
-  const Icon = order.status === "ready" && isDelivery ? Bike : STEP_ICON[order.status]
+  const Icon = STEP_ICON[order.status]
 
   const whats = whatsappLink(store.phone, `Olá! Sobre o meu pedido #${order.orderNumber} (${order.customerName}).`)
   const map = !isDelivery ? mapsLink(store.address) : null
@@ -51,7 +63,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
           <section
             className={cn(
               "overflow-hidden rounded-3xl border shadow-sm",
-              order.status === "ready" ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950" : "bg-card",
+              highlight ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950" : "bg-card",
               order.status === "cancelled" && "border-destructive/30 bg-destructive/5",
             )}
             aria-live="polite"
@@ -60,7 +72,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
               <span
                 className={cn(
                   "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl",
-                  order.status === "ready" ? "bg-green-600 text-white" : order.status === "cancelled" ? "bg-destructive text-white" : "bg-primary text-primary-foreground",
+                  highlight ? "bg-green-600 text-white" : order.status === "cancelled" ? "bg-destructive text-white" : "bg-primary text-primary-foreground",
                 )}
                 aria-hidden
               >
@@ -75,12 +87,12 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
 
             {order.status !== "cancelled" && (
               <div className="px-5 pb-5">
-                <ol className="grid grid-cols-4 gap-1.5" aria-label="Andamento do pedido">
-                  {STEPS.map((s, i) => (
+                <ol className={cn("grid gap-1.5", steps.length === 5 ? "grid-cols-5" : "grid-cols-4")} aria-label="Andamento do pedido">
+                  {steps.map((s, i) => (
                     <li key={s} aria-current={i === step ? "step" : undefined}>
-                      <span className={cn("block h-1.5 rounded-full", i <= step ? (order.status === "ready" ? "bg-green-600" : "bg-primary") : "bg-muted")} />
+                      <span className={cn("block h-1.5 rounded-full", i <= step ? (highlight ? "bg-green-600" : "bg-primary") : "bg-muted")} />
                       <span className={cn("mt-1.5 block text-xs", i === step ? "font-bold" : "text-muted-foreground")}>
-                        {s === "ready" && isDelivery ? "A caminho" : STATUS_LABEL[s]}
+                        {SHORT_LABEL[s] ?? STATUS_LABEL[s]}
                       </span>
                     </li>
                   ))}
