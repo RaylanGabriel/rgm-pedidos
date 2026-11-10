@@ -1,7 +1,7 @@
 # Roadmap
 
 Plano do produto (cardápio digital + pedidos para lanchonetes e carrinhos, multi-loja).
-Cada item é entregue sozinho: implementa → testa → commit → preview → `main`.
+Cada item é entregue sozinho: branch → implementa → testa → commit → preview → aprovado → `main`.
 
 Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 
@@ -12,7 +12,8 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - Login próprio do painel (sessão no banco, rate limit, papéis owner/staff + superadmin).
 - Pedido criado pela função `create_order()` no banco: preço sempre calculado no servidor.
 - Acompanhamento público por token, painel da cozinha, relatórios, editor de cardápio, configurações + QR code.
-- Deploy: Vercel (`main` = produção, branches = preview).
+- Impressão do pedido em bobina 58 mm (trazida da versão do v0).
+- Deploy: Vercel (`main` = produção, branches = preview). Variáveis antigas do Supabase removidas; `SITE_URL` cadastrada.
 
 ## ✅ 1. Lembrar os dados do cliente no aparelho
 **Objetivo:** quem já pediu não digita tudo de novo. Sem login.
@@ -24,10 +25,16 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 ## ✅ 2. Painel do super admin (criar lojas para clientes)
 **Objetivo:** criar a loja de um cliente sem terminal/SQL.
 - `/admin/lojas` (só `is_superadmin`): lista de lojas, criar loja + dono num formulário,
-  suspender (com motivo mostrado ao dono) / reativar loja, "entrar como" (trocar `active_store_id` da sessão) para dar suporte.
+  suspender / reativar loja, "entrar como" (trocar `active_store_id` da sessão) para dar suporte.
 - Senha provisória + troca obrigatória no primeiro acesso (`users.must_change_password`).
 - "Minha conta → trocar senha" para todos.
 - Opcional: cardápio inicial modelo ao criar a loja.
+
+**Extras pedidos durante o item 2 ✅**
+- **Motivo da suspensão** em texto livre (ex.: "contrato encerrado", "falta de pagamento"), mostrado ao dono e à equipe
+  (`stores.suspended_reason`, `suspended_at`).
+- **Fotos** de lanches, bebidas etc. e **logo** por upload (Vercel Blob, store `cardapio-fotos`): imagem reduzida no
+  navegador (WebP), conferida no servidor (tipo real do arquivo, até 2 MB), foto antiga apagada ao trocar.
 
 ## ✅ 3. Taxa de entrega por localização
 **Objetivo:** cobrar a entrega certa sem depender de API paga.
@@ -47,7 +54,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - Distância em linha reta (Haversine) calculada no banco → faixa de preço.
 
 ## ✅ 4. Cardápio mais completo + novo design
-Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`).
+Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`). Cor da marca: `#8d1a1e`.
 
 **Etapas 1–2 ✅ (experiência no celular + base visual)**
 - Topo da loja: capa na cor da marca, logo, status, tempo de preparo, entrega e pedido mínimo.
@@ -55,12 +62,11 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
   celular / modal no computador) com adicionais, quantidade e botão com o total.
 - Barra fixa "Ver carrinho" no celular; carrinho lateral no computador; alvos de toque ≥ 36–44px.
 - Adicionais por categoria (`categories.extras_enabled`, validado também em `create_order`).
-- Cardápio de demonstração com ilustrações: `npm run demo:seed -- --store <slug>`.
-
-- Capa da loja por upload (`stores.cover_url`); itens em mais de uma categoria (`menu_item_categories`,
-  "Também mostrar em"); menu ☰ com todas as categorias quando há 5 ou mais.
-
-- Ordem própria dos itens "também mostrados" numa categoria (`menu_item_categories.sort_order`, setas no painel).
+- Cardápio de demonstração com ilustrações (lanches, porções, bebidas): `npm run demo:seed -- --store <slug> [--cover | --only-cover]`.
+- **Capa da loja** por upload (`stores.cover_url`), para o dono ter a própria identidade visual.
+- **Categorias criadas pelo dono aparecem no cardápio** (ex.: "Vegetarianos", "⭐ Mais pedidos"); itens em mais de uma
+  categoria (`menu_item_categories`, "Também mostrar em"), com ordem própria dentro de cada uma (`sort_order`, setas no painel).
+- **Menu ☰** com todas as categorias em lista quando há 5 ou mais.
 
 **Etapas 3–4 ✅**
 - "Para acompanhar" no carrinho e no checkout (itens de categorias sem adicionais, prioriza o que falta no carrinho).
@@ -69,13 +75,40 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
 - Acompanhamento: status em destaque com previsão de horário, barra de progresso, "Falar com a loja" (WhatsApp com
   mensagem pronta), endereço de retirada com mapa (`stores.address`), resumo com subtotal/entrega.
 - Página 404 em português.
-**Painel da cozinha ✅** quadro Novos / Preparando / Prontos (abas no celular), mais antigo primeiro, tempo de espera
-com alerta de atraso (laranja ≥ previsão, vermelho ≥ previsão + 10 min), observação em destaque, um botão por etapa
-com resposta imediata (useOptimistic), voltar etapa, cancelar, imprimir; som de pedido novo (liga/desliga), tela cheia
-com tela sempre acesa (Wake Lock) e contagem de novos no título da aba.
-Etapa "Saiu para entrega" (só entregas) com a mesma sequência na cozinha e no cliente (`orderSteps`); cliente
-confirma "Recebi meu pedido"; se ninguém confirmar, fecha sozinho 1h após a saída (`autoCompleteDeliveries`,
-roda ao ler pedidos — sem tarefa agendada).
+
+**Painel da cozinha ✅**
+- Quadro Novos / Preparando / Prontos (abas no celular), mais antigo primeiro, tempo de espera com alerta de atraso
+  (laranja ≥ previsão, vermelho ≥ previsão + 10 min), selo NOVO, observação em destaque.
+- Um botão por etapa com resposta imediata (useOptimistic), voltar etapa, cancelar, imprimir.
+- Som de pedido novo (liga/desliga), tela cheia com tela sempre acesa (Wake Lock), contagem de novos no título da aba.
+
+**Fluxo de entrega ✅ (pedido durante o painel da cozinha)**
+- Etapa **"Saiu para entrega"** (só entregas), com a **mesma sequência na cozinha e no cliente** (`orderSteps` em
+  `lib/order-shared.ts`) — corrigiu a cozinha e o cliente mostrando etapas diferentes.
+- Cliente confirma **"Recebi meu pedido"** na tela de acompanhamento (`orders.customer_confirmed_at`).
+- Se ninguém confirmar, **fecha sozinho 1h após a saída** (`out_for_delivery_at`, `auto_delivered`,
+  `autoCompleteDeliveries`, roda ao ler pedidos — o plano grátis da Vercel não tem tarefa agendada frequente).
+
+## ✅ 4b. Relatórios (fora do plano original)
+Revisão de bugs, lógica e design com o plugin de design + skill de gráficos (dataviz).
+
+**Correções**
+- Contas feitas **no banco** (`lib/reports.ts`): antes somava só os 5.000 pedidos carregados (números errados em períodos grandes).
+- Relatórios e fechamento de caixa **só para o dono** (a equipe não vê faturamento).
+- Histórico paginado (30 por página); datas inválidas recusadas; período máximo de 1 ano.
+
+**Novidades**
+- Atalhos de período (Hoje, Ontem, 7 dias, 30 dias, Este mês, Mês passado) e **comparação com o período anterior**.
+- Faturamento por dia (por mês acima de 62 dias) com detalhe ao tocar, melhor dia, **horário de pico**.
+- Quebras por forma de pagamento, tipo de pedido e bairro; mais vendidos com faturamento; adicionais mais pedidos.
+- **Planilha Excel (.xlsx)** gerada sem biblioteca (`lib/xlsx.ts`): abas Resumo, Pedidos, Itens e Clientes, com números
+  e datas de verdade (o CSV quebrava as colunas no Excel configurado com vírgula).
+- **Fechamento de caixa** (`/admin/relatorios/caixa`): resumo do dia para imprimir (térmica ou A4), total por pagamento,
+  fundo de troco lembrado no aparelho, esperado × contado na gaveta (sobrando/faltando), aviso de pedidos em aberto.
+- **Melhores clientes** pelo telefone, com botão de WhatsApp e quantos voltaram a pedir.
+- **Tempo médio** (até ficar pronto, entrega, total) com alerta quando passa do tempo prometido; novo `orders.ready_at`
+  (só conta pedidos a partir de nov/2026).
+- **Pouca saída**: itens abaixo de 30% da média do cardápio, com dica (promoção, combo, tirar do cardápio).
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.
@@ -90,6 +123,20 @@ roda ao ler pedidos — sem tarefa agendada).
 ## 💭 Depois
 - Horário de funcionamento automático (abre/fecha sozinho).
 - Notificação no WhatsApp quando o pedido fica pronto.
-- Cupons / fidelidade ("10º lanche grátis").
+- Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
+- Campo "Troco para R$ ___" no checkout quando o pagamento é dinheiro (hoje vai nas observações).
 - Banco separado para preview (branch do Neon) para testes não sujarem a produção.
 - Cobrança das lojas (plano mensal) quando houver clientes.
+
+---
+
+## Pendências do Mr. Smash (dados, não código)
+- Cadastrar endereço e WhatsApp da loja em Configurações (aparecem no topo e no acompanhamento).
+- Categorias de teste ("Teste 1/2/3", "Teste") podem ser apagadas quando quiser.
+
+## Notas técnicas
+- **Banco único** para dev, preview e produção: toda migration vale na hora para todos — só mudanças compatíveis
+  (colunas novas opcionais) antes do merge.
+- Migrations em `drizzle/` (0003 → 0016): `npm run db:generate -- --name x` e `npm run db:migrate`.
+- Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
+- Datas no fuso de São Paulo (`lib/dates.ts`).
