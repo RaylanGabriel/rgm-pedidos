@@ -1,0 +1,1 @@
+ALTER TABLE "categories" ADD COLUMN "extras_enabled" boolean DEFAULT true NOT NULL;

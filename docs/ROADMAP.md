@@ -46,12 +46,20 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
   (ViaCEP → endereço; geocodificação via Nominatim/OpenStreetMap, gratuito com limite).
 - Distância em linha reta (Haversine) calculada no banco → faixa de preço.
 
-## ⏳ 4. Cardápio mais completo + novo design
-- Seed de teste com várias categorias: lanches, porções, bebidas, sobremesas, combos.
-- ✅ Foto por item e logo (upload via Vercel Blob, reduzida no navegador) — entregue junto com o item 2.
-- Design do site do cliente: capa/banner da loja, navegação por categorias fixa no topo,
-  cards com foto, carrinho flutuante no celular, estados vazios/esgotado mais claros.
-- Painel da cozinha: visual de "quadro" (Novos / Preparando / Prontos), modo tela cheia.
+## 🔨 4. Cardápio mais completo + novo design
+Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`).
+
+**Etapas 1–2 ✅ (experiência no celular + base visual)**
+- Topo da loja: capa na cor da marca, logo, status, tempo de preparo, entrega e pedido mínimo.
+- Abas de categoria fixas (acompanham a rolagem), cards com foto e "+", janela do item (bottom sheet no
+  celular / modal no computador) com adicionais, quantidade e botão com o total.
+- Barra fixa "Ver carrinho" no celular; carrinho lateral no computador; alvos de toque ≥ 36–44px.
+- Adicionais por categoria (`categories.extras_enabled`, validado também em `create_order`).
+- Cardápio de demonstração com ilustrações: `npm run demo:seed -- --store <slug>`.
+
+**Etapa 3 ⏳** destaque "Mais pedido", sugestão de bebida no carrinho.
+**Etapa 4 ⏳** checkout (botão fixo com total, confiança) e acompanhamento (WhatsApp, endereço).
+**Depois:** painel da cozinha (quadro Novos / Preparando / Prontos).
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.

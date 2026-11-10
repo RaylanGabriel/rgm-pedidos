@@ -97,9 +97,9 @@ export function ItemForm({
   )
 }
 
-export function CategoryForm({ category }: { category?: { id: string; name: string } }) {
+export function CategoryForm({ category }: { category?: { id: string; name: string; extrasEnabled: boolean } }) {
   return (
-    <ActionForm action={saveCategoryAction} resetOnSuccess={!category} className="flex flex-wrap items-end gap-2">
+    <ActionForm action={saveCategoryAction} resetOnSuccess={!category} className="flex flex-wrap items-end gap-x-3 gap-y-2">
       {(s) => (
         <>
           {category && <input type="hidden" name="id" value={category.id} />}
@@ -113,7 +113,11 @@ export function CategoryForm({ category }: { category?: { id: string; name: stri
             error={s.fieldErrors?.name}
             className="flex-1 min-w-48"
           />
-          <SubmitButton variant={category ? "outline" : "default"}>{category ? "Renomear" : "Criar"}</SubmitButton>
+          <label className="flex items-center gap-2 text-sm h-9 cursor-pointer" title="Mostra a lista de adicionais (bacon, queijo…) ao escolher itens desta categoria">
+            <input type="checkbox" name="extrasEnabled" defaultChecked={category?.extrasEnabled ?? true} className="h-4 w-4 accent-[var(--primary)]" />
+            Oferecer adicionais
+          </label>
+          <SubmitButton variant={category ? "outline" : "default"}>{category ? "Salvar" : "Criar"}</SubmitButton>
         </>
       )}
     </ActionForm>

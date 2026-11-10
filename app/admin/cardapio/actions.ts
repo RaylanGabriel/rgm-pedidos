@@ -161,12 +161,15 @@ function swapped(ids: string[], id: string, direction: "up" | "down") {
 }
 
 // ---------- Categorias ----------
-const categorySchema = z.object({ name: z.string().min(2, "Nome muito curto").max(40, "Nome muito longo") })
+const categorySchema = z.object({
+  name: z.string().min(2, "Nome muito curto").max(40, "Nome muito longo"),
+  extrasEnabled: z.boolean(),
+})
 
 export async function saveCategoryAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const ctx = await isOwner()
   if (!ctx) return NO_PERMISSION
-  const parsed = categorySchema.safeParse({ name: formText(fd, "name") })
+  const parsed = categorySchema.safeParse({ name: formText(fd, "name"), extrasEnabled: fd.get("extrasEnabled") === "on" })
   if (!parsed.success) return zodErrorState(parsed.error)
 
   const id = formText(fd, "id")
@@ -181,7 +184,7 @@ export async function saveCategoryAction(_prev: FormState, fd: FormData): Promis
     await db.insert(categories).values({ ...parsed.data, storeId: ctx.store.id, sortOrder: n })
   }
   refresh(ctx.store.slug)
-  return { ok: true, message: id ? "Categoria renomeada." : "Categoria criada." }
+  return { ok: true, message: id ? "Categoria salva." : "Categoria criada." }
 }
 
 export async function deleteCategoryAction(id: string) {

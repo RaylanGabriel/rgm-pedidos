@@ -47,7 +47,7 @@ export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: Del
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start">
       <ItemPicker menu={menu} onAdd={(l) => setLines((p) => [...p, l])} disabled={pending} />
 
       <form onSubmit={submit} className="space-y-6 lg:sticky lg:top-6">

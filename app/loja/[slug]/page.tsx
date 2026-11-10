@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { brandStyle } from "@/lib/color"
 import { Store } from "lucide-react"
-import { getMenu, getStoreBySlug, getSuspendedStoreName, publicStore } from "@/lib/orders"
-import { StoreFooter, StoreHeader } from "@/components/store/store-header"
+import { getDeliveryConfig, getMenu, getStoreBySlug, getSuspendedStoreName, publicStore } from "@/lib/orders"
+import { StoreFooter, StoreHero } from "@/components/store/store-header"
 import { StoreMenu } from "./store-menu"
 
 type Props = { params: Promise<{ slug: string }> }
@@ -29,12 +29,12 @@ export default async function LojaPage({ params }: Props) {
       </main>
     )
   }
-  const menu = await getMenu(store.id)
+  const [menu, delivery] = await Promise.all([getMenu(store.id), getDeliveryConfig(store)])
   const pub = publicStore(store)
 
   return (
-    <div style={brandStyle(pub.primaryColor)} className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted">
-      <StoreHeader store={pub} />
+    <div style={brandStyle(pub.primaryColor)} className="min-h-screen flex flex-col bg-background">
+      <StoreHero store={pub} delivery={delivery} />
       <main className="flex-1">
         <StoreMenu store={pub} menu={menu} />
       </main>

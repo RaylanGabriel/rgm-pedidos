@@ -104,7 +104,6 @@ export function CheckoutForm({ store, menu, delivery }: { store: PublicStore; me
         </CardHeader>
         <CardContent>
           <CartSummary lines={cart.lines} deliveryFee={fee} />
-          <p className="text-xs text-muted-foreground mt-3">O valor final é confirmado pela loja ao registrar o pedido.</p>
         </CardContent>
       </Card>
 

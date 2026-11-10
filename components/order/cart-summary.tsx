@@ -1,7 +1,7 @@
 "use client"
 
-import { Minus, Plus, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Trash2 } from "lucide-react"
+import { QuantityStepper } from "@/components/order/bottom-sheet"
 import type { CartLine } from "@/lib/cart"
 import { formatBRL, lineTotal } from "@/lib/order-shared"
 
@@ -28,44 +28,44 @@ export function CartSummary({
 
   return (
     <div className="space-y-3">
-      {lines.map((line, index) => (
-        <div key={index} className="rounded-lg border bg-card p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="font-semibold">
-                {!onQuantity && `${line.quantity}x `}
-                {line.name}
-              </p>
-              {line.extras.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  + {line.extras.map((e) => (e.quantity > 1 ? `${e.quantity}x ${e.name}` : e.name)).join(", ")}
+      <ul className="divide-y">
+        {lines.map((line, index) => (
+          <li key={index} className="py-3 first:pt-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold leading-snug">
+                  {!onQuantity && <span className="text-primary">{line.quantity}x </span>}
+                  {line.name}
                 </p>
-              )}
-            </div>
-            {onRemove && (
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => onRemove(index)} aria-label={`Remover ${line.name}`}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-          <div className="flex items-center justify-between mt-2">
-            {onQuantity ? (
-              <div className="flex items-center gap-1">
-                <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => onQuantity(index, line.quantity - 1)} aria-label="Diminuir quantidade">
-                  <Minus className="w-3 h-3" />
-                </Button>
-                <span className="w-7 text-center text-sm font-medium">{line.quantity}</span>
-                <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => onQuantity(index, line.quantity + 1)} aria-label="Aumentar quantidade">
-                  <Plus className="w-3 h-3" />
-                </Button>
+                {line.extras.length > 0 && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    + {line.extras.map((e) => (e.quantity > 1 ? `${e.quantity}x ${e.name}` : e.name)).join(", ")}
+                  </p>
+                )}
               </div>
-            ) : (
-              <span />
+              <span className="shrink-0 font-bold tabular-nums">{formatBRL(lineTotal(line))}</span>
+            </div>
+            {(onQuantity || onRemove) && (
+              <div className="mt-2 flex items-center gap-2">
+                {onQuantity && (
+                  <QuantityStepper value={line.quantity} onChange={(q) => onQuantity(index, q)} size="sm" label={`quantidade de ${line.name}`} />
+                )}
+                {onRemove && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className="flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Remover ${line.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                    Remover
+                  </button>
+                )}
+              </div>
             )}
-            <span className="font-bold">{formatBRL(lineTotal(line))}</span>
-          </div>
-        </div>
-      ))}
+          </li>
+        ))}
+      </ul>
       {deliveryFee !== undefined && (
         <div className="border-t pt-3 space-y-1 text-sm">
           <div className="flex justify-between">
@@ -80,7 +80,7 @@ export function CartSummary({
       )}
       <div className="flex justify-between items-center border-t pt-3 text-lg font-bold">
         <span>Total</span>
-        <span className="text-primary">{formatBRL(cartTotal(lines) + (deliveryFee ?? 0))}</span>
+        <span className="tabular-nums">{formatBRL(cartTotal(lines) + (deliveryFee ?? 0))}</span>
       </div>
     </div>
   )

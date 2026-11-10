@@ -11,7 +11,8 @@
     "db:migrate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs migrate",
     "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio",
     "db:sql": "node --env-file=.env.local db/run-sql.mjs",
-    "user:create": "tsx --env-file=.env.local scripts/create-user.ts"
+    "user:create": "tsx --env-file=.env.local scripts/create-user.ts",
+    "demo:seed": "tsx --env-file=.env.local scripts/seed-demo.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

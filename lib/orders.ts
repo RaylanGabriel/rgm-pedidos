@@ -69,7 +69,7 @@ export interface IngredientView {
   groupName: string
 }
 export interface MenuView {
-  categories: { id: string; name: string }[]
+  categories: { id: string; name: string; extrasEnabled: boolean }[]
   items: MenuItemView[]
   ingredients: IngredientView[]
 }
@@ -77,7 +77,7 @@ export interface MenuView {
 export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
   const [cats, items, ings] = await Promise.all([
     db
-      .select({ id: categories.id, name: categories.name })
+      .select({ id: categories.id, name: categories.name, extrasEnabled: categories.extrasEnabled })
       .from(categories)
       .where(eq(categories.storeId, storeId))
       .orderBy(asc(categories.sortOrder), asc(categories.name)),

@@ -57,6 +57,20 @@
       "when": 1794316495791,
       "tag": "0007_drop_old_create_order",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794317891304,
+      "tag": "0008_category_extras",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794317894213,
+      "tag": "0009_create_order_category_extras",
+      "breakpoints": true
     }
   ]
 }

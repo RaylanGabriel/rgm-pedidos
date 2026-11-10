@@ -129,6 +129,7 @@ export const categories = pgTable(
       .references(() => stores.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
+    extrasEnabled: boolean("extras_enabled").notNull().default(true), // bebidas/sobremesas: sem adicionais
   },
   (t) => [index("categories_store_idx").on(t.storeId)],
 )
