@@ -210,6 +210,23 @@ export const deliveryZones = pgTable(
 )
 
 // ---------- Pedidos ----------
+/**
+ * Conta do Mercado Pago conectada pela loja (OAuth). Tokens criptografados (AES-256-GCM, lib/crypto.ts).
+ * Uma conta por loja; o Pix do pedido cai direto na conta do dono.
+ */
+export const storePaymentAccounts = pgTable("store_payment_accounts", {
+  storeId: uuid("store_id")
+    .primaryKey()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  mpUserId: text("mp_user_id").notNull(), // id do vendedor no Mercado Pago (chega nos webhooks)
+  accessTokenEnc: text("access_token_enc").notNull(),
+  refreshTokenEnc: text("refresh_token_enc"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  liveMode: boolean("live_mode").notNull().default(false), // false = conta/credencial de teste
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+  connectedBy: uuid("connected_by").references(() => users.id, { onDelete: "set null" }),
+})
+
 export const orders = pgTable(
   "orders",
   {
@@ -231,6 +248,11 @@ export const orders = pgTable(
     deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }).notNull().default("0"),
     total: numeric("total", { precision: 10, scale: 2 }).notNull(),
     changeFor: numeric("change_for", { precision: 10, scale: 2 }), // dinheiro: "troco para R$ ___"
+    // Pix online (Mercado Pago da loja)
+    mpOrderId: text("mp_order_id"), // id da order no Mercado Pago
+    pixCode: text("pix_code"), // Pix copia e cola
+    pixExpiresAt: timestamp("pix_expires_at", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     estimatedWaitMinutes: integer("estimated_wait_minutes").notNull(),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -243,6 +265,7 @@ export const orders = pgTable(
   (t) => [
     uniqueIndex("orders_store_number_unique").on(t.storeId, t.orderNumber),
     uniqueIndex("orders_public_token_unique").on(t.publicToken),
+    index("orders_mp_order_idx").on(t.mpOrderId),
     index("orders_store_status_created_idx").on(t.storeId, t.status, t.createdAt),
   ],
 )

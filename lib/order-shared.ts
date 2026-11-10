@@ -50,7 +50,15 @@ export interface OrderView {
   outForDeliveryAt: string | null
   /** Fechado sozinho 1h depois de sair para entrega */
   autoDelivered: boolean
+  /** Pix online (Mercado Pago): copia e cola, validade e quando foi pago */
+  pixCode: string | null
+  pixExpiresAt: string | null
+  paidAt: string | null
 }
+
+/** Pedido com Pix online ainda não pago: não entra na fila da cozinha. */
+export const awaitingPix = (o: Pick<OrderView, "pixCode" | "paymentStatus" | "status">) =>
+  !!o.pixCode && o.paymentStatus === "pending" && o.status === "pending"
 
 export type OrderWithItemsView = OrderView & { items: OrderItemView[] }
 

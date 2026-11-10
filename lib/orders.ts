@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto"
 import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
+import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
 import { categories, deliveryZones, ingredients, menuItemCategories, menuItems, orders, stores } from "@/db/schema"
 import {
   formatBRL,
@@ -198,6 +199,9 @@ export async function createOrder(
         .set({ changeFor: o.changeFor.toFixed(2) })
         .where(and(eq(orders.publicToken, token), eq(orders.storeId, storeId), sql`${orders.total} < ${o.changeFor}`))
     }
+    // Pix online: só no pedido do cliente pelo site e se a loja conectou o Mercado Pago.
+    // Se falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
+    if (o.paymentMethod === "pix" && opts.requireOpen) await attachPixCharge(storeId, token)
     return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken }
   } catch (err) {
     // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
@@ -216,6 +220,27 @@ export async function createOrder(
     if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
     console.error("Erro ao criar pedido:", err)
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." }
+  }
+}
+
+async function attachPixCharge(storeId: string, publicToken: string) {
+  try {
+    const mpToken = await storeAccessToken(storeId)
+    if (!mpToken) return
+    const [row] = await db
+      .select({ id: orders.id, orderNumber: orders.orderNumber, total: orders.total, storeName: stores.name })
+      .from(orders)
+      .innerJoin(stores, eq(stores.id, orders.storeId))
+      .where(and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)))
+      .limit(1)
+    if (!row) return
+    const pix = await createPixCharge(mpToken, { ...row, total: Number(row.total) })
+    await db
+      .update(orders)
+      .set({ mpOrderId: pix.mpOrderId, pixCode: pix.pixCode, pixExpiresAt: pix.expiresAt })
+      .where(eq(orders.id, row.id))
+  } catch (err) {
+    console.error("Pix: não foi possível gerar a cobrança no Mercado Pago:", err instanceof Error ? err.message : err)
   }
 }
 
@@ -256,6 +281,9 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     customerConfirmedAt: o.customerConfirmedAt?.toISOString() ?? null,
     outForDeliveryAt: o.outForDeliveryAt?.toISOString() ?? null,
     autoDelivered: o.autoDelivered,
+    pixCode: o.pixCode,
+    pixExpiresAt: o.pixExpiresAt?.toISOString() ?? null,
+    paidAt: o.paidAt?.toISOString() ?? null,
     items: o.items.map((i) => ({
       id: i.id,
       name: i.nameSnapshot,
@@ -285,6 +313,19 @@ export async function getOrderByToken(token: string) {
   if (row?.status === "out_for_delivery") {
     await autoCompleteDeliveries(row.storeId)
     row = await find()
+  }
+  // Pix aguardando: confere no Mercado Pago (a tela atualiza a cada poucos segundos; o webhook também confirma)
+  if (row && row.mpOrderId && row.paymentStatus === "pending" && row.status === "pending") {
+    try {
+      const result = await syncPixOrder(row.id)
+      if (result !== "pending") row = await find()
+      else if (row.pixExpiresAt && row.pixExpiresAt.getTime() < Date.now() - 5 * 60_000) {
+        await cancelOverduePix(row.storeId)
+        row = await find()
+      }
+    } catch (err) {
+      console.error("Pix: falha ao consultar o Mercado Pago:", err instanceof Error ? err.message : err)
+    }
   }
   if (!row) return null
   return { order: toView(row), store: publicStore(row.store) }
@@ -317,7 +358,7 @@ export async function listOrders(
   storeId: string,
   filter: { from?: Date; to?: Date; statuses?: OrderStatus[]; limit?: number; offset?: number } = {},
 ) {
-  await autoCompleteDeliveries(storeId)
+  await Promise.all([autoCompleteDeliveries(storeId), cancelOverduePix(storeId)])
   const rows = await db.query.orders.findMany({
     where: and(
       eq(orders.storeId, storeId),

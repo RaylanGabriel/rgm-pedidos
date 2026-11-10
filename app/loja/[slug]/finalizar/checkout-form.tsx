@@ -13,7 +13,18 @@ import type { MenuView, PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 import { placeOrder } from "./actions"
 
-export function CheckoutForm({ store, menu, delivery }: { store: PublicStore; menu: MenuView; delivery: DeliveryConfig }) {
+export function CheckoutForm({
+  store,
+  menu,
+  delivery,
+  pixOnline = false,
+}: {
+  store: PublicStore
+  menu: MenuView
+  delivery: DeliveryConfig
+  /** Loja conectou o Mercado Pago: Pix é pago pelo site logo depois de confirmar */
+  pixOnline?: boolean
+}) {
   const cart = useCart(store.slug, menu)
   const router = useRouter()
   const [fields, setFields] = useState<OrderFieldsValue>(emptyOrderFields)
@@ -106,7 +117,9 @@ export function CheckoutForm({ store, menu, delivery }: { store: PublicStore; me
   ) : isDelivery && fee === null ? (
     "Escolha o bairro"
   ) : (
-    <>Confirmar pedido · {formatBRL(total)}</>
+    <>
+      {pixOnline && fields.paymentMethod === "pix" ? "Confirmar e pagar com Pix" : "Confirmar pedido"} · {formatBRL(total)}
+    </>
   )
   const canSubmit = store.isOpen && !pending && !(isDelivery && fee === null) && !belowMin
 
@@ -156,7 +169,7 @@ export function CheckoutForm({ store, menu, delivery }: { store: PublicStore; me
           )}
 
           <div className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={total} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={total} pixOnline={pixOnline} />
 
             <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm">
               <input

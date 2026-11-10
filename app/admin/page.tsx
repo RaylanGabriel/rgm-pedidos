@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog } from "lucide-react"
+import { ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog, Wallet } from "lucide-react"
 import { toggleStoreOpenAction } from "./actions"
 import Image from "next/image"
 import { requireStore } from "@/lib/auth/session"
@@ -192,6 +192,23 @@ export default async function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Bairros atendidos, taxa de entrega e pedido mínimo</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {canManage && (
+            <Link href="/admin/pagamentos" className="group">
+              <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-accent">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
+                    <Wallet className="w-6 h-6 text-accent-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Pagamentos</CardTitle>
+                  <CardDescription>Pix pelo Mercado Pago</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Conecte sua conta: o cliente paga o Pix pelo site e o pedido só entra na cozinha depois de pago</p>
                 </CardContent>
               </Card>
             </Link>

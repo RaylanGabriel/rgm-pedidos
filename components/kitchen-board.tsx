@@ -87,14 +87,20 @@ function chime() {
   }
 }
 
+/** Pedido entra na fila quando foi feito — ou, no Pix online, quando foi pago. */
+const queuedAt = (o: OrderWithItemsView) => o.paidAt ?? o.createdAt
+
 export function KitchenBoard({
   storeName,
   active,
   finished,
+  awaitingPayment = [],
 }: {
   storeName: string
   active: OrderWithItemsView[]
   finished: OrderWithItemsView[]
+  /** Pix online gerado e ainda não pago: não entra na fila até pagar */
+  awaitingPayment?: OrderWithItemsView[]
 }) {
   const router = useRouter()
   const now = useNow()
@@ -115,7 +121,7 @@ export function KitchenBoard({
       const col = COLUMN_OF[o.status]
       if (col) g[col].push(o)
     }
-    for (const k of Object.keys(g) as Column[]) g[k].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) // mais antigo primeiro
+    for (const k of Object.keys(g) as Column[]) g[k].sort((a, b) => queuedAt(a).localeCompare(queuedAt(b))) // mais antigo primeiro (Pix: desde o pagamento)
     return g
   }, [orders])
 
@@ -255,6 +261,16 @@ export function KitchenBoard({
         </div>
       </header>
 
+      {awaitingPayment.length > 0 && (
+        <div role="status" className="border-b bg-sky-50 px-3 py-2 text-sm text-sky-950 dark:bg-sky-950 dark:text-sky-100 sm:px-4">
+          <span className="font-semibold">💳 Aguardando Pix ({awaitingPayment.length}):</span>{" "}
+          {awaitingPayment
+            .map((o) => `#${o.orderNumber} ${o.customerName.split(" ")[0]} ${formatBRL(o.total)}${o.pixExpiresAt ? ` (vence ${formatTimeSP(o.pixExpiresAt)})` : ""}`)
+            .join(" · ")}
+          <span className="block text-xs opacity-80">Entram em Novos sozinhos quando o pagamento cair. Se vencer, são cancelados.</span>
+        </div>
+      )}
+
       {error && (
         <div role="alert" className="mx-3 mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive sm:mx-4">
           {error}
@@ -340,7 +356,7 @@ function OrderCard({
   onMove: (order: OrderWithItemsView, status: OrderStatus) => void
 }) {
   const status = order.status
-  const waited = minutesSince(order.createdAt, now)
+  const waited = minutesSince(queuedAt(order), now)
   const cooking = status === "pending" || status === "preparing"
   const late = cooking && waited >= order.estimatedWaitMinutes
   const veryLate = cooking && waited >= order.estimatedWaitMinutes + 10
@@ -437,7 +453,11 @@ function OrderCard({
       )}
 
       <div className="mt-3 flex items-center justify-between px-4 text-xs text-muted-foreground">
-        <span>{PAYMENT_LABEL[order.paymentMethod]}</span>
+        {order.paidAt ? (
+          <span className="rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-900 dark:bg-green-950 dark:text-green-200">✓ Pix pago</span>
+        ) : (
+          <span>{PAYMENT_LABEL[order.paymentMethod]}</span>
+        )}
         <span className="text-sm font-bold text-foreground tabular-nums">{formatBRL(order.total)}</span>
       </div>
       {changeText(order) && (

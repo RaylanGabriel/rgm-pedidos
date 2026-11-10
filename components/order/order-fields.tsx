@@ -108,6 +108,7 @@ export function OrderFields({
   phoneRequired,
   delivery,
   total,
+  pixOnline = false,
 }: {
   value: OrderFieldsValue
   onChange: (v: OrderFieldsValue) => void
@@ -117,6 +118,8 @@ export function OrderFields({
   delivery: DeliveryConfig
   /** Total previsto do pedido (para calcular o troco) */
   total?: number
+  /** Loja aceita Pix pelo site (Mercado Pago conectado) */
+  pixOnline?: boolean
 }) {
   const canDeliver = deliveryAvailable(delivery)
   const typeLabels = canDeliver
@@ -280,7 +283,11 @@ export function OrderFields({
           disabled={disabled}
         />
         {value.paymentMethod === "cash" && <ChangeField value={value.changeFor} total={total} error={errors.changeFor} disabled={disabled} onChange={(v) => set("changeFor", v)} />}
-        <p className="text-xs text-muted-foreground">O pagamento é feito direto com a loja.</p>
+        <p className="text-xs text-muted-foreground">
+          {pixOnline && value.paymentMethod === "pix"
+            ? "Na próxima tela aparece o Pix (copia e cola ou QR code). Seu pedido vai para a cozinha assim que o pagamento cair."
+            : "O pagamento é feito direto com a loja."}
+        </p>
       </Section>
 
       <Section title="Observações">

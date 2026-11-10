@@ -3,7 +3,7 @@ import { KitchenBoard } from "@/components/kitchen-board"
 import { requireStore } from "@/lib/auth/session"
 import { startOfDaySP } from "@/lib/dates"
 import { listOrders } from "@/lib/orders"
-import { ACTIVE_STATUSES } from "@/lib/order-shared"
+import { ACTIVE_STATUSES, awaitingPix } from "@/lib/order-shared"
 
 export default async function PedidosPage() {
   const { store } = await requireStore()
@@ -17,7 +17,12 @@ export default async function PedidosPage() {
   return (
     <>
       <AutoRefresh seconds={8} />
-      <KitchenBoard storeName={store.name} active={active} finished={finishedToday} />
+      <KitchenBoard
+        storeName={store.name}
+        active={active.filter((o) => !awaitingPix(o))}
+        awaitingPayment={active.filter(awaitingPix)}
+        finished={finishedToday}
+      />
     </>
   )
 }

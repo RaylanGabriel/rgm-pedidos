@@ -169,10 +169,27 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
   levar; aparece na cozinha, impressão, acompanhamento, fechamento de caixa e planilha.
 - **Banco separado para testes** (branch `preview` do Neon) — ver Notas técnicas.
 
-## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
-- OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.
-- Pedido Pix → cobrança na conta do dono → QR + copia e cola → webhook confirma (revalidando na API) → "Pago".
-- Pix não pago expira (~15 min). Possível comissão da plataforma (`marketplace_fee`).
+## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
+Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
+
+**Feito (em teste — `MP_TEST_MODE=true`):**
+- `/admin/pagamentos`: "Conectar Mercado Pago" (OAuth com `state` anti-CSRF em cookie), desconectar; super admin pode
+  usar a conta de teste da plataforma em modo de teste.
+- Tokens da loja **criptografados** (AES-256-GCM, `MP_TOKEN_KEY`) em `store_payment_accounts`; renovação automática
+  pelo refresh token quando faltar menos de 7 dias.
+- Pedido com Pix pelo site → cobrança na conta da loja (valor do banco, `X-Idempotency-Key` por pedido) → tela com
+  **copiar código Pix**, QR code e contagem de 30 min.
+- **Pedido só entra na cozinha depois de pago** (faixa "Aguardando Pix"); a espera conta a partir do pagamento.
+  Pix vencido (+5 min) é cancelado sozinho.
+- Confirmação pelo **webhook** `/api/mercado-pago/webhook` (assinatura `x-signature` conferida; status sempre
+  consultado na API) e pela própria tela do pedido (consulta a cada 5 s).
+- Se o Mercado Pago falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
+
+**Falta:**
+- Testar o "Conectar Mercado Pago" de verdade com uma conta vendedora de teste (só funciona no endereço cadastrado).
+- Trocar `MP_REDIRECT_URI`/webhook para `painel.rgm.dev.br` quando o domínio entrar.
+- Ligar produção (`MP_TEST_MODE=false`) e fazer o primeiro Pix real de valor baixo.
+- Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel, Pix também no pedido do balcão.
 
 ## 💭 6. Conta do cliente (opcional) com Google
 - Botão "Entrar com Google" no checkout, nunca obrigatório.
