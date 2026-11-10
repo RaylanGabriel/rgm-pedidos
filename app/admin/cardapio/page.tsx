@@ -14,6 +14,7 @@ import {
   deleteIngredientAction,
   deleteItemAction,
   moveCategoryAction,
+  moveExtraItemAction,
   moveItemAction,
   toggleAvailableAction,
   toggleIngredientAction,
@@ -40,7 +41,8 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
       .select({ itemId: menuItemCategories.menuItemId, categoryId: menuItemCategories.categoryId })
       .from(menuItemCategories)
       .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
-      .where(eq(categories.storeId, store.id)),
+      .where(eq(categories.storeId, store.id))
+      .orderBy(asc(menuItemCategories.sortOrder)),
   ])
   const catOptions = cats.map((c) => ({ id: c.id, name: c.name }))
   const catName = new Map(cats.map((c) => [c.id, c.name]))
@@ -102,7 +104,14 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
 
             {[...cats.map((c) => ({ id: c.id as string | null, name: c.name })), { id: null, name: "Sem categoria" }].map((section) => {
               const list = items.filter((i) => i.categoryId === section.id)
-              if (!list.length) return null
+              // "Também mostrados aqui" (ordem própria desta categoria)
+              const extras = section.id
+                ? links
+                    .filter((l) => l.categoryId === section.id)
+                    .map((l) => items.find((i) => i.id === l.itemId))
+                    .filter((i): i is (typeof items)[number] => !!i && i.categoryId !== section.id)
+                : []
+              if (!list.length && !extras.length) return null
               return (
                 <Card key={section.id ?? "none"}>
                   <CardHeader>
@@ -178,6 +187,55 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                         )}
                       </div>
                     ))}
+                    {extras.length > 0 && (
+                      <div className={list.length ? "pt-4" : ""}>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          Também mostrados aqui{canEdit && " · use as setas para escolher a ordem"}
+                        </p>
+                        <ul className="divide-y rounded-lg border">
+                          {extras.map((item, idx) => (
+                            <li key={item.id} className="flex items-center gap-3 px-3 py-2">
+                              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                                {item.imageUrl && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium">
+                                  {item.name} {!item.active && <Badge variant="outline">Oculto</Badge>}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatBRL(Number(item.price))} · principal: {(item.categoryId && catName.get(item.categoryId)) || "sem categoria"}
+                                </p>
+                              </div>
+                              {canEdit && (
+                                <div className="flex gap-1">
+                                  <ActionButton
+                                    action={moveExtraItemAction.bind(null, section.id!, item.id, "up")}
+                                    size="icon"
+                                    variant="ghost"
+                                    disabled={idx === 0}
+                                    aria-label={`Subir ${item.name} em ${section.name}`}
+                                  >
+                                    <ArrowUp className="w-4 h-4" />
+                                  </ActionButton>
+                                  <ActionButton
+                                    action={moveExtraItemAction.bind(null, section.id!, item.id, "down")}
+                                    size="icon"
+                                    variant="ghost"
+                                    disabled={idx === extras.length - 1}
+                                    aria-label={`Descer ${item.name} em ${section.name}`}
+                                  >
+                                    <ArrowDown className="w-4 h-4" />
+                                  </ActionButton>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )

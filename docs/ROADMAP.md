@@ -60,7 +60,9 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
 - Capa da loja por upload (`stores.cover_url`); itens em mais de uma categoria (`menu_item_categories`,
   "Também mostrar em"); menu ☰ com todas as categorias quando há 5 ou mais.
 
-**Etapa 3 ⏳** sugestão de bebida no carrinho; ordem própria dos itens em categorias de destaque.
+- Ordem própria dos itens "também mostrados" numa categoria (`menu_item_categories.sort_order`, setas no painel).
+
+**Etapa 3 ⏳** sugestão de bebida no carrinho.
 **Etapa 4 ⏳** checkout (botão fixo com total, confiança) e acompanhamento (WhatsApp, endereço).
 **Depois:** painel da cozinha (quadro Novos / Preparando / Prontos).
 

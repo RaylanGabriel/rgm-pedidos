@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, asc, count, eq, inArray, isNull, not } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, max, not } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { categories, ingredients, menuItemCategories, menuItems } from "@/db/schema"
@@ -103,10 +103,32 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
         .values({ ...values, storeId: store.id, sortOrder: n })
         .returning({ id: menuItems.id })
     }
-    // Substitui as categorias extras do item (o item já foi conferido como desta loja)
-    await db.batch([
-      db.delete(menuItemCategories).where(eq(menuItemCategories.menuItemId, itemId)),
-      ...alsoIn.map((categoryId) => db.insert(menuItemCategories).values({ menuItemId: itemId, categoryId })),
+    // Categorias extras do item (o item já foi conferido como desta loja):
+    // as que continuam mantêm a posição; as novas entram no fim da lista daquela categoria
+    const current = await db
+      .select({ categoryId: menuItemCategories.categoryId })
+      .from(menuItemCategories)
+      .where(eq(menuItemCategories.menuItemId, itemId))
+    const removed = current.map((c) => c.categoryId).filter((c) => !alsoIn.includes(c))
+    const added = alsoIn.filter((c) => !current.some((x) => x.categoryId === c))
+    const last = added.length
+      ? await db
+          .select({ categoryId: menuItemCategories.categoryId, max: max(menuItemCategories.sortOrder) })
+          .from(menuItemCategories)
+          .where(inArray(menuItemCategories.categoryId, added))
+          .groupBy(menuItemCategories.categoryId)
+      : []
+    await runBatch([
+      ...(removed.length
+        ? [db.delete(menuItemCategories).where(and(eq(menuItemCategories.menuItemId, itemId), inArray(menuItemCategories.categoryId, removed)))]
+        : []),
+      ...added.map((categoryId) =>
+        db.insert(menuItemCategories).values({
+          menuItemId: itemId,
+          categoryId,
+          sortOrder: (last.find((l) => l.categoryId === categoryId)?.max ?? -1) + 1,
+        }),
+      ),
     ])
   } catch (e) {
     if (imageUrl) await deleteImage(imageUrl) // não deixa foto órfã
@@ -160,6 +182,33 @@ export async function moveItemAction(id: string, direction: "up" | "down") {
   const ids = swapped(siblings.map((s) => s.id), id, direction)
   if (!ids) return
   await runBatch(ids.map((sid, i) => db.update(menuItems).set({ sortOrder: i }).where(eq(menuItems.id, sid))))
+  refresh(ctx.store.slug)
+}
+
+/** Sobe/desce um item entre os "também mostrados" numa categoria (ex.: ordem em "Mais pedidos"). */
+export async function moveExtraItemAction(categoryId: string, itemId: string, direction: "up" | "down") {
+  const ctx = await isOwner()
+  if (!ctx || !uuid.safeParse(categoryId).success || !uuid.safeParse(itemId).success) return
+  const rows = await db
+    .select({ itemId: menuItemCategories.menuItemId })
+    .from(menuItemCategories)
+    .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
+    .where(and(eq(menuItemCategories.categoryId, categoryId), eq(categories.storeId, ctx.store.id)))
+    .orderBy(asc(menuItemCategories.sortOrder))
+  const ids = swapped(
+    rows.map((r) => r.itemId),
+    itemId,
+    direction,
+  )
+  if (!ids) return
+  await runBatch(
+    ids.map((id, i) =>
+      db
+        .update(menuItemCategories)
+        .set({ sortOrder: i })
+        .where(and(eq(menuItemCategories.categoryId, categoryId), eq(menuItemCategories.menuItemId, id))),
+    ),
+  )
   refresh(ctx.store.slug)
 }
 

@@ -169,6 +169,7 @@ export const menuItemCategories = pgTable(
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0), // ordem do item dentro dessa categoria
   },
   (t) => [uniqueIndex("menu_item_categories_pk").on(t.menuItemId, t.categoryId), index("menu_item_categories_cat_idx").on(t.categoryId)],
 )

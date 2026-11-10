@@ -33,13 +33,15 @@ export function ItemPicker({
   // Categorias vazias não aparecem; itens sem categoria vão para "Outros".
   const sections = useMemo<Section[]>(() => {
     const known = new Set(menu.categories.map((c) => c.id))
+    const byId = new Map(menu.items.map((i) => [i.id, i]))
     const named = menu.categories
       .map((c) => ({
         id: c.id,
         name: c.name,
         items: [
           ...menu.items.filter((i) => i.categoryId === c.id),
-          ...menu.items.filter((i) => i.categoryId !== c.id && i.alsoIn.includes(c.id)),
+          // os "também mostrados aqui", na ordem escolhida pelo dono
+          ...(menu.extraOrder[c.id] ?? []).map((id) => byId.get(id)).filter((i): i is MenuItemView => !!i && i.categoryId !== c.id),
         ],
       }))
       .filter((s) => s.items.length > 0)

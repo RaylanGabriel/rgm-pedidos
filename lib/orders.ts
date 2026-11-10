@@ -74,6 +74,8 @@ export interface IngredientView {
 export interface MenuView {
   categories: { id: string; name: string; extrasEnabled: boolean }[]
   items: MenuItemView[]
+  /** Ordem dos itens que aparecem numa categoria além da principal: categoria → ids de item */
+  extraOrder: Record<string, string[]>
   ingredients: IngredientView[]
 }
 
@@ -98,13 +100,19 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       .select({ itemId: menuItemCategories.menuItemId, categoryId: menuItemCategories.categoryId })
       .from(menuItemCategories)
       .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
-      .where(eq(categories.storeId, storeId)),
+      .where(eq(categories.storeId, storeId))
+      .orderBy(asc(menuItemCategories.sortOrder)),
   ])
   const alsoIn = new Map<string, string[]>()
-  for (const l of links) alsoIn.set(l.itemId, [...(alsoIn.get(l.itemId) ?? []), l.categoryId])
+  const extraOrder: Record<string, string[]> = {}
+  for (const l of links) {
+    alsoIn.set(l.itemId, [...(alsoIn.get(l.itemId) ?? []), l.categoryId])
+    ;(extraOrder[l.categoryId] ??= []).push(l.itemId)
+  }
 
   return {
     categories: cats,
+    extraOrder,
     items: items.map((i) => ({
       id: i.id,
       categoryId: i.categoryId,
