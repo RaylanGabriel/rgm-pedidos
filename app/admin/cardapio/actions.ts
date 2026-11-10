@@ -1,10 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, asc, count, eq, isNull, not } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, not } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { categories, ingredients, menuItems } from "@/db/schema"
+import { categories, ingredients, menuItemCategories, menuItems } from "@/db/schema"
 import { isOwner, requireStore } from "@/lib/auth/session"
 import { formText, optional, priceSchema, zodErrorState, type FormState } from "@/lib/form-state"
 import { deleteImage, fileFrom, uploadImage } from "@/lib/storage"
@@ -76,7 +76,17 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
     imageUrl = up.url
   } else if (fd.get("removeImage") === "on") imageUrl = null
 
+  // "Também mostrar em": só categorias desta loja, sem repetir a principal
+  const wanted = [...new Set(fd.getAll("alsoIn").map(String))].filter((c) => uuid.safeParse(c).success && c !== data.categoryId).slice(0, 30)
+  const alsoIn = wanted.length
+    ? (await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(and(eq(categories.storeId, store.id), inArray(categories.id, wanted)))).map((c) => c.id)
+    : []
+
   const values = imageUrl === undefined ? data : { ...data, imageUrl }
+  let itemId = id
   try {
     if (id) {
       await db
@@ -88,8 +98,16 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
         .select({ n: count() })
         .from(menuItems)
         .where(and(eq(menuItems.storeId, store.id), data.categoryId ? eq(menuItems.categoryId, data.categoryId) : isNull(menuItems.categoryId)))
-      await db.insert(menuItems).values({ ...values, storeId: store.id, sortOrder: n })
+      ;[{ id: itemId }] = await db
+        .insert(menuItems)
+        .values({ ...values, storeId: store.id, sortOrder: n })
+        .returning({ id: menuItems.id })
     }
+    // Substitui as categorias extras do item (o item já foi conferido como desta loja)
+    await db.batch([
+      db.delete(menuItemCategories).where(eq(menuItemCategories.menuItemId, itemId)),
+      ...alsoIn.map((categoryId) => db.insert(menuItemCategories).values({ menuItemId: itemId, categoryId })),
+    ])
   } catch (e) {
     if (imageUrl) await deleteImage(imageUrl) // não deixa foto órfã
     throw e

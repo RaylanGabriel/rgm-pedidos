@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto"
 import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { categories, deliveryZones, ingredients, menuItems, orders, stores } from "@/db/schema"
+import { categories, deliveryZones, ingredients, menuItemCategories, menuItems, orders, stores } from "@/db/schema"
 import {
   formatBRL,
   orderInputSchema,
@@ -44,6 +44,7 @@ export function publicStore(s: StoreRow) {
     slug: s.slug,
     name: s.name,
     logoUrl: s.logoUrl,
+    coverUrl: s.coverUrl,
     primaryColor: s.primaryColor,
     phone: s.phone,
     isOpen: s.isOpen,
@@ -56,6 +57,8 @@ export type PublicStore = ReturnType<typeof publicStore>
 export interface MenuItemView {
   id: string
   categoryId: string | null
+  /** Outras categorias em que o item também aparece ("Mais vendidos"…) */
+  alsoIn: string[]
   name: string
   description: string | null
   price: number
@@ -75,7 +78,7 @@ export interface MenuView {
 }
 
 export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
-  const [cats, items, ings] = await Promise.all([
+  const [cats, items, ings, links] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name, extrasEnabled: categories.extrasEnabled })
       .from(categories)
@@ -91,13 +94,21 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       .from(ingredients)
       .where(and(eq(ingredients.storeId, storeId), eq(ingredients.active, true)))
       .orderBy(asc(ingredients.groupName), asc(ingredients.name)),
+    db
+      .select({ itemId: menuItemCategories.menuItemId, categoryId: menuItemCategories.categoryId })
+      .from(menuItemCategories)
+      .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
+      .where(eq(categories.storeId, storeId)),
   ])
+  const alsoIn = new Map<string, string[]>()
+  for (const l of links) alsoIn.set(l.itemId, [...(alsoIn.get(l.itemId) ?? []), l.categoryId])
 
   return {
     categories: cats,
     items: items.map((i) => ({
       id: i.id,
       categoryId: i.categoryId,
+      alsoIn: (alsoIn.get(i.id) ?? []).filter((c) => c !== i.categoryId),
       name: i.name,
       description: i.description,
       price: Number(i.price),

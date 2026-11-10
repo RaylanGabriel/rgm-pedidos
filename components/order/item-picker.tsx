@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, Plus } from "lucide-react"
+import { Check, Menu, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BottomSheet, QuantityStepper } from "@/components/order/bottom-sheet"
 import type { CartExtra, CartLine } from "@/lib/cart"
@@ -9,7 +9,7 @@ import type { MenuItemView, MenuView } from "@/lib/orders"
 import { formatBRL } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
 
-type Section = { id: string; name: string; extras: boolean; items: MenuItemView[] }
+type Section = { id: string; name: string; items: MenuItemView[] }
 
 /**
  * Cardápio: abas de categoria fixas no topo, cards com foto e "+", e a janela do item (adicionais + quantidade).
@@ -27,18 +27,28 @@ export function ItemPicker({
   /** Distância do topo para as abas fixas (classe Tailwind) */
   navTop?: string
 }) {
-  const [selected, setSelected] = useState<{ item: MenuItemView; extras: boolean } | null>(null)
+  const [selected, setSelected] = useState<MenuItemView | null>(null)
 
-  // Itens agrupados por categoria (sem categoria vão para "Outros")
+  // Seções por categoria: itens da categoria principal + os que também foram colocados nela ("Mais vendidos"…).
+  // Categorias vazias não aparecem; itens sem categoria vão para "Outros".
   const sections = useMemo<Section[]>(() => {
-    const byCat = new Map<string | null, MenuItemView[]>()
-    for (const item of menu.items) byCat.set(item.categoryId, [...(byCat.get(item.categoryId) ?? []), item])
+    const known = new Set(menu.categories.map((c) => c.id))
     const named = menu.categories
-      .filter((c) => byCat.has(c.id))
-      .map((c) => ({ id: c.id, name: c.name, extras: c.extrasEnabled, items: byCat.get(c.id)! }))
-    const orphans = [...byCat.entries()].filter(([id]) => !id || !menu.categories.some((c) => c.id === id)).flatMap(([, i]) => i)
-    return orphans.length ? [...named, { id: "outros", name: named.length ? "Outros" : "Cardápio", extras: true, items: orphans }] : named
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        items: [
+          ...menu.items.filter((i) => i.categoryId === c.id),
+          ...menu.items.filter((i) => i.categoryId !== c.id && i.alsoIn.includes(c.id)),
+        ],
+      }))
+      .filter((s) => s.items.length > 0)
+    const orphans = menu.items.filter((i) => !i.categoryId || !known.has(i.categoryId))
+    return orphans.length ? [...named, { id: "outros", name: named.length ? "Outros" : "Cardápio", items: orphans }] : named
   }, [menu])
+
+  // Os adicionais seguem a categoria PRINCIPAL do item (a mesma regra do banco)
+  const extrasFor = (item: MenuItemView) => menu.categories.find((c) => c.id === item.categoryId)?.extrasEnabled ?? true
 
   return (
     <div className="min-w-0">
@@ -57,7 +67,7 @@ export function ItemPicker({
                   key={item.id}
                   item={item}
                   disabled={disabled}
-                  onOpen={() => setSelected({ item, extras: section.extras })}
+                  onOpen={() => setSelected(item)}
                 />
               ))}
             </div>
@@ -66,8 +76,8 @@ export function ItemPicker({
       </div>
 
       <ItemSheet
-        item={selected?.item ?? null}
-        ingredients={selected?.extras ? menu.ingredients : []}
+        item={selected}
+        ingredients={selected && extrasFor(selected) ? menu.ingredients : []}
         onClose={() => setSelected(null)}
         onAdd={(line) => {
           onAdd(line)
@@ -79,8 +89,15 @@ export function ItemPicker({
 }
 
 // ---------- Abas de categoria (fixas, com destaque da seção visível) ----------
+const MENU_FROM = 5 // a partir de quantas categorias aparece o botão ☰
+
 function CategoryNav({ sections, top }: { sections: Section[]; top: string }) {
   const [active, setActive] = useState<string | undefined>(sections[0]?.id)
+  const [listOpen, setListOpen] = useState(false)
+  const goTo = (id: string) => {
+    setActive(id)
+    document.getElementById(`cat-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
   const navRef = useRef<HTMLDivElement>(null)
 
   // Aba ativa = última seção cujo topo já passou da barra de abas
@@ -121,17 +138,26 @@ function CategoryNav({ sections, top }: { sections: Section[]; top: string }) {
       aria-label="Categorias do cardápio"
       className={cn("sticky z-30 -mx-4 border-b bg-background/90 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/75", top)}
     >
-      <div ref={navRef} className="flex gap-2 overflow-x-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center gap-2">
+      {sections.length >= MENU_FROM && (
+        <button
+          type="button"
+          onClick={() => setListOpen(true)}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-background text-foreground transition hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Ver todas as categorias"
+          aria-haspopup="dialog"
+        >
+          <Menu className="h-5 w-5" aria-hidden />
+        </button>
+      )}
+      <div ref={navRef} className="flex min-w-0 flex-1 gap-2 overflow-x-auto py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {sections.map((s) => (
           <button
             key={s.id}
             type="button"
             data-tab={s.id}
             aria-current={active === s.id ? "true" : undefined}
-            onClick={() => {
-              setActive(s.id)
-              document.getElementById(`cat-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }}
+            onClick={() => goTo(s.id)}
             className={cn(
               "h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active === s.id ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-foreground hover:bg-primary/10",
@@ -141,6 +167,33 @@ function CategoryNav({ sections, top }: { sections: Section[]; top: string }) {
           </button>
         ))}
       </div>
+      </div>
+
+      <BottomSheet open={listOpen} onOpenChange={setListOpen} title="Categorias">
+        <ul className="px-3 pb-4">
+          {sections.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setListOpen(false)
+                  // espera a janela fechar para a rolagem não ser cancelada
+                  setTimeout(() => goTo(s.id), 220)
+                }}
+                className={cn(
+                  "flex min-h-12 w-full items-center justify-between rounded-xl px-3 text-left font-medium transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  active === s.id && "bg-primary/10 text-primary",
+                )}
+              >
+                <span>{s.name}</span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {s.items.length} {s.items.length === 1 ? "item" : "itens"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </BottomSheet>
     </nav>
   )
 }

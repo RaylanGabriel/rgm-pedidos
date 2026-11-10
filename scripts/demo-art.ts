@@ -251,3 +251,28 @@ export function combo(spec: BurgerSpec, drink: { body: string; band: string; lab
   const content = friesParts({}, 0.62, 230, -10) + canParts(drink.body, drink.band, drink.label, 0.6, -250, 0) + burgerParts(spec, 0.78, 0, 40)
   return frame(content, ["#ffe2b8", "#ef8f45"], 520, 330)
 }
+
+// ---------- Capa (larga) ----------
+/** Capa 1800×560: degradê na cor da loja com lanche, batata e bebida à direita. */
+export function cover(color: string) {
+  const piece = (inner: string, x: number, y: number, w: number) =>
+    `<svg x="${x}" y="${y}" width="${w}" height="${(w * 3) / 4}" viewBox="0 0 800 600">${inner}</svg>`
+  const burger = burgerParts({ patties: 2, cheese: 2, bacon: true, lettuce: true, tomato: true }, 1.25, 0, -40)
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="560" viewBox="0 0 1800 560">
+  <defs>
+    <linearGradient id="c" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="#1a0606"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1800" height="560" fill="url(#c)"/>
+  ${Array.from({ length: 40 }, (_, i) => `<circle cx="${(i * 197) % 1800}" cy="${(i * 113) % 560}" r="${3 + (i % 4) * 2}" fill="#fff" opacity=".06"/>`).join("")}
+  <circle cx="1350" cy="300" r="330" fill="#ffb347" opacity=".18"/>
+  <circle cx="1350" cy="300" r="230" fill="#ffd27a" opacity=".16"/>
+  ${piece(friesParts({ cheddar: true, bacon: true }), 1480, 120, 380)}
+  ${piece(canParts("#b71c1c", "#e53935", "COLA"), 920, 150, 340)}
+  ${piece(burger, 1080, 20, 560)}
+</svg>`
+}

@@ -38,6 +38,7 @@ export default async function ConfiguracoesPage() {
                 name: store.name,
                 phone: store.phone,
                 logoUrl: store.logoUrl,
+                coverUrl: store.coverUrl,
                 primaryColor: store.primaryColor,
                 avgPrepMinutes: store.avgPrepMinutes,
               }}

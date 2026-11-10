@@ -57,7 +57,10 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
 - Adicionais por categoria (`categories.extras_enabled`, validado também em `create_order`).
 - Cardápio de demonstração com ilustrações: `npm run demo:seed -- --store <slug>`.
 
-**Etapa 3 ⏳** destaque "Mais pedido", sugestão de bebida no carrinho.
+- Capa da loja por upload (`stores.cover_url`); itens em mais de uma categoria (`menu_item_categories`,
+  "Também mostrar em"); menu ☰ com todas as categorias quando há 5 ou mais.
+
+**Etapa 3 ⏳** sugestão de bebida no carrinho; ordem própria dos itens em categorias de destaque.
 **Etapa 4 ⏳** checkout (botão fixo com total, confiança) e acompanhamento (WhatsApp, endereço).
 **Depois:** painel da cozinha (quadro Novos / Preparando / Prontos).
 

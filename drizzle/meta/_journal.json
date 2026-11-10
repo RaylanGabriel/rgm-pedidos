@@ -71,6 +71,13 @@
       "when": 1794317894213,
       "tag": "0009_create_order_category_extras",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794320004666,
+      "tag": "0010_cover_and_item_categories",
+      "breakpoints": true
     }
   ]
 }

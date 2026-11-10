@@ -1,6 +1,6 @@
 "use client"
 
-import { useContext } from "react"
+import { useContext, useState } from "react"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
@@ -21,6 +21,7 @@ export interface ItemFormData {
   categoryId: string | null
   active: boolean
   imageUrl: string | null
+  alsoIn: string[]
 }
 
 /** Criar (sem `item`) ou editar um lanche. */
@@ -34,8 +35,10 @@ export function ItemForm({
   defaultCategoryId?: string | null
 }) {
   const close = useContext(CloseContext)
+  const initialCategory = item ? (item.categoryId ?? "") : (defaultCategoryId ?? "")
+  const [primary, setPrimary] = useState(initialCategory)
   return (
-    <ActionForm action={saveItemAction} resetOnSuccess={!item} onSuccess={item ? close : undefined} className="space-y-4">
+    <ActionForm action={saveItemAction} resetOnSuccess={!item} onSuccess={item ? close : () => setPrimary(initialCategory)} className="space-y-4">
       {(s) => (
         <>
           {item && <input type="hidden" name="id" value={item.id} />}
@@ -74,7 +77,8 @@ export function ItemForm({
               <select
                 id={`cat-${item?.id ?? "novo"}`}
                 name="categoryId"
-                defaultValue={item ? (item.categoryId ?? "") : (defaultCategoryId ?? "")}
+                value={primary}
+                onChange={(e) => setPrimary(e.target.value)}
                 className={selectClass}
               >
                 <option value="">Sem categoria</option>
@@ -90,6 +94,25 @@ export function ItemForm({
               Mostrar no cardápio
             </label>
           </div>
+          {categories.length > 1 && (
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium">Também mostrar em</legend>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Ex.: coloque o item em “Mais vendidos” ou “Vegetarianos” sem tirar da categoria principal.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {categories.filter((c) => c.id !== primary).map((c) => (
+                  <label
+                    key={c.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+                  >
+                    <input type="checkbox" name="alsoIn" value={c.id} defaultChecked={item?.alsoIn.includes(c.id)} className="h-4 w-4 accent-[var(--primary)]" />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <SubmitButton>{item ? "Salvar alterações" : "Adicionar item"}</SubmitButton>
         </>
       )}

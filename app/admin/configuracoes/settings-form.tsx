@@ -12,6 +12,7 @@ export interface SettingsValues {
   name: string
   phone: string | null
   logoUrl: string | null
+  coverUrl: string | null
   primaryColor: string
   avgPrepMinutes: number
 }
@@ -65,6 +66,18 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             aspect="aspect-square"
             hint="De preferência quadrada, com fundo transparente ou branco."
             error={s.fieldErrors?.logo}
+          />
+
+          <ImageInput
+            label="Capa do cardápio"
+            name="cover"
+            removeName="removeCover"
+            currentUrl={values.coverUrl}
+            aspect="aspect-[16/5]"
+            previewClass="w-48 sm:w-64"
+            maxSide={1800}
+            hint="Foto larga (ex.: a fachada, o balcão ou os lanches). Sem capa, usamos um degradê na cor principal."
+            error={s.fieldErrors?.cover}
           />
 
           <div>

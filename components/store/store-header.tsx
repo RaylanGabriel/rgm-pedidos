@@ -23,14 +23,22 @@ export function StoreHero({ store, delivery }: { store: PublicStore; delivery: D
 
   return (
     <header>
-      <div
-        className="h-28 sm:h-40"
-        style={{
-          background:
-            "radial-gradient(120% 140% at 85% 0%, color-mix(in oklch, var(--primary), white 18%) 0%, var(--primary) 45%, color-mix(in oklch, var(--primary), black 45%) 100%)",
-        }}
-        aria-hidden
-      />
+      {store.coverUrl ? (
+        <div className="relative h-36 overflow-hidden bg-muted sm:h-56">
+          <Image src={store.coverUrl} alt="" fill priority sizes="100vw" className="object-cover" />
+          {/* escurece levemente a base para o logo "flutuar" sem sumir em fotos claras */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" aria-hidden />
+        </div>
+      ) : (
+        <div
+          className="h-28 sm:h-40"
+          style={{
+            background:
+              "radial-gradient(120% 140% at 85% 0%, color-mix(in oklch, var(--primary), white 18%) 0%, var(--primary) 45%, color-mix(in oklch, var(--primary), black 45%) 100%)",
+          }}
+          aria-hidden
+        />
+      )}
       <div className="container mx-auto max-w-6xl px-4">
         <div className="-mt-12 flex items-end gap-4 sm:-mt-14">
           <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-4 border-background bg-white shadow-lg sm:h-28 sm:w-28">

@@ -69,3 +69,9 @@ export const DEMO_MENU: DemoCategory[] = [
     ],
   },
 ]
+
+/** Categoria de destaque: os itens continuam nas categorias deles e também aparecem aqui (no topo). */
+export const DEMO_FEATURED = {
+  name: "⭐ Mais pedidos",
+  items: ["Smash Bacon", "Combo Clássico", "Batata Cheddar e Bacon", "Milkshake de Morango"],
+}

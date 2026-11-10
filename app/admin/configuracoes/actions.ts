@@ -33,20 +33,31 @@ export async function saveSettingsAction(_prev: FormState, fd: FormData): Promis
   })
   if (!parsed.success) return zodErrorState(parsed.error)
 
-  // Logo: nova (substitui), removida, ou mantém a atual
-  const file = fileFrom(fd, "logo")
-  let logoUrl: string | null | undefined
-  if (file) {
-    const up = await uploadImage(file, `stores/${ctx.store.id}/logo`)
-    if ("error" in up) return { fieldErrors: { logo: up.error }, error: up.error }
-    logoUrl = up.url
-  } else if (fd.get("removeLogo") === "on") logoUrl = null
+  // Logo e capa: nova (substitui), removida, ou mantém a atual
+  const images: Partial<Record<"logoUrl" | "coverUrl", string | null>> = {}
+  const uploaded: string[] = []
+  for (const [field, key, folder] of [
+    ["logo", "logoUrl", "logo"],
+    ["cover", "coverUrl", "cover"],
+  ] as const) {
+    const file = fileFrom(fd, field)
+    if (file) {
+      const up = await uploadImage(file, `stores/${ctx.store.id}/${folder}`)
+      if ("error" in up) {
+        await Promise.all(uploaded.map(deleteImage))
+        return { fieldErrors: { [field]: up.error }, error: up.error }
+      }
+      images[key] = up.url
+      uploaded.push(up.url)
+    } else if (fd.get(field === "logo" ? "removeLogo" : "removeCover") === "on") images[key] = null
+  }
 
   await db
     .update(stores)
-    .set(logoUrl === undefined ? parsed.data : { ...parsed.data, logoUrl })
+    .set({ ...parsed.data, ...images })
     .where(eq(stores.id, ctx.store.id))
-  if (logoUrl !== undefined) await deleteImage(ctx.store.logoUrl)
+  if ("logoUrl" in images) await deleteImage(ctx.store.logoUrl)
+  if ("coverUrl" in images) await deleteImage(ctx.store.coverUrl)
 
   revalidatePath("/admin", "layout")
   revalidatePath(`/loja/${ctx.store.slug}`, "layout")

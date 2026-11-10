@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, ImageOff, Trash2 } from "lucide-react"
 import { asc, eq } from "drizzle-orm"
 import { db } from "@/db"
-import { categories, ingredients, menuItems } from "@/db/schema"
+import { categories, ingredients, menuItemCategories, menuItems } from "@/db/schema"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,7 +23,7 @@ import { CategoryForm, IngredientForm, ItemForm } from "./forms"
 
 export const metadata = { title: "Cardápio" }
 
-const TABS = { itens: "Lanches", adicionais: "Adicionais", categorias: "Categorias" } as const
+const TABS = { itens: "Itens", adicionais: "Adicionais", categorias: "Categorias" } as const
 type Tab = keyof typeof TABS
 
 export default async function CardapioAdminPage({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
@@ -32,12 +32,22 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
   const aba = ((await searchParams).aba ?? "itens") as Tab
   const tab: Tab = aba in TABS ? aba : "itens"
 
-  const [cats, items, ings] = await Promise.all([
+  const [cats, items, ings, links] = await Promise.all([
     db.select().from(categories).where(eq(categories.storeId, store.id)).orderBy(asc(categories.sortOrder), asc(categories.name)),
     db.select().from(menuItems).where(eq(menuItems.storeId, store.id)).orderBy(asc(menuItems.sortOrder), asc(menuItems.name)),
     db.select().from(ingredients).where(eq(ingredients.storeId, store.id)).orderBy(asc(ingredients.groupName), asc(ingredients.name)),
+    db
+      .select({ itemId: menuItemCategories.menuItemId, categoryId: menuItemCategories.categoryId })
+      .from(menuItemCategories)
+      .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
+      .where(eq(categories.storeId, store.id)),
   ])
   const catOptions = cats.map((c) => ({ id: c.id, name: c.name }))
+  const catName = new Map(cats.map((c) => [c.id, c.name]))
+  const alsoIn = (itemId: string) => links.filter((l) => l.itemId === itemId).map((l) => l.categoryId)
+  /** Itens que aparecem na categoria no cardápio (principal + "também em"), só os visíveis */
+  const shownIn = (catId: string) =>
+    items.filter((i) => i.active && (i.categoryId === catId || links.some((l) => l.itemId === i.id && l.categoryId === catId))).length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
@@ -83,7 +93,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
             {canEdit && (
               <Card>
                 <CardContent className="pt-6">
-                  <Collapsible summary="+ Adicionar lanche" defaultOpen={items.length === 0}>
+                  <Collapsible summary="+ Adicionar item" defaultOpen={items.length === 0}>
                     <ItemForm categories={catOptions} defaultCategoryId={cats[0]?.id} />
                   </Collapsible>
                 </CardContent>
@@ -117,6 +127,11 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                               {!item.available && <Badge variant="destructive">Esgotado</Badge>}
                             </p>
                             <p className="text-sm text-muted-foreground">{formatBRL(Number(item.price))}</p>
+                            {alsoIn(item.id).length > 0 && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Também em: {alsoIn(item.id).map((c) => catName.get(c)).filter(Boolean).join(", ")}
+                              </p>
+                            )}
                           </div>
                           <ActionButton action={toggleAvailableAction.bind(null, item.id)} size="sm" variant={item.available ? "outline" : "default"}>
                             {item.available ? "Marcar esgotado" : "Voltou a ter"}
@@ -144,6 +159,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                                   categoryId: item.categoryId,
                                   active: item.active,
                                   imageUrl: item.imageUrl,
+                                  alsoIn: alsoIn(item.id),
                                 }}
                                 categories={catOptions}
                               />
@@ -248,13 +264,15 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
               {canEdit && <CategoryForm />}
               <div className="divide-y">
                 {cats.map((cat, idx) => {
-                  const n = items.filter((i) => i.categoryId === cat.id).length
+                  const n = shownIn(cat.id)
                   return (
                     <div key={cat.id} className="py-4 flex flex-wrap items-end gap-3">
                       <div className="flex-1 min-w-56">
                         {canEdit ? <CategoryForm category={cat} /> : <p className="font-semibold">{cat.name}</p>}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {n} {n === 1 ? "item" : "itens"}
+                        <p className={`text-xs mt-1 ${n ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>
+                          {n
+                            ? `${n} ${n === 1 ? "item" : "itens"} no cardápio`
+                            : "Vazia: não aparece no cardápio. Coloque itens nela pelo “Também mostrar em” de cada item (aba Itens)."}
                         </p>
                       </div>
                       {canEdit && (

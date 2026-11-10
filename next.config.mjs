@@ -4,8 +4,8 @@ const nextConfig = {
     unoptimized: true,
   },
   experimental: {
-    // Upload de fotos pelos formulários (o navegador já reduz; 3 MB cobre a foto original de 2 MB)
-    serverActions: { bodySizeLimit: "3mb" },
+    // Upload de fotos (o navegador já reduz; 5 MB cobre logo + capa originais de até 2 MB cada)
+    serverActions: { bodySizeLimit: "5mb" },
   },
   // URLs do site antigo (links salvos, QR codes impressos) continuam funcionando
   async redirects() {

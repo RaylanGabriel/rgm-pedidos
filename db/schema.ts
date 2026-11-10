@@ -61,6 +61,7 @@ export const stores = pgTable(
     slug: text("slug").notNull(), // /loja/<slug>
     name: text("name").notNull(),
     logoUrl: text("logo_url"),
+    coverUrl: text("cover_url"), // capa do topo do cardápio
     primaryColor: text("primary_color").notNull().default("#f97316"),
     phone: text("phone"),
     isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja
@@ -155,6 +156,23 @@ export const menuItems = pgTable(
 )
 
 /** Adicionais/ingredientes extras (bacon, cheddar...). */
+/**
+ * Categorias extras de um item ("Mais vendidos", "Vegetarianos"…), além da principal (menu_items.category_id).
+ * A principal decide os adicionais e onde o item fica no painel; aqui ele só aparece também em outras seções.
+ */
+export const menuItemCategories = pgTable(
+  "menu_item_categories",
+  {
+    menuItemId: uuid("menu_item_id")
+      .notNull()
+      .references(() => menuItems.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("menu_item_categories_pk").on(t.menuItemId, t.categoryId), index("menu_item_categories_cat_idx").on(t.categoryId)],
+)
+
 export const ingredients = pgTable(
   "ingredients",
   {

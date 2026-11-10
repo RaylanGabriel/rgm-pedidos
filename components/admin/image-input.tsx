@@ -5,12 +5,10 @@ import { ImagePlus, Loader2, Trash2, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 
-const MAX_SIDE = 1200
-
 /** Reduz a foto no navegador (celular tira fotos de 3–8 MB) para WebP/JPEG de ~100–300 KB. */
-async function shrink(file: File): Promise<File> {
+async function shrink(file: File, maxSide: number): Promise<File> {
   const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
   const w = Math.round(bitmap.width * scale)
   const h = Math.round(bitmap.height * scale)
   const canvas = document.createElement("canvas")
@@ -42,6 +40,8 @@ export function ImageInput({
   aspect = "aspect-[4/3]",
   hint = "JPG, PNG ou WebP. A foto é reduzida automaticamente.",
   error,
+  maxSide = 1200,
+  previewClass = "w-32",
 }: {
   name?: string
   removeName?: string
@@ -50,6 +50,10 @@ export function ImageInput({
   aspect?: string
   hint?: string
   error?: string
+  /** Maior lado da imagem depois de reduzida (px) */
+  maxSide?: number
+  /** Largura da prévia (classe Tailwind) */
+  previewClass?: string
 }) {
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
@@ -79,7 +83,7 @@ export function ImageInput({
     if (!file) return
     setBusy(true)
     try {
-      const small = await shrink(file)
+      const small = await shrink(file, maxSide)
       const dt = new DataTransfer()
       dt.items.add(small)
       e.target.files = dt.files
@@ -110,7 +114,7 @@ export function ImageInput({
         {label}
       </Label>
       <div className="flex items-start gap-4">
-        <div className={`relative w-32 shrink-0 overflow-hidden rounded-lg border bg-muted ${aspect}`}>
+        <div className={`relative shrink-0 overflow-hidden rounded-lg border bg-muted ${previewClass} ${aspect}`}>
           {busy ? (
             <Loader2 className="absolute inset-0 m-auto w-6 h-6 animate-spin text-muted-foreground" />
           ) : shown ? (
@@ -121,6 +125,7 @@ export function ImageInput({
           )}
         </div>
         <div className="space-y-2 min-w-0">
+          {/* input nativo escondido (o texto dele vem em inglês, do navegador); o rótulo abaixo faz o papel de botão */}
           <input
             ref={input}
             id={id}
@@ -128,9 +133,16 @@ export function ImageInput({
             type="file"
             accept="image/jpeg,image/png,image/webp,image/*"
             onChange={onPick}
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:opacity-90"
+            className="peer sr-only"
             aria-invalid={!!msg}
           />
+          <label
+            htmlFor={id}
+            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
+          >
+            <ImagePlus className="h-4 w-4" aria-hidden />
+            {shown ? "Trocar foto" : "Escolher foto"}
+          </label>
           <div className="flex flex-wrap gap-2">
             {preview && (
               <Button type="button" variant="ghost" size="sm" onClick={clearPick}>
