@@ -209,6 +209,7 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - Categorias de teste ("Teste 1/2/3", "Teste") podem ser apagadas quando quiser.
 
 ## Notas técnicas
+- Repositório: **github.com/RaylanGabriel/rgm-pedidos** (antes `v0-mr-smash-street-website`; o GitHub redireciona o nome antigo).
 - **Dois bancos (branches do Neon, projeto "Hamburguerias")**:
   - `production` → só o site no ar (variável `DATABASE_URL` de Production na Vercel; local em `.env.prod-db`).
   - `preview` → previews da Vercel e testes locais (`.env.local`). É uma cópia da produção: testes não sujam o site no ar.
