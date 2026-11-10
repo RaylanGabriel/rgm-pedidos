@@ -191,6 +191,13 @@ export async function createOrder(
         ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid
       ) as result`)
     const result = res.rows[0].result
+    // Troco: só em dinheiro e só se a nota cobre o total calculado pelo banco
+    if (o.paymentMethod === "cash" && o.changeFor) {
+      await db
+        .update(orders)
+        .set({ changeFor: o.changeFor.toFixed(2) })
+        .where(and(eq(orders.publicToken, token), eq(orders.storeId, storeId), sql`${orders.total} < ${o.changeFor}`))
+    }
     return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken }
   } catch (err) {
     // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
@@ -241,6 +248,7 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     subtotal: Number(o.subtotal),
     deliveryFee: Number(o.deliveryFee),
     total: Number(o.total),
+    changeFor: o.changeFor === null ? null : Number(o.changeFor),
     estimatedWaitMinutes: o.estimatedWaitMinutes,
     notes: o.notes,
     createdAt: o.createdAt.toISOString(),

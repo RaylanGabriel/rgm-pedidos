@@ -138,6 +138,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: SP }) 
                   <li key={o.id} className="flex justify-between gap-3">
                     <span className="min-w-0 truncate">
                       #{o.orderNumber} · {formatTimeSP(o.createdAt)} · {o.customerName}
+                      {o.changeFor && o.changeFor > o.total ? ` · troco p/ ${formatBRL(o.changeFor)}` : ""}
                     </span>
                     <span className="shrink-0">{formatBRL(o.total)}</span>
                   </li>

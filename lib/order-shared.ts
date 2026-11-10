@@ -39,6 +39,8 @@ export interface OrderView {
   subtotal: number
   deliveryFee: number
   total: number
+  /** Dinheiro: cliente vai pagar com esta nota (troco = changeFor − total) */
+  changeFor: number | null
   estimatedWaitMinutes: number
   notes: string | null
   createdAt: string
@@ -109,6 +111,21 @@ export const formatBRL = (value: number) => brl.format(value)
 export function lineTotal(item: { unitPrice: number; quantity: number; extras: { unitPrice: number; quantity: number }[] }) {
   const each = item.unitPrice + item.extras.reduce((s, e) => s + e.unitPrice * e.quantity, 0)
   return Math.round(each * item.quantity * 100) / 100
+}
+
+/** "50" / "50,00" / "R$ 1.000,50" → 50 / 1000.5 (vazio ou inválido = null). */
+export function parseMoneyBR(v: string | null | undefined): number | null {
+  const clean = (v ?? "").replace(/[^\d,.]/g, "")
+  if (!clean) return null
+  const n = Number(clean.includes(",") ? clean.replace(/\./g, "").replace(",", ".") : clean)
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null
+}
+
+/** Texto do troco para cozinha, impressão e cliente ("Troco para R$ 50,00 (levar R$ 12,00)"). */
+export function changeText(o: { paymentMethod: PaymentMethod; changeFor: number | null; total: number }) {
+  if (o.paymentMethod !== "cash" || !o.changeFor) return null
+  const back = Math.round((o.changeFor - o.total) * 100) / 100
+  return back > 0 ? `Troco para ${formatBRL(o.changeFor)} (levar ${formatBRL(back)})` : null
 }
 
 // ---------- Entrega ----------
@@ -184,6 +201,12 @@ export const orderInputSchema = z
       .transform((v) => (v ? v : null))
       .pipe(z.string().uuid("Escolha um bairro da lista").nullable()),
     paymentMethod: z.enum(["pix", "cash", "card_on_delivery"]).default("pix"),
+    changeFor: z
+      .string()
+      .max(20)
+      .optional()
+      .transform((v) => parseMoneyBR(v))
+      .pipe(z.number().max(10_000, "Valor de troco muito alto").nullable()),
     notes: optionalText(500, "Observações muito longas"),
     items: cartInputSchema,
   })

@@ -230,6 +230,7 @@ export const orders = pgTable(
     subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
     deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }).notNull().default("0"),
     total: numeric("total", { precision: 10, scale: 2 }).notNull(),
+    changeFor: numeric("change_for", { precision: 10, scale: 2 }), // dinheiro: "troco para R$ ___"
     estimatedWaitMinutes: integer("estimated_wait_minutes").notNull(),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

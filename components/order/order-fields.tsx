@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   deliveryAvailable,
   formatBRL,
+  parseMoneyBR,
   PAYMENT_LABEL,
   TYPE_LABEL,
   type DeliveryConfig,
@@ -21,6 +22,8 @@ export interface OrderFieldsValue {
   deliveryAddress: string
   deliveryZoneId: string
   paymentMethod: PaymentMethod
+  /** "Troco para" (texto digitado; só vale em dinheiro) */
+  changeFor: string
   notes: string
 }
 
@@ -31,6 +34,7 @@ export const emptyOrderFields: OrderFieldsValue = {
   deliveryAddress: "",
   deliveryZoneId: "",
   paymentMethod: "pix",
+  changeFor: "",
   notes: "",
 }
 
@@ -103,6 +107,7 @@ export function OrderFields({
   disabled,
   phoneRequired,
   delivery,
+  total,
 }: {
   value: OrderFieldsValue
   onChange: (v: OrderFieldsValue) => void
@@ -110,6 +115,8 @@ export function OrderFields({
   disabled?: boolean
   phoneRequired?: boolean
   delivery: DeliveryConfig
+  /** Total previsto do pedido (para calcular o troco) */
+  total?: number
 }) {
   const canDeliver = deliveryAvailable(delivery)
   const typeLabels = canDeliver
@@ -272,6 +279,7 @@ export function OrderFields({
           onChange={(v) => set("paymentMethod", v)}
           disabled={disabled}
         />
+        {value.paymentMethod === "cash" && <ChangeField value={value.changeFor} total={total} error={errors.changeFor} disabled={disabled} onChange={(v) => set("changeFor", v)} />}
         <p className="text-xs text-muted-foreground">O pagamento é feito direto com a loja.</p>
       </Section>
 
@@ -283,13 +291,71 @@ export function OrderFields({
           value={value.notes}
           onChange={(e) => set("notes", e.target.value)}
           maxLength={500}
-          placeholder="Ex.: sem cebola, ponto da carne, troco para R$ 50… (opcional)"
+          placeholder="Ex.: sem cebola, ponto da carne… (opcional)"
           disabled={disabled}
           className="text-base"
           aria-invalid={!!errors.notes}
         />
         {err("notes")}
       </Section>
+    </div>
+  )
+}
+
+/** "Troco para quanto?" — atalhos com as notas mais comuns acima do total + campo livre. */
+function ChangeField({
+  value,
+  total,
+  error,
+  disabled,
+  onChange,
+}: {
+  value: string
+  total?: number
+  error?: string
+  disabled?: boolean
+  onChange: (v: string) => void
+}) {
+  const amount = parseMoneyBR(value)
+  const notes = total ? [10, 20, 50, 100, 200].filter((n) => n > total).slice(0, 3) : []
+  const tooLow = amount !== null && total !== undefined && amount <= total
+  const back = amount !== null && total !== undefined && amount > total ? amount - total : null
+  const chip = (active: boolean) =>
+    `h-9 rounded-full border px-3.5 text-sm font-medium transition-colors ${active ? "border-primary bg-primary/10 text-primary" : "bg-background hover:border-primary"}`
+  return (
+    <div className="space-y-2 rounded-xl border border-dashed p-3">
+      <Label htmlFor="changeFor" className="text-sm font-semibold">
+        Precisa de troco?
+      </Label>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={chip(value === "")} aria-pressed={value === ""} disabled={disabled} onClick={() => onChange("")}>
+          Não preciso
+        </button>
+        {notes.map((n) => (
+          <button key={n} type="button" className={chip(amount === n)} aria-pressed={amount === n} disabled={disabled} onClick={() => onChange(String(n))}>
+            Para {formatBRL(n).replace(",00", "")}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">Troco para R$</span>
+        <Input
+          id="changeFor"
+          inputMode="decimal"
+          autoComplete="off"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="outro valor"
+          maxLength={10}
+          disabled={disabled}
+          className="h-10 w-32 text-base"
+          aria-invalid={tooLow || !!error}
+          aria-describedby="changeFor-hint"
+        />
+      </div>
+      <p id="changeFor-hint" className={`text-xs ${tooLow || error ? "text-destructive" : "text-muted-foreground"}`} role={tooLow ? "alert" : undefined}>
+        {error ?? (tooLow ? `O valor precisa ser maior que o total (${formatBRL(total!)}).` : back !== null ? `A loja vai levar ${formatBRL(back)} de troco.` : "Deixe em branco se for pagar o valor exato.")}
+      </p>
     </div>
   )
 }

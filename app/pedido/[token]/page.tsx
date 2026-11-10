@@ -8,7 +8,7 @@ import { brandStyle } from "@/lib/color"
 import { formatDateTimeSP, formatTimeSP } from "@/lib/dates"
 import { mapsLink, whatsappLink } from "@/lib/links"
 import { getOrderByToken } from "@/lib/orders"
-import { formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
+import { changeText, formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
 import { ConfirmDelivery } from "./confirm-delivery"
 
@@ -206,6 +206,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
               <p className="text-muted-foreground">
                 {TYPE_LABEL[order.type]} · {PAYMENT_LABEL[order.paymentMethod]} · pagamento direto com a loja
               </p>
+              {changeText(order) && <p className="font-medium">{changeText(order)}</p>}
               {order.notes && <p className="pt-1 text-muted-foreground">Obs.: {order.notes}</p>}
             </div>
           </section>

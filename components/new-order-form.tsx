@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Loader2, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CartSummary } from "@/components/order/cart-summary"
+import { CartSummary, cartTotal } from "@/components/order/cart-summary"
 import { ItemPicker } from "@/components/order/item-picker"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
 import { createCounterOrderAction } from "@/app/admin/actions"
@@ -73,7 +73,7 @@ export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: Del
             <CardTitle>Dados do pedido</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={lines.length ? cartTotal(lines) + (fee ?? 0) : undefined} />
             {error && (
               <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive">
                 <p className="text-sm text-destructive">{error}</p>

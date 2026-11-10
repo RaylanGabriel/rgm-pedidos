@@ -30,6 +30,7 @@ import {
   formatBRL,
   fullAddress,
   nextStatus,
+  changeText,
   PAYMENT_LABEL,
   prevStatus,
   STATUS_LABEL,
@@ -439,6 +440,11 @@ function OrderCard({
         <span>{PAYMENT_LABEL[order.paymentMethod]}</span>
         <span className="text-sm font-bold text-foreground tabular-nums">{formatBRL(order.total)}</span>
       </div>
+      {changeText(order) && (
+        <p className="mx-4 mt-2 rounded-xl bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+          💵 {changeText(order)}
+        </p>
+      )}
 
       <div className="space-y-2 p-4 pt-3">
         <Button className={cn("h-12 w-full rounded-xl text-base font-bold", primary.cls)} onClick={() => next && onMove(order, next)}>
