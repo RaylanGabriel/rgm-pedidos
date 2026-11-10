@@ -130,7 +130,7 @@ Revisão de bugs, lógica e design com o plugin de design + skill de gráficos (
   (só conta pedidos a partir de nov/2026).
 - **Pouca saída**: itens abaixo de 30% da média do cardápio, com dica (promoção, combo, tirar do cardápio).
 
-## ⏳ 4c. Domínio da plataforma (fazer ANTES do Mercado Pago)
+## 🔨 4c. Domínio da plataforma — rgm.dev.br (fazer ANTES do Mercado Pago)
 **Problema:** hoje o endereço é `mr-smash-street.vercel.app/loja/<slug>` — o nome "Mr. Smash" não faz sentido para
 as outras lojas, mesmo com o nome delas depois da `/`.
 
@@ -151,7 +151,18 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - Login do painel (cookie `sid`) no domínio do painel; Mercado Pago usa sempre o domínio da plataforma (uma URL fixa
   para todas as lojas), mesmo quando a loja tiver domínio próprio.
 - Atualizar `SITE_URL`, os links do QR code em Configurações e o nome do projeto na Vercel.
-- **Decisão pendente:** nome/domínio da plataforma.
+
+**✅ Decisão: `rgm.dev.br`** (marca pessoal — Raylan Gabriel Miranda — usada também nos outros projetos)
+- `<loja>.rgm.dev.br` → cardápio da loja (ex.: `dogaodoze.rgm.dev.br`, `mrsmash.rgm.dev.br`)
+- `painel.rgm.dev.br` → painel dos donos e super admin (login, Mercado Pago OAuth e webhook usam este endereço)
+- `rgm.dev.br` → site pessoal / portfólio
+- `<projeto>.rgm.dev.br` → outros projetos
+- **Subdomínios reservados** (nenhuma loja pode usar como slug): `www`, `painel`, `app`, `admin`, `api`, `mail`,
+  `blog`, `docs`, `status` + os nomes dos outros projetos (lista em código, fácil de aumentar).
+- DNS do domínio na Vercel (servidores `ns1/ns2.vercel-dns.com` no registro.br) — exigido para o curinga `*.rgm.dev.br`
+  ter HTTPS automático; registros dos outros sites continuam podendo apontar para qualquer lugar.
+- Escolha justificada: o cliente chega pelo QR code da mesa/carrinho, então o nome do domínio pesa pouco; projetos de
+  risco (ex.: rifa) ficam **fora** deste domínio para não dividir reputação.
 
 ## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 - OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.
