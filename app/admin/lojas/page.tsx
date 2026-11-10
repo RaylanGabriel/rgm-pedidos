@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ActionButton } from "@/components/admin/form-ui"
 import { db } from "@/db"
 import { requireSuperadmin } from "@/lib/auth/session"
-import { siteUrl } from "@/lib/site-url"
+import { storeUrl } from "@/lib/site-url"
 import { enterStoreAction, reactivateStoreAction } from "./actions"
 import { NewStoreForm, ResetPasswordForm, SuspendForm } from "./forms"
 
@@ -30,7 +30,7 @@ type StoreRow = {
 
 export default async function LojasPage() {
   const session = await requireSuperadmin()
-  const base = await siteUrl()
+  const base = await storeUrl("{slug}")
 
   const { rows } = await db.execute<StoreRow>(sql`
     SELECT s.id, s.name, s.slug, s.active, s.is_open, s.created_at, s.suspended_reason, s.suspended_at,

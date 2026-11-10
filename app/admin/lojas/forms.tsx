@@ -48,7 +48,7 @@ export function NewStoreForm({ siteUrl }: { siteUrl: string }) {
               placeholder="dogao-do-ze"
               maxLength={40}
               required
-              hint={`${siteUrl}/loja/${shownSlug || "…"}`}
+              hint={siteUrl.replace("{slug}", shownSlug || "…")}
               error={s.fieldErrors?.slug}
             />
             <Field label="Nome do dono" name="ownerName" placeholder="José da Silva" maxLength={100} required error={s.fieldErrors?.ownerName} />

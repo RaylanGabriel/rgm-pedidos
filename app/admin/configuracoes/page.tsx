@@ -4,14 +4,14 @@ import { ArrowLeft, Download, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { requireOwner } from "@/lib/auth/session"
-import { siteUrl } from "@/lib/site-url"
+import { storeUrl as publicStoreUrl } from "@/lib/site-url"
 import { SettingsForm } from "./settings-form"
 
 export const metadata = { title: "Configurações" }
 
 export default async function ConfiguracoesPage() {
   const { store } = await requireOwner()
-  const storeUrl = `${await siteUrl()}/loja/${store.slug}`
+  const storeUrl = await publicStoreUrl(store.slug)
   const qrSvg = await QRCode.toString(storeUrl, { type: "svg", margin: 1, errorCorrectionLevel: "M" })
   const qrDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg)}`
 

@@ -11,6 +11,7 @@ import { generateTempPassword, hashPassword } from "@/lib/auth/password"
 import { requireSuperadmin, setActiveStore } from "@/lib/auth/session"
 import { formText, zodErrorState, type FormState } from "@/lib/form-state"
 import { SLUG_RE } from "@/lib/slug"
+import { isReservedSlug } from "@/lib/domains"
 
 /** Categorias criadas numa loja nova (o dono renomeia/apaga à vontade). */
 const STARTER_CATEGORIES = ["Lanches", "Porções", "Bebidas", "Sobremesas"]
@@ -21,7 +22,8 @@ const newStoreSchema = z.object({
     .string()
     .min(3, "Mínimo 3 caracteres")
     .max(40, "Máximo 40 caracteres")
-    .regex(SLUG_RE, "Use só letras minúsculas, números e hífen (ex.: dogao-do-ze)"),
+    .regex(SLUG_RE, "Use só letras minúsculas, números e hífen (ex.: dogao-do-ze)")
+    .refine((v) => !isReservedSlug(v), "Esse endereço é reservado do sistema. Escolha outro."),
   ownerName: z.string().min(2, "Nome muito curto").max(100, "Nome muito longo"),
   ownerEmail: z.string().email("E-mail inválido").max(255).transform((v) => v.toLowerCase()),
   starter: z.boolean(),
