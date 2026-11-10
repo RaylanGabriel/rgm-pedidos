@@ -36,6 +36,20 @@
       "when": 1794311327832,
       "tag": "0004_store_suspension",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794312280467,
+      "tag": "0005_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794312283444,
+      "tag": "0006_create_order_delivery",
+      "breakpoints": true
     }
   ]
 }

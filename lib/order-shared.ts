@@ -32,6 +32,7 @@ export interface OrderView {
   customerPhone: string | null
   type: OrderType
   deliveryAddress: string | null
+  deliveryZoneName: string | null
   status: OrderStatus
   paymentMethod: PaymentMethod
   paymentStatus: "pending" | "paid" | "refunded"
@@ -86,6 +87,32 @@ export function lineTotal(item: { unitPrice: number; quantity: number; extras: {
   return Math.round(each * item.quantity * 100) / 100
 }
 
+// ---------- Entrega ----------
+/** Regras de entrega da loja (públicas: vão para o navegador montar o checkout). */
+export interface DeliveryConfig {
+  enabled: boolean
+  pricing: "fixed" | "zones"
+  fixedFee: number
+  minOrder: number
+  zones: { id: string; name: string; fee: number }[]
+}
+
+/**
+ * Taxa prevista para mostrar no checkout (o valor cobrado é o que create_order calcula no banco).
+ * null = ainda falta escolher o bairro.
+ */
+export function previewDeliveryFee(config: DeliveryConfig, zoneId: string | null | undefined): number | null {
+  if (config.pricing === "fixed") return config.fixedFee
+  return config.zones.find((z) => z.id === zoneId)?.fee ?? null
+}
+
+/** A loja consegue entregar? (por bairro sem nenhum bairro cadastrado = não) */
+export const deliveryAvailable = (c: DeliveryConfig) => c.enabled && (c.pricing === "fixed" || c.zones.length > 0)
+
+/** Endereço com o bairro, para a cozinha, a impressão e o cliente. */
+export const fullAddress = (o: { deliveryAddress: string | null; deliveryZoneName: string | null }) =>
+  [o.deliveryAddress, o.deliveryZoneName].filter(Boolean).join(" — ")
+
 // ---------- Validação da entrada de pedido ----------
 const uuid = z.string().uuid()
 
@@ -127,6 +154,11 @@ export const orderInputSchema = z
       .transform((v) => (v === "" ? null : v)),
     type: z.enum(["pickup", "delivery", "dine_in"]).default("pickup"),
     deliveryAddress: optionalText(300, "Endereço muito longo"),
+    deliveryZoneId: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v : null))
+      .pipe(z.string().uuid("Escolha um bairro da lista").nullable()),
     paymentMethod: z.enum(["pix", "cash", "card_on_delivery"]).default("pix"),
     notes: optionalText(500, "Observações muito longas"),
     items: cartInputSchema,

@@ -10,9 +10,10 @@ import { CartSummary } from "@/components/order/cart-summary"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
 import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, useCart } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
+import { deliveryAvailable, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 import { placeOrder } from "./actions"
 
-export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuView }) {
+export function CheckoutForm({ store, menu, delivery }: { store: PublicStore; menu: MenuView; delivery: DeliveryConfig }) {
   const cart = useCart(store.slug, menu)
   const router = useRouter()
   const [fields, setFields] = useState<OrderFieldsValue>(emptyOrderFields)
@@ -27,9 +28,21 @@ export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuVi
   useEffect(() => {
     const saved = loadCustomer()
     if (!saved) return
-    setFields((f) => ({ ...f, ...saved }))
+    // Dados salvos podem ser de outra loja ou de antes de a lista de bairros mudar
+    const canDeliver = deliveryAvailable(delivery)
+    const zoneOk = delivery.zones.some((z) => z.id === saved.deliveryZoneId)
+    setFields((f) => ({
+      ...f,
+      ...saved,
+      type: saved.type === "delivery" && !canDeliver ? "pickup" : saved.type,
+      deliveryZoneId: zoneOk ? saved.deliveryZoneId : "",
+    }))
     setUsingSaved(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const isDelivery = fields.type === "delivery"
+  const fee = isDelivery ? previewDeliveryFee(delivery, fields.deliveryZoneId) : undefined
 
   const forget = () => {
     forgetCustomer()
@@ -90,7 +103,7 @@ export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuVi
           <CardTitle>Resumo</CardTitle>
         </CardHeader>
         <CardContent>
-          <CartSummary lines={cart.lines} />
+          <CartSummary lines={cart.lines} deliveryFee={fee} />
           <p className="text-xs text-muted-foreground mt-3">O valor final é confirmado pela loja ao registrar o pedido.</p>
         </CardContent>
       </Card>
@@ -113,7 +126,7 @@ export function CheckoutForm({ store, menu }: { store: PublicStore; menu: MenuVi
             </div>
           )}
           <form onSubmit={submit} className="space-y-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} />
 
             <label className="flex items-start gap-3 text-sm cursor-pointer">
               <input

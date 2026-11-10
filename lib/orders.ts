@@ -4,9 +4,11 @@ import { randomBytes } from "node:crypto"
 import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { categories, ingredients, menuItems, orders, stores } from "@/db/schema"
+import { categories, deliveryZones, ingredients, menuItems, orders, stores } from "@/db/schema"
 import {
+  formatBRL,
   orderInputSchema,
+  type DeliveryConfig,
   type OrderInput,
   type OrderStatus,
   type OrderWithItemsView,
@@ -106,6 +108,26 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
   }
 })
 
+// ---------- Entrega ----------
+/** Regras de entrega da loja + bairros ativos (ordem alfabética). */
+export const getDeliveryConfig = cache(async (store: StoreRow): Promise<DeliveryConfig> => {
+  const zones =
+    store.deliveryPricing === "zones"
+      ? await db
+          .select({ id: deliveryZones.id, name: deliveryZones.name, fee: deliveryZones.fee })
+          .from(deliveryZones)
+          .where(and(eq(deliveryZones.storeId, store.id), eq(deliveryZones.active, true)))
+          .orderBy(asc(sql`lower(${deliveryZones.name})`))
+      : []
+  return {
+    enabled: store.deliveryEnabled,
+    pricing: store.deliveryPricing,
+    fixedFee: Number(store.deliveryFixedFee),
+    minOrder: Number(store.deliveryMinOrder),
+    zones: zones.map((z) => ({ id: z.id, name: z.name, fee: Number(z.fee) })),
+  }
+})
+
 // ---------- Criar pedido ----------
 export type CreateOrderResult =
   | { ok: true; orderNumber: number; publicToken: string }
@@ -116,6 +138,7 @@ const DB_ERRORS: Record<string, string> = {
   STORE_CLOSED: "A loja está fechada no momento e não está recebendo pedidos.",
   INVALID_ITEMS: "Seu carrinho tem itens inválidos. Atualize a página e monte o pedido de novo.",
   EXTRA_UNAVAILABLE: "Um dos adicionais escolhidos não está mais disponível. Revise seu carrinho.",
+  DELIVERY_UNAVAILABLE: "Esta loja não está fazendo entregas no momento. Escolha retirada.",
 }
 
 /**
@@ -144,14 +167,24 @@ export async function createOrder(
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
         ${o.type === "delivery" ? o.deliveryAddress : null}, ${o.paymentMethod}::payment_method, ${o.notes},
-        ${JSON.stringify(o.items)}::jsonb, ${token}, ${opts.requireOpen}
+        ${JSON.stringify(o.items)}::jsonb, ${token}, ${opts.requireOpen},
+        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid
       ) as result`)
     const result = res.rows[0].result
     return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : ""
+    // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
+    // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
+    const dbError = err instanceof Error && err.cause instanceof Error ? err.cause : err
+    const msg = dbError instanceof Error ? dbError.message : ""
     const code = Object.keys(DB_ERRORS).find((c) => msg.includes(c))
     if (code) return { ok: false, error: DB_ERRORS[code] }
+    if (msg.includes("ZONE_INVALID")) {
+      const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
+      return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
+    }
+    const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
+    if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
     const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
     if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
     console.error("Erro ao criar pedido:", err)
@@ -181,6 +214,7 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     customerPhone: o.customerPhone,
     type: o.type,
     deliveryAddress: o.deliveryAddress,
+    deliveryZoneName: o.deliveryZoneName,
     status: o.status,
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,

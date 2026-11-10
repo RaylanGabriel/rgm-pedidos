@@ -7,7 +7,7 @@ import { AutoRefresh } from "@/components/auto-refresh"
 import { StoreFooter, StoreHeader } from "@/components/store/store-header"
 import { brandStyle } from "@/lib/color"
 import { getOrderByToken } from "@/lib/orders"
-import { formatBRL, lineTotal, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
+import { formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
 
 export const metadata = { title: "Acompanhar pedido", robots: { index: false } }
 
@@ -111,7 +111,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
                 <span>Total</span>
                 <span className="text-primary">{formatBRL(order.total)}</span>
               </div>
-              {order.deliveryAddress && <p className="text-sm text-muted-foreground">Entrega em: {order.deliveryAddress}</p>}
+              {order.type === "delivery" && <p className="text-sm text-muted-foreground">Entrega em: {fullAddress(order)}</p>}
               {order.notes && <p className="text-sm text-muted-foreground">Obs.: {order.notes}</p>}
             </CardContent>
           </Card>

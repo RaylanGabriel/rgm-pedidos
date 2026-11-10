@@ -105,6 +105,7 @@ export interface SavedCustomer {
   customerPhone: string
   type: OrderType
   deliveryAddress: string
+  deliveryZoneId: string
   paymentMethod: PaymentMethod
 }
 
@@ -124,6 +125,7 @@ export function loadCustomer(): SavedCustomer | null {
     customerPhone: str(raw.customerPhone, 20),
     type: (type in TYPE_LABEL ? type : "pickup") as OrderType,
     deliveryAddress: str(raw.deliveryAddress, 300),
+    deliveryZoneId: str(raw.deliveryZoneId, 36), // conferido contra os bairros da loja no checkout
     paymentMethod: (paymentMethod in PAYMENT_LABEL ? paymentMethod : "pix") as PaymentMethod,
   }
 }
@@ -134,6 +136,7 @@ export function saveCustomer(c: SavedCustomer) {
     customerPhone: c.customerPhone.trim(),
     type: c.type,
     deliveryAddress: c.deliveryAddress.trim(),
+    deliveryZoneId: c.deliveryZoneId,
     paymentMethod: c.paymentMethod,
   })
 }

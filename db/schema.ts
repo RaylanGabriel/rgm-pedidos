@@ -34,6 +34,11 @@ export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "refun
 
 export const memberRole = pgEnum("member_role", ["owner", "staff"])
 
+export const deliveryPricing = pgEnum("delivery_pricing", [
+  "fixed", // mesma taxa para qualquer endereço
+  "zones", // taxa por bairro (tabela delivery_zones)
+])
+
 // ---------- Plataforma ----------
 export const users = pgTable(
   "users",
@@ -64,6 +69,11 @@ export const stores = pgTable(
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     avgPrepMinutes: integer("avg_prep_minutes").notNull().default(15),
     nextOrderNumber: integer("next_order_number").notNull().default(1), // contador por loja
+    // Entrega (a taxa é sempre calculada em create_order, nunca vem do navegador)
+    deliveryEnabled: boolean("delivery_enabled").notNull().default(true),
+    deliveryPricing: deliveryPricing("delivery_pricing").notNull().default("fixed"),
+    deliveryFixedFee: numeric("delivery_fixed_fee", { precision: 10, scale: 2 }).notNull().default("0"),
+    deliveryMinOrder: numeric("delivery_min_order", { precision: 10, scale: 2 }).notNull().default("0"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("stores_slug_unique").on(t.slug)],
@@ -160,6 +170,23 @@ export const ingredients = pgTable(
   (t) => [index("ingredients_store_idx").on(t.storeId)],
 )
 
+// ---------- Entrega ----------
+/** Bairros atendidos e a taxa de cada um (quando stores.delivery_pricing = 'zones'). */
+export const deliveryZones = pgTable(
+  "delivery_zones",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    fee: numeric("fee", { precision: 10, scale: 2 }).notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("delivery_zones_store_name_unique").on(t.storeId, sql`lower(${t.name})`)],
+)
+
 // ---------- Pedidos ----------
 export const orders = pgTable(
   "orders",
@@ -174,6 +201,7 @@ export const orders = pgTable(
     customerPhone: text("customer_phone"),
     type: orderType("type").notNull().default("pickup"),
     deliveryAddress: text("delivery_address"),
+    deliveryZoneName: text("delivery_zone_name"), // bairro no momento do pedido (cópia)
     status: orderStatus("status").notNull().default("pending"),
     paymentMethod: paymentMethod("payment_method").notNull().default("pix"),
     paymentStatus: paymentStatus("payment_status").notNull().default("pending"),

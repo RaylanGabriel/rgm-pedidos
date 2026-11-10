@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ClipboardList, Plus, BarChart3, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog } from "lucide-react"
+import { ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog } from "lucide-react"
 import { toggleStoreOpenAction } from "./actions"
 import Image from "next/image"
 import { requireStore } from "@/lib/auth/session"
@@ -171,6 +171,25 @@ export default async function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Personalize a loja e baixe o QR code do cardápio</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {canManage && (
+            <Link href="/admin/entrega" className="group">
+              <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-primary">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mb-4 group-hover:bg-accent transition-colors">
+                    <Bike className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Entrega</CardTitle>
+                  <CardDescription>
+                    {!store.deliveryEnabled ? "Desligada" : store.deliveryPricing === "zones" ? "Taxa por bairro" : "Taxa fixa"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Bairros atendidos, taxa de entrega e pedido mínimo</p>
                 </CardContent>
               </Card>
             </Link>

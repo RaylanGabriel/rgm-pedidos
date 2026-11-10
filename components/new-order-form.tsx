@@ -11,15 +11,17 @@ import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/componen
 import { createCounterOrderAction } from "@/app/admin/actions"
 import type { CartLine } from "@/lib/cart"
 import type { MenuView } from "@/lib/orders"
+import { previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 
 /** Pedido lançado no balcão pelo painel. Carrinho só em memória (não usa o do site). */
-export function NewOrderForm({ menu }: { menu: MenuView }) {
+export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: DeliveryConfig }) {
   const router = useRouter()
   const [lines, setLines] = useState<CartLine[]>([])
   const [fields, setFields] = useState<OrderFieldsValue>(emptyOrderFields)
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const fee = fields.type === "delivery" ? previewDeliveryFee(delivery, fields.deliveryZoneId) : undefined
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,6 +63,7 @@ export function NewOrderForm({ menu }: { menu: MenuView }) {
               lines={lines}
               onQuantity={(i, q) => setLines((p) => p.map((l, j) => (j === i ? { ...l, quantity: Math.min(20, Math.max(1, q)) } : l)))}
               onRemove={(i) => setLines((p) => p.filter((_, j) => j !== i))}
+              deliveryFee={lines.length ? fee : undefined}
             />
           </CardContent>
         </Card>
@@ -70,7 +73,7 @@ export function NewOrderForm({ menu }: { menu: MenuView }) {
             <CardTitle>Dados do pedido</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} />
             {error && (
               <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive">
                 <p className="text-sm text-destructive">{error}</p>

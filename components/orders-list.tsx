@@ -10,6 +10,7 @@ import { updateOrderStatusAction } from "@/app/admin/actions"
 import { formatTimeSP, formatDateTimeSP } from "@/lib/dates"
 import {
   formatBRL,
+  fullAddress,
   lineTotal,
   NEXT_STATUS,
   PAYMENT_LABEL,
@@ -68,8 +69,9 @@ function printOrder(order: OrderWithItemsView, storeName: string) {
     ${order.customerPhone ? `<p><strong>Tel:</strong> ${e(order.customerPhone)}</p>` : ""}
     <p><strong>${TYPE_LABEL[order.type]}</strong> · ${PAYMENT_LABEL[order.paymentMethod]}</p>
     <p>${formatDateTimeSP(order.createdAt)}</p>
-    ${order.deliveryAddress ? `<div class="box"><strong>Entrega:</strong><br>${e(order.deliveryAddress)}</div>` : ""}
+    ${order.type === "delivery" ? `<div class="box"><strong>Entrega:</strong><br>${e(fullAddress(order))}</div>` : ""}
     <div>${items}</div>
+    ${order.deliveryFee > 0 ? `<div class="row" style="margin-top:2mm"><span>Taxa de entrega</span><span>${formatBRL(order.deliveryFee)}</span></div>` : ""}
     <div class="row total"><span>TOTAL</span><span>${formatBRL(order.total)}</span></div>
     ${order.notes ? `<div class="box"><strong>Obs.:</strong><br>${e(order.notes)}</div>` : ""}
     </body></html>`)
@@ -195,9 +197,15 @@ export function OrdersList({
                       ))}
                     </div>
 
-                    {order.deliveryAddress && <p className="text-xs border-t pt-2">Entrega: {order.deliveryAddress}</p>}
+                    {order.type === "delivery" && <p className="text-xs border-t pt-2">Entrega: {fullAddress(order)}</p>}
                     {order.notes && <p className="text-xs border-t pt-2 font-medium">Obs.: {order.notes}</p>}
 
+                    {order.deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm border-t pt-2">
+                        <span>Taxa de entrega</span>
+                        <span>{formatBRL(order.deliveryFee)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center border-t pt-2">
                       <span className="font-bold">Total</span>
                       <span className="text-lg font-bold text-primary">{formatBRL(order.total)}</span>

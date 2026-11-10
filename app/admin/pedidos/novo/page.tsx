@@ -3,13 +3,13 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { NewOrderForm } from "@/components/new-order-form"
 import { requireStore } from "@/lib/auth/session"
-import { getMenu } from "@/lib/orders"
+import { getDeliveryConfig, getMenu } from "@/lib/orders"
 
 export const metadata = { title: "Novo pedido" }
 
 export default async function NovoPedidoPage() {
   const { store } = await requireStore()
-  const menu = await getMenu(store.id)
+  const [menu, delivery] = await Promise.all([getMenu(store.id), getDeliveryConfig(store)])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
@@ -26,7 +26,7 @@ export default async function NovoPedidoPage() {
           <p className="text-muted-foreground">Lançar um pedido feito no balcão.</p>
         </div>
 
-        <NewOrderForm menu={menu} />
+        <NewOrderForm menu={menu} delivery={delivery} />
       </div>
     </div>
   )

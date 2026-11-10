@@ -18,7 +18,8 @@ import {
   toggleAvailableAction,
   toggleIngredientAction,
 } from "./actions"
-import { CategoryForm, Collapsible, IngredientForm, ItemForm } from "./forms"
+import { Collapsible } from "@/components/admin/collapsible"
+import { CategoryForm, IngredientForm, ItemForm } from "./forms"
 
 export const metadata = { title: "Cardápio" }
 

@@ -14,10 +14,13 @@ export function CartSummary({
   lines,
   onQuantity,
   onRemove,
+  deliveryFee,
 }: {
   lines: CartLine[]
   onQuantity?: (index: number, quantity: number) => void
   onRemove?: (index: number) => void
+  /** Pedido de entrega: taxa prevista (null = falta escolher o bairro). Sem entrega: undefined. */
+  deliveryFee?: number | null
 }) {
   if (lines.length === 0) {
     return <p className="text-sm text-muted-foreground text-center py-6">Seu carrinho está vazio.</p>
@@ -63,9 +66,21 @@ export function CartSummary({
           </div>
         </div>
       ))}
+      {deliveryFee !== undefined && (
+        <div className="border-t pt-3 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatBRL(cartTotal(lines))}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Entrega</span>
+            <span>{deliveryFee === null ? "escolha o bairro" : deliveryFee > 0 ? formatBRL(deliveryFee) : "grátis"}</span>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between items-center border-t pt-3 text-lg font-bold">
         <span>Total</span>
-        <span className="text-primary">{formatBRL(cartTotal(lines))}</span>
+        <span className="text-primary">{formatBRL(cartTotal(lines) + (deliveryFee ?? 0))}</span>
       </div>
     </div>
   )
