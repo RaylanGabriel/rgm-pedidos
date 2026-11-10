@@ -1,140 +1,557 @@
-import { Ban, DollarSign, ShoppingBag, TrendingUp } from "lucide-react"
+import Link from "next/link"
+import { ArrowDownRight, ArrowUpRight, Download, FileSpreadsheet, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { formatDateTimeSP } from "@/lib/dates"
-import { formatBRL, STATUS_LABEL, type OrderWithItemsView } from "@/lib/order-shared"
+import {
+  formatBRL,
+  PAYMENT_LABEL,
+  STATUS_LABEL,
+  TYPE_LABEL,
+  type OrderWithItemsView,
+} from "@/lib/order-shared"
+import { presets } from "@/lib/report-range"
+import { rangeDays, type Report } from "@/lib/reports"
 
-/** Relatório do período (componente de servidor: o filtro é um formulário GET). */
+const pct = (v: number) => `${Math.round(v * 100)}%`
+
+/** "2026-11-07" → "sex 07/11" (datas sem fuso: meio-dia UTC evita virar o dia). */
+const dayFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit" })
+const monthFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", month: "short", year: "2-digit" })
+const longFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" })
+const asDate = (ymd: string) => new Date(`${ymd.length === 7 ? `${ymd}-01` : ymd}T12:00:00Z`)
+const dayLabel = (key: string) => dayFmt.format(asDate(key)).replace(".", "").replace(",", "")
+const seriesLabel = (key: string) => (key.length === 7 ? monthFmt.format(asDate(key)).replace(".", "") : dayLabel(key))
+
+/** Relatório do período (componente de servidor: filtros são links/formulário GET). */
 export function ReportsView({
+  storeName,
+  report,
   orders,
   de,
   ate,
-  truncated,
+  clamped,
+  page,
+  pageSize,
 }: {
+  storeName: string
+  report: Report
   orders: OrderWithItemsView[]
   de: string
   ate: string
-  truncated: boolean
+  clamped: boolean
+  page: number
+  pageSize: number
 }) {
-  const valid = orders.filter((o) => o.status !== "cancelled")
-  const cancelled = orders.length - valid.length
-  const revenue = valid.reduce((s, o) => s + o.total, 0)
-  const avg = valid.length ? revenue / valid.length : 0
-
-  const counts = new Map<string, number>()
-  for (const o of valid) for (const i of o.items) counts.set(i.name, (counts.get(i.name) ?? 0) + i.quantity)
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
-  const topMax = top[0]?.[1] ?? 1
+  const { current: cur, previous: prev } = report
+  const avg = cur.orders ? cur.revenue / cur.orders : 0
+  const prevAvg = prev.orders ? prev.revenue / prev.orders : 0
+  const allOrders = cur.orders + cur.cancelled
+  const days = rangeDays(de, ate)
+  const periodText = de === ate ? longFmt.format(asDate(de)) : `${longFmt.format(asDate(de))} a ${longFmt.format(asDate(ate))}`
+  const compareText = days === 1 ? "vs. dia anterior" : `vs. ${days} dias anteriores`
+  const qs = (extra: Record<string, string | number> = {}) =>
+    new URLSearchParams({ de, ate, ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, String(v)])) }).toString()
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Período</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form method="get" className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-            <div className="space-y-2">
-              <Label htmlFor="de">De</Label>
-              <Input id="de" name="de" type="date" defaultValue={de} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ate">Até</Label>
-              <Input id="ate" name="ate" type="date" defaultValue={ate} />
-            </div>
-            <Button type="submit">Aplicar</Button>
-          </form>
-          {truncated && <p className="text-xs text-destructive mt-3">Período muito grande: mostrando só os 5.000 pedidos mais recentes.</p>}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Stat title="Pedidos" icon={ShoppingBag} value={String(valid.length)} note="sem contar cancelados" />
-        <Stat title="Faturamento" icon={DollarSign} value={formatBRL(revenue)} note="no período" />
-        <Stat title="Ticket médio" icon={TrendingUp} value={formatBRL(avg)} note="por pedido" />
-        <Stat title="Cancelados" icon={Ban} value={String(cancelled)} note={orders.length ? `${Math.round((cancelled / orders.length) * 100)}% do total` : "—"} />
+      {/* Cabeçalho + exportar */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold sm:text-4xl">Relatórios</h1>
+          <p className="text-muted-foreground">
+            {storeName} · {periodText}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <a href={`/admin/relatorios/exportar?${qs({ tipo: "pedidos" })}`} download>
+              <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden />
+              Planilha de pedidos
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href={`/admin/relatorios/exportar?${qs({ tipo: "itens" })}`} download>
+              <Download className="mr-2 h-4 w-4" aria-hidden />
+              Planilha de itens
+            </a>
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Mais vendidos</CardTitle>
-          <CardDescription>Top 5 do período (unidades)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {top.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhuma venda no período.</p>
-          ) : (
-            <ol className="space-y-4">
-              {top.map(([name, count], i) => (
-                <li key={name} className="flex items-center gap-4">
-                  <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {count} {count === 1 ? "unidade" : "unidades"}
-                    </p>
-                  </div>
-                  <div className="w-24 sm:w-32 bg-muted rounded-full h-2 overflow-hidden" aria-hidden>
-                    <div className="h-full bg-primary" style={{ width: `${(count / topMax) * 100}%` }} />
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </CardContent>
-      </Card>
+      <PeriodPicker de={de} ate={ate} clamped={clamped} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico</CardTitle>
-          <CardDescription>
-            {orders.length} {orders.length === 1 ? "pedido" : "pedidos"} no período
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {orders.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Nenhum pedido encontrado.</p>
-          ) : (
-            <div className="space-y-3">
-              {orders.map((o) => (
-                <div key={o.id} className={`p-4 rounded-lg border bg-card ${o.status === "cancelled" ? "opacity-60" : ""}`}>
-                  <div className="flex items-start justify-between gap-4 mb-1">
-                    <div className="min-w-0">
-                      <p className="font-semibold">
-                        #{o.orderNumber} · {o.customerName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{STATUS_LABEL[o.status]}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={`font-bold ${o.status === "cancelled" ? "line-through" : "text-primary"}`}>{formatBRL(o.total)}</p>
-                      <p className="text-xs text-muted-foreground">{formatDateTimeSP(o.createdAt)}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{o.items.map((i) => `${i.quantity}x ${i.name}`).join(" · ")}</p>
-                </div>
-              ))}
+      {/* Indicadores */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4">
+        <Stat
+          title="Faturamento"
+          value={formatBRL(cur.revenue)}
+          delta={<Delta now={cur.revenue} before={prev.revenue} label={compareText} />}
+          note={cur.deliveryFees > 0 ? `inclui ${formatBRL(cur.deliveryFees)} de entrega` : undefined}
+        />
+        <Stat title="Pedidos" value={String(cur.orders)} delta={<Delta now={cur.orders} before={prev.orders} label={compareText} />} />
+        <Stat title="Ticket médio" value={formatBRL(avg)} delta={<Delta now={avg} before={prevAvg} label={compareText} />} />
+        <Stat
+          title="Cancelados"
+          value={String(cur.cancelled)}
+          delta={<Delta now={cur.cancelled} before={prev.cancelled} label={compareText} invert />}
+          note={cur.cancelled ? `${formatBRL(cur.cancelledTotal)} · ${pct(cur.cancelled / allOrders)} dos pedidos` : undefined}
+        />
+      </div>
+
+      {cur.orders === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="font-semibold">Nenhuma venda neste período.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Escolha outro período acima ou compartilhe o link do cardápio com seus clientes.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <SalesChart report={report} />
+
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <TopItems items={report.topItems} extras={report.topExtras} />
+            <div className="space-y-6">
+              <PeakHours hours={report.byHour} />
+              <Breakdown
+                title="Formas de pagamento"
+                description="Para conferir o caixa"
+                rows={report.byPayment.map((p) => ({ label: PAYMENT_LABEL[p.method], orders: p.orders, value: p.revenue }))}
+                total={cur.revenue}
+              />
+              <Breakdown
+                title="Tipo de pedido"
+                rows={report.byType.map((t) => ({ label: TYPE_LABEL[t.type], orders: t.orders, value: t.revenue }))}
+                total={cur.revenue}
+              />
+              {report.byZone.length > 0 && (
+                <Breakdown
+                  title="Entregas por bairro"
+                  description="Quantidade de entregas e taxas cobradas"
+                  rows={report.byZone.map((z) => ({ label: z.zone, orders: z.orders, value: z.fees }))}
+                  total={report.byZone.reduce((s, z) => s + z.orders, 0)}
+                  byOrders
+                />
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </>
+      )}
+
+      <History orders={orders} total={allOrders} page={page} pageSize={pageSize} qs={qs} />
     </div>
   )
 }
 
-function Stat({ title, icon: Icon, value, note }: { title: string; icon: typeof ShoppingBag; value: string; note: string }) {
+// ---------- Período ----------
+function PeriodPicker({ de, ate, clamped }: { de: string; ate: string; clamped: boolean }) {
+  const list = presets()
+  const custom = !list.some((p) => p.de === de && p.ate === ate)
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="w-4 h-4 text-muted-foreground" />
+      <CardContent className="space-y-4 py-4">
+        <nav aria-label="Atalhos de período" className="flex flex-wrap gap-2">
+          {list.map((p) => {
+            const active = p.de === de && p.ate === ate
+            return (
+              <Link
+                key={p.label}
+                href={`/admin/relatorios?de=${p.de}&ate=${p.ate}`}
+                aria-current={active ? "true" : undefined}
+                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  active ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:border-primary hover:text-primary"
+                }`}
+              >
+                {p.label}
+              </Link>
+            )
+          })}
+        </nav>
+        <form method="get" className="grid grid-cols-2 items-end gap-3 sm:grid-cols-[1fr_1fr_auto] sm:max-w-xl">
+          <div className="space-y-1.5">
+            <Label htmlFor="de" className="text-xs text-muted-foreground">
+              De
+            </Label>
+            <Input id="de" name="de" type="date" defaultValue={de} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ate" className="text-xs text-muted-foreground">
+              Até
+            </Label>
+            <Input id="ate" name="ate" type="date" defaultValue={ate} />
+          </div>
+          <Button type="submit" variant={custom ? "default" : "secondary"} className="col-span-2 sm:col-span-1">
+            Ver período
+          </Button>
+        </form>
+        {clamped && <p className="text-xs text-destructive">O período máximo é de 1 ano: ajustamos a data inicial.</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Indicadores ----------
+function Stat({ title, value, delta, note }: { title: string; value: string; delta: React.ReactNode; note?: string }) {
+  return (
+    <Card className="gap-0 py-4">
+      <CardContent className="space-y-1 px-4">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        <p className="text-2xl font-bold tabular-nums sm:text-3xl">{value}</p>
+        {delta}
+        {note && <p className="text-xs text-muted-foreground">{note}</p>}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Variação contra o período anterior: seta + texto (nunca só cor). invert = subir é ruim. */
+function Delta({ now, before, label, invert = false }: { now: number; before: number; label: string; invert?: boolean }) {
+  if (before === 0) {
+    return <p className="text-xs text-muted-foreground">{now === 0 ? "—" : `sem dados ${label.replace("vs. ", "nos ")}`}</p>
+  }
+  const change = (now - before) / before
+  const flat = Math.abs(change) < 0.005
+  const good = invert ? change < 0 : change > 0
+  const Icon = flat ? Minus : change > 0 ? ArrowUpRight : ArrowDownRight
+  const tone = flat ? "text-muted-foreground" : good ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+  return (
+    <p className={`flex items-center gap-1 text-xs font-medium ${tone}`}>
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>
+        {flat ? "igual" : `${change > 0 ? "+" : "−"}${pct(Math.abs(change))}`} <span className="font-normal text-muted-foreground">{label}</span>
+      </span>
+    </p>
+  )
+}
+
+// ---------- Gráfico de vendas ----------
+/** Teto "redondo" para o eixo (ex.: 437 → 500). */
+function niceMax(v: number) {
+  if (v <= 0) return 1
+  const p = 10 ** Math.floor(Math.log10(v))
+  return ([1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((m) => m * p >= v) ?? 10) * p
+}
+const compactBRL = (v: number) =>
+  v >= 1000 ? `R$ ${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil` : `R$ ${Math.round(v)}`
+
+function SalesChart({ report }: { report: Report }) {
+  const s = report.series
+  const max = niceMax(Math.max(...s.map((d) => d.revenue)))
+  const best = s.reduce((a, b) => (b.revenue > a.revenue ? b : a), s[0])
+  const unit = report.granularity === "day" ? "dia" : "mês"
+  const every = Math.ceil(s.length / 8) // no máximo ~8 rótulos no eixo
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Faturamento por {unit}</CardTitle>
+        <CardDescription>
+          Melhor {unit}: <strong className="text-foreground">{seriesLabel(best.key)}</strong> com {formatBRL(best.revenue)} ({best.orders}{" "}
+          {best.orders === 1 ? "pedido" : "pedidos"})
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{note}</p>
+        <div className="flex gap-2">
+          {/* eixo Y */}
+          <div className="flex h-48 flex-col justify-between py-0 text-right text-[11px] tabular-nums text-muted-foreground" aria-hidden>
+            <span className="-translate-y-1/2">{compactBRL(max)}</span>
+            <span>{compactBRL(max / 2)}</span>
+            <span className="translate-y-1/2">R$ 0</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="relative h-48">
+              {/* grade recessiva */}
+              <div className="pointer-events-none absolute inset-0 flex flex-col justify-between" aria-hidden>
+                <div className="border-t border-dashed border-border" />
+                <div className="border-t border-dashed border-border" />
+                <div className="border-t border-border" />
+              </div>
+              <ul className="relative flex h-full items-end gap-[2px]" aria-label={`Faturamento por ${unit}`}>
+                {s.map((d, i) => {
+                  const h = (d.revenue / max) * 100
+                  const edge = i < 2 ? "left-0" : i > s.length - 3 ? "right-0" : "left-1/2 -translate-x-1/2"
+                  return (
+                    <li
+                      key={d.key}
+                      tabIndex={0}
+                      aria-label={`${seriesLabel(d.key)}: ${formatBRL(d.revenue)}, ${d.orders} pedidos`}
+                      className="group relative flex h-full min-w-0 flex-1 items-end justify-center outline-none"
+                    >
+                      <div
+                        className="w-full max-w-14 rounded-t-[4px] bg-primary/85 transition-colors group-hover:bg-primary group-focus-visible:bg-primary"
+                        style={{ height: d.revenue > 0 ? `max(${h}%, 3px)` : 0 }}
+                      />
+                      <div
+                        className={`pointer-events-none absolute z-10 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${edge}`}
+                        style={{ bottom: `calc(${h}% + 6px)` }}
+                        role="presentation"
+                      >
+                        <p className="font-semibold capitalize">{seriesLabel(d.key)}</p>
+                        <p className="tabular-nums">{formatBRL(d.revenue)}</p>
+                        <p className="text-muted-foreground">
+                          {d.orders} {d.orders === 1 ? "pedido" : "pedidos"}
+                        </p>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+            {/* eixo X */}
+            <div className="mt-2 flex gap-[2px] text-[11px] text-muted-foreground" aria-hidden>
+              {s.map((d, i) => (
+                <span key={d.key} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-center">
+                  {i % every !== 0 ? null : report.granularity === "day" ? (
+                    <>
+                      {/* dia da semana só com espaço (poucos dias, tela larga) */}
+                      {s.length <= 14 && <span className="hidden sm:inline">{dayLabel(d.key).split(" ")[0]} </span>}
+                      {`${d.key.slice(8, 10)}/${d.key.slice(5, 7)}`}
+                    </>
+                  ) : (
+                    seriesLabel(d.key)
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Horário de pico ----------
+function PeakHours({ hours }: { hours: Report["byHour"] }) {
+  if (hours.length === 0) return null
+  const first = hours[0].hour
+  const last = hours[hours.length - 1].hour
+  const map = new Map(hours.map((h) => [h.hour, h.orders]))
+  const list = Array.from({ length: last - first + 1 }, (_, i) => ({ hour: first + i, orders: map.get(first + i) ?? 0 }))
+  const max = Math.max(...list.map((h) => h.orders))
+  const peak = list.find((h) => h.orders === max)!
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Horário de pico</CardTitle>
+        <CardDescription>
+          Mais pedidos entre <strong className="text-foreground">{peak.hour}h e {peak.hour + 1}h</strong> — bom horário para reforçar a equipe
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex h-24 items-end gap-[2px]" aria-label="Pedidos por hora">
+          {list.map((h) => (
+            <li
+              key={h.hour}
+              tabIndex={0}
+              title={`${h.hour}h: ${h.orders} ${h.orders === 1 ? "pedido" : "pedidos"}`}
+              aria-label={`${h.hour}h: ${h.orders} pedidos`}
+              className="group flex h-full min-w-0 flex-1 items-end outline-none"
+            >
+              <div
+                className={`w-full rounded-t-[4px] transition-colors ${h === peak ? "bg-primary" : "bg-primary/40 group-hover:bg-primary/70"}`}
+                style={{ height: h.orders ? `max(${(h.orders / max) * 100}%, 3px)` : 0 }}
+              />
+            </li>
+          ))}
+        </ul>
+        <div className="mt-1.5 flex gap-[2px] text-[11px] tabular-nums text-muted-foreground" aria-hidden>
+          {list.map((h, i) => (
+            <span key={h.hour} className="min-w-0 flex-1 text-center">
+              {list.length <= 12 || i % 2 === 0 ? `${h.hour}h` : ""}
+            </span>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Quebras (pagamento, tipo, bairro) ----------
+function Breakdown({
+  title,
+  description,
+  rows,
+  total,
+  byOrders = false,
+}: {
+  title: string
+  description?: string
+  rows: { label: string; orders: number; value: number }[]
+  total: number
+  /** proporção pela quantidade de pedidos (bairros) em vez do valor */
+  byOrders?: boolean
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-3">
+          {rows.map((r) => {
+            const share = total ? (byOrders ? r.orders : r.value) / total : 0
+            return (
+              <li key={r.label}>
+                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
+                  <span className="min-w-0 font-medium">{r.label}</span>
+                  <span className="ml-auto shrink-0 tabular-nums">
+                    <strong>{formatBRL(r.value)}</strong>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {r.orders} {r.orders === 1 ? (byOrders ? "entrega" : "pedido") : byOrders ? "entregas" : "pedidos"} · {pct(share)}
+                    </span>
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${share * 100}%` }} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Mais vendidos ----------
+function TopItems({ items, extras }: { items: Report["topItems"]; extras: Report["topExtras"] }) {
+  const max = items[0]?.qty ?? 1
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Mais vendidos</CardTitle>
+        <CardDescription>Top 10 do período, com o faturamento de cada item (já com adicionais)</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <ol className="space-y-3">
+          {items.map((it, i) => (
+            <li key={it.name} className="flex items-center gap-3">
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                  i < 3 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate font-medium">{it.name}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    <strong className="text-foreground">{it.qty}</strong> un · {formatBRL(it.revenue)}
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${(it.qty / max) * 100}%` }} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {extras.length > 0 && (
+          <div className="border-t pt-4">
+            <p className="mb-2 text-sm font-semibold">Adicionais mais pedidos</p>
+            <ul className="divide-y text-sm">
+              {extras.map((e) => (
+                <li key={e.name} className="flex justify-between gap-3 py-1.5">
+                  <span className="min-w-0 truncate">{e.name}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    {e.qty} un · {formatBRL(e.revenue)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------- Histórico ----------
+const STATUS_TONE: Record<string, string> = {
+  delivered: "bg-green-100 text-green-900 dark:bg-green-950 dark:text-green-200",
+  cancelled: "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200",
+}
+
+function History({
+  orders,
+  total,
+  page,
+  pageSize,
+  qs,
+}: {
+  orders: OrderWithItemsView[]
+  total: number
+  page: number
+  pageSize: number
+  qs: (extra?: Record<string, string | number>) => string
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  const from = (page - 1) * pageSize + 1
+  return (
+    <Card id="historico">
+      <CardHeader>
+        <CardTitle>Pedidos do período</CardTitle>
+        <CardDescription>
+          {total === 0
+            ? "Nenhum pedido"
+            : `${total} ${total === 1 ? "pedido" : "pedidos"} (incluindo cancelados)${pages > 1 ? ` · mostrando ${from}–${Math.min(total, from + orders.length - 1)}` : ""}`}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {orders.length === 0 ? (
+          <p className="py-6 text-center text-muted-foreground">{total ? "Página vazia." : "Nenhum pedido encontrado."}</p>
+        ) : (
+          <ul className="divide-y">
+            {orders.map((o) => {
+              const cancelled = o.status === "cancelled"
+              return (
+                <li key={o.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-3">
+                  <p className="min-w-0 truncate font-semibold">
+                    #{o.orderNumber} · {o.customerName}
+                  </p>
+                  <p className={`text-right font-bold tabular-nums ${cancelled ? "text-muted-foreground line-through" : ""}`}>{formatBRL(o.total)}</p>
+                  <p className="min-w-0 truncate text-sm text-muted-foreground">{o.items.map((i) => `${i.quantity}x ${i.name}`).join(" · ")}</p>
+                  <p className="text-right text-xs text-muted-foreground tabular-nums">{formatDateTimeSP(o.createdAt)}</p>
+                  <div className="col-span-2 flex flex-wrap gap-1.5 text-[11px] font-medium">
+                    <span className={`rounded-full px-2 py-0.5 ${STATUS_TONE[o.status] ?? "bg-muted text-foreground"}`}>{STATUS_LABEL[o.status]}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5">{TYPE_LABEL[o.type]}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5">{PAYMENT_LABEL[o.paymentMethod]}</span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {pages > 1 && (
+          <nav aria-label="Páginas" className="mt-4 flex items-center justify-between gap-2 border-t pt-4">
+            {page > 1 ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/admin/relatorios?${qs({ pagina: page - 1 })}#historico`}>← Mais recentes</Link>
+              </Button>
+            ) : (
+              <span />
+            )}
+            <span className="text-sm text-muted-foreground">
+              Página {page} de {pages}
+            </span>
+            {page < pages ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/admin/relatorios?${qs({ pagina: page + 1 })}#historico`}>Mais antigos →</Link>
+              </Button>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )}
       </CardContent>
     </Card>
   )

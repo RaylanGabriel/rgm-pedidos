@@ -125,22 +125,24 @@ export default async function AdminPage() {
             </Card>
           </Link>
 
-          <Link href="/admin/relatorios" className="group">
-            <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-secondary">
-              <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center mb-4 group-hover:bg-accent transition-colors">
-                  <BarChart3 className="w-6 h-6 text-secondary-foreground" />
-                </div>
-                <CardTitle className="text-2xl">Relatórios</CardTitle>
-                <CardDescription>Análise de pedidos e vendas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Consulte pedidos por data, total de vendas e estatísticas
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
+          {canManage && (
+            <Link href="/admin/relatorios" className="group">
+              <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-secondary">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-secondary flex items-center justify-center mb-4 group-hover:bg-accent transition-colors">
+                    <BarChart3 className="w-6 h-6 text-secondary-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Relatórios</CardTitle>
+                  <CardDescription>Faturamento, mais vendidos e horário de pico</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Compare com o período anterior, confira o caixa por forma de pagamento e baixe em planilha
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
           <Link href="/admin/cardapio" className="group">
             <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-primary">

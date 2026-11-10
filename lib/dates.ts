@@ -24,6 +24,9 @@ export const isYmd = (v: unknown): v is string => typeof v === "string" && /^\d{
 export function formatDateTimeSP(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", { timeZone: TZ, dateStyle: "short", timeStyle: "short" })
 }
+export function formatDateSP(iso: string) {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: TZ })
+}
 export function formatTimeSP(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })
 }

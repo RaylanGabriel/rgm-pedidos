@@ -282,7 +282,6 @@ export async function getOrderByToken(token: string) {
   return { order: toView(row), store: publicStore(row.store) }
 }
 
-/** Pedidos da loja, com filtros opcionais de período e status. */
 /** Depois de quanto tempo "saiu para entrega" vira "entregue" sozinho (se ninguém confirmar). */
 export const AUTO_DELIVER_MINUTES = 60
 
@@ -305,9 +304,10 @@ export async function autoCompleteDeliveries(storeId: string) {
     )
 }
 
+/** Pedidos da loja, com filtros opcionais de período e status (mais recentes primeiro). */
 export async function listOrders(
   storeId: string,
-  filter: { from?: Date; to?: Date; statuses?: OrderStatus[]; limit?: number } = {},
+  filter: { from?: Date; to?: Date; statuses?: OrderStatus[]; limit?: number; offset?: number } = {},
 ) {
   await autoCompleteDeliveries(storeId)
   const rows = await db.query.orders.findMany({
@@ -318,13 +318,13 @@ export async function listOrders(
       filter.statuses?.length ? inArray(orders.status, filter.statuses) : undefined,
     ),
     with: withItems,
-    orderBy: desc(orders.createdAt),
+    orderBy: [desc(orders.createdAt), desc(orders.orderNumber)],
     limit: filter.limit ?? 500,
+    offset: filter.offset,
   })
   return rows.map(toView)
 }
 
-/** Muda o status de um pedido — sempre restrito à loja informada. */
 /**
  * Cliente confirma pelo link do pedido que recebeu a entrega.
  * Só vale para pedido de entrega que está "saiu para entrega" (o token público é a autorização).
@@ -339,6 +339,7 @@ export async function confirmDeliveryByToken(token: string) {
   return !!row
 }
 
+/** Muda o status de um pedido — sempre restrito à loja informada. */
 export async function setOrderStatus(storeId: string, orderId: string, status: OrderStatus) {
   const done = status === "delivered" || status === "cancelled"
   const updated = await db

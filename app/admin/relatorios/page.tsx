@@ -2,46 +2,55 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ReportsView } from "@/components/reports-view"
-import { requireStore } from "@/lib/auth/session"
-import { addDaysYmd, isYmd, startOfDaySP, ymdSP } from "@/lib/dates"
+import { requireOwner } from "@/lib/auth/session"
+import { addDaysYmd, startOfDaySP } from "@/lib/dates"
 import { listOrders } from "@/lib/orders"
+import { resolveRange } from "@/lib/report-range"
+import { getReport } from "@/lib/reports"
 
 export const metadata = { title: "Relatórios" }
 
-type SP = Promise<{ de?: string; ate?: string }>
+const PAGE_SIZE = 30
+
+type SP = Promise<{ de?: string; ate?: string; pagina?: string }>
 
 export default async function RelatoriosPage({ searchParams }: { searchParams: SP }) {
-  const { store } = await requireStore()
+  // Faturamento é informação do dono: a equipe (staff) não vê
+  const { store } = await requireOwner()
   const sp = await searchParams
+  const { de, ate, clamped } = resolveRange(sp.de, sp.ate)
+  const page = Math.max(1, Math.min(10_000, Number.parseInt(sp.pagina ?? "1", 10) || 1))
 
-  // Padrão: últimos 7 dias, incluindo hoje
-  const today = ymdSP()
-  let de = isYmd(sp.de) ? sp.de : addDaysYmd(today, -6)
-  let ate = isYmd(sp.ate) ? sp.ate : today
-  if (de > ate) [de, ate] = [ate, de]
-
-  const orders = await listOrders(store.id, {
-    from: startOfDaySP(de),
-    to: startOfDaySP(addDaysYmd(ate, 1)),
-    limit: 5000,
-  })
+  const [report, orders] = await Promise.all([
+    getReport(store.id, de, ate),
+    listOrders(store.id, {
+      from: startOfDaySP(de),
+      to: startOfDaySP(addDaysYmd(ate, 1)),
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    }),
+  ])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
-      <div className="container mx-auto px-4 py-8">
-        <Button asChild variant="ghost" size="sm" className="mb-6">
+      <div className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
+        <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
           <Link href="/admin">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar
           </Link>
         </Button>
 
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Relatórios</h1>
-          <p className="text-muted-foreground">Vendas de {store.name}</p>
-        </div>
-
-        <ReportsView orders={orders} de={de} ate={ate} truncated={orders.length >= 5000} />
+        <ReportsView
+          storeName={store.name}
+          report={report}
+          orders={orders}
+          de={de}
+          ate={ate}
+          clamped={clamped}
+          page={page}
+          pageSize={PAGE_SIZE}
+        />
       </div>
     </div>
   )
