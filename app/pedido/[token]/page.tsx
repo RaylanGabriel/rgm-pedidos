@@ -10,6 +10,7 @@ import { mapsLink, whatsappLink } from "@/lib/links"
 import { getOrderByToken } from "@/lib/orders"
 import { formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
+import { ConfirmDelivery } from "./confirm-delivery"
 
 export const metadata = { title: "Acompanhar pedido", robots: { index: false } }
 
@@ -91,12 +92,23 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
                   {steps.map((s, i) => (
                     <li key={s} aria-current={i === step ? "step" : undefined}>
                       <span className={cn("block h-1.5 rounded-full", i <= step ? (highlight ? "bg-green-600" : "bg-primary") : "bg-muted")} />
-                      <span className={cn("mt-1.5 block text-xs", i === step ? "font-bold" : "text-muted-foreground")}>
+                      <span className={cn("mt-1.5 block leading-tight", steps.length === 5 ? "text-[11px]" : "text-xs", i === step ? "font-bold" : "text-muted-foreground")}>
                         {SHORT_LABEL[s] ?? STATUS_LABEL[s]}
                       </span>
                     </li>
                   ))}
                 </ol>
+                {order.status === "out_for_delivery" && (
+                  <div className="mt-4 space-y-2 rounded-2xl bg-background/80 p-4">
+                    <p className="text-sm font-semibold">Já chegou? Avise a loja com um toque:</p>
+                    <ConfirmDelivery token={order.publicToken} />
+                  </div>
+                )}
+                {order.status === "delivered" && order.customerConfirmedAt && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Você confirmou o recebimento às {formatTimeSP(order.customerConfirmedAt)}. Obrigado!
+                  </p>
+                )}
                 {!finished && <p className="mt-3 text-xs text-muted-foreground">Esta página se atualiza sozinha.</p>}
               </div>
             )}

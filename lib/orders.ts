@@ -245,6 +245,7 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     notes: o.notes,
     createdAt: o.createdAt.toISOString(),
     completedAt: o.completedAt?.toISOString() ?? null,
+    customerConfirmedAt: o.customerConfirmedAt?.toISOString() ?? null,
     items: o.items.map((i) => ({
       id: i.id,
       name: i.nameSnapshot,
@@ -293,6 +294,20 @@ export async function listOrders(
 }
 
 /** Muda o status de um pedido — sempre restrito à loja informada. */
+/**
+ * Cliente confirma pelo link do pedido que recebeu a entrega.
+ * Só vale para pedido de entrega que está "saiu para entrega" (o token público é a autorização).
+ */
+export async function confirmDeliveryByToken(token: string) {
+  const now = new Date()
+  const [row] = await db
+    .update(orders)
+    .set({ status: "delivered", completedAt: now, customerConfirmedAt: now })
+    .where(and(eq(orders.publicToken, token), eq(orders.type, "delivery"), eq(orders.status, "out_for_delivery")))
+    .returning({ id: orders.id })
+  return !!row
+}
+
 export async function setOrderStatus(storeId: string, orderId: string, status: OrderStatus) {
   const done = status === "delivered" || status === "cancelled"
   const updated = await db

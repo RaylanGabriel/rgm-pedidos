@@ -43,6 +43,8 @@ export interface OrderView {
   notes: string | null
   createdAt: string
   completedAt: string | null
+  /** Cliente confirmou o recebimento pelo celular */
+  customerConfirmedAt: string | null
 }
 
 export type OrderWithItemsView = OrderView & { items: OrderItemView[] }

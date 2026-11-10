@@ -310,6 +310,7 @@ export function KitchenBoard({
                   <span className={cn("text-xs font-semibold", o.status === "cancelled" ? "text-destructive" : "text-muted-foreground")}>
                     {STATUS_LABEL[o.status]}
                     {o.completedAt && ` ${formatTimeSP(o.completedAt)}`}
+                    {o.customerConfirmedAt && <span className="ml-1 text-green-700 dark:text-green-400">✓ confirmado pelo cliente</span>}
                   </span>
                   <span className="w-20 text-right tabular-nums">{formatBRL(o.total)}</span>
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => printOrder(o, storeName)} aria-label={`Imprimir pedido ${o.orderNumber}`}>
@@ -426,6 +427,11 @@ function OrderCard({
         </p>
       )}
       {isDelivery && <p className="mx-4 mt-3 rounded-xl bg-muted px-3 py-2 text-sm">Entrega: {fullAddress(order)}</p>}
+      {onTheWay && (
+        <p className="mx-4 mt-2 text-xs text-muted-foreground">
+          Quando o cliente tocar “Recebi meu pedido”, ele sai daqui sozinho. Ou marque abaixo.
+        </p>
+      )}
 
       <div className="mt-3 flex items-center justify-between px-4 text-xs text-muted-foreground">
         <span>{PAYMENT_LABEL[order.paymentMethod]}</span>

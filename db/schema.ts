@@ -234,6 +234,7 @@ export const orders = pgTable(
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    customerConfirmedAt: timestamp("customer_confirmed_at", { withTimezone: true }), // cliente tocou "Recebi meu pedido"
   },
   (t) => [
     uniqueIndex("orders_store_number_unique").on(t.storeId, t.orderNumber),
