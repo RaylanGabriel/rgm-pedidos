@@ -169,7 +169,7 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
   com o ícone do WhatsApp para conversar.
 
 ## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
-Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
+Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
 
 **Feito (em teste — `MP_TEST_MODE=true`):**
 - `/admin/pagamentos`: "Conectar Mercado Pago" (OAuth com `state` anti-CSRF em cookie), desconectar; super admin pode
@@ -191,7 +191,7 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 
 **✅ Em produção (11/11/2026):** `MP_TEST_MODE=false` em Production (Preview continua em teste). Primeiro Pix real
 (R$ 1, pedido #16 da Mr. Smash): QR → pago → webhook com assinatura válida em 1 s → pedido entrou na cozinha.
-- App atual no Mercado Pago: **RGMPEDIDOS** (Checkout Transparente, API de Orders). O antigo RGM_PEDIDOS foi excluído.
+- App atual no Mercado Pago: **RGM-PEDIDOS** (Checkout Transparente, API de Orders). O antigo RGM_PEDIDOS foi excluído.
 - Endereço do OAuth: `auth.mercadopago.com.br` (o genérico `.com` recusava o app do Brasil).
 - Loja própria (Mr. Smash): ligada à **conta dona do app** pelo `MP_PROD_ACCESS_TOKEN` (botão só do super admin,
   "Usar a conta dona da plataforma"), sem OAuth.

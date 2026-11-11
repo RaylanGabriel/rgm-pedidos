@@ -7,7 +7,7 @@ import { orders, storePaymentAccounts } from "@/db/schema"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
 
 /**
- * Integração com o Mercado Pago (aplicação RGM_PEDIDOS).
+ * Integração com o Mercado Pago (aplicação RGM-PEDIDOS).
  * - Cada loja conecta a própria conta por OAuth; o Pix cai direto na conta do dono.
  * - Pix criado pela API de Orders (POST /v1/orders, type "online", pix/bank_transfer).
  * - Confirmação: webhook (assinatura conferida) + consulta na API ao abrir a tela do pedido.

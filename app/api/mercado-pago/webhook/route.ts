@@ -4,7 +4,7 @@ import { orders, storePaymentAccounts } from "@/db/schema"
 import { syncPixOrder, verifyWebhookSignature } from "@/lib/mercadopago"
 
 /**
- * Avisos do Mercado Pago (aplicação RGM_PEDIDOS).
+ * Avisos do Mercado Pago (aplicação RGM-PEDIDOS).
  * Nunca confiamos no conteúdo do aviso: ele só diz "olhe a cobrança X"; o status vem sempre da API do Mercado Pago
  * com o token da loja (syncPixOrder). A assinatura é conferida para barrar chamadas falsas.
  */
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         .limit(20)
       for (const o of pending) await syncPixOrder(o.id)
     } else if (type === "mp-connect" && sellerId && body.action?.includes("deauthorized")) {
-      // Dono desconectou a RGM_PEDIDOS na conta dele: para de gerar Pix para essa loja
+      // Dono desconectou a RGM-PEDIDOS na conta dele: para de gerar Pix para essa loja
       await db.delete(storePaymentAccounts).where(eq(storePaymentAccounts.mpUserId, sellerId))
     }
   } catch (err) {
