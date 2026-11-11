@@ -30,7 +30,10 @@ export function authorizationUrl(state: string) {
     state,
     redirect_uri: process.env.MP_REDIRECT_URI!,
   })
-  return `https://auth.mercadopago.com/authorization?${p}`
+  // O app é do Mercado Pago Brasil: o endereço genérico (auth.mercadopago.com) responde "o aplicativo não está pronto
+  // para se conectar"; o do país (auth.mercadopago.com.br) abre o login normalmente.
+  const base = process.env.MP_AUTH_URL || "https://auth.mercadopago.com.br/authorization"
+  return `${base}?${p}`
 }
 
 interface TokenResponse {
