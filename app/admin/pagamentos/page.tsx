@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ActionButton } from "@/components/admin/form-ui"
 import { requireOwner } from "@/lib/auth/session"
 import { formatDateTimeSP } from "@/lib/dates"
-import { getAccountInfo, mpConfigured, mpTestMode } from "@/lib/mercadopago"
-import { connectTestAccountAction, disconnectMercadoPagoAction } from "./actions"
+import { getAccountInfo, mpConfigured, mpTestMode, ownerAccountAvailable } from "@/lib/mercadopago"
+import { connectOwnerAccountAction, connectTestAccountAction, disconnectMercadoPagoAction } from "./actions"
 
 export const metadata = { title: "Pagamentos" }
 
 const MESSAGES: Record<string, { tone: "ok" | "erro"; text: string }> = {
   "ok=conectado": { tone: "ok", text: "Mercado Pago conectado! O Pix dos pedidos agora cai direto na sua conta." },
+  "ok=dona": { tone: "ok", text: "Loja ligada à conta dona da plataforma (produção). O Pix cai direto nessa conta." },
   "ok=teste": { tone: "ok", text: "Conta de teste da plataforma ligada a esta loja (modo de teste)." },
   "ok=desconectado": { tone: "ok", text: "Mercado Pago desconectado. Os pedidos com Pix voltam a ser pagos direto com a loja." },
   "erro=negado": { tone: "erro", text: "A conexão foi cancelada no Mercado Pago. Tente de novo quando quiser." },
@@ -119,6 +120,19 @@ export default async function PagamentosPage({ searchParams }: { searchParams: S
                   </Button>
                 ) : (
                   <p className="text-sm text-destructive">Integração ainda não configurada na plataforma.</p>
+                )}
+                {ownerAccountAvailable() && user.isSuperadmin && (
+                  <div className="border-t pt-4">
+                    <p className="mb-2 text-xs text-muted-foreground">Só você vê (super admin): para lojas suas, sem passar pelo Conectar.</p>
+                    <ActionButton
+                      action={connectOwnerAccountAction}
+                      variant="secondary"
+                      size="sm"
+                      confirmText="Ligar esta loja à SUA conta do Mercado Pago (dona da plataforma)? O Pix desta loja vai cair na sua conta."
+                    >
+                      Usar a conta dona da plataforma (produção)
+                    </ActionButton>
+                  </div>
                 )}
                 {mpTestMode() && user.isSuperadmin && (
                   <div className="border-t pt-4">

@@ -75,6 +75,21 @@ export async function connectPlatformTestAccount(storeId: string, userId: string
   await saveAccount(storeId, userId, { access_token: token, expires_in: 10 * 365 * 86400, user_id: me.id, live_mode: false })
 }
 
+/**
+ * Só em produção e só para o super admin: liga a loja na conta DONA do app (a do próprio Raylan),
+ * pelo Access Token de produção — sem OAuth, que serve para contas de outras pessoas.
+ * Usado na Mr. Smash (loja própria) e para o primeiro pagamento real que o Mercado Pago exige para "liberar" o app.
+ */
+export const ownerAccountAvailable = () => !mpTestMode() && !!process.env.MP_PROD_ACCESS_TOKEN
+
+export async function connectPlatformOwnerAccount(storeId: string, userId: string) {
+  const token = process.env.MP_PROD_ACCESS_TOKEN
+  if (!ownerAccountAvailable() || !token) throw new Error("Disponível só em produção")
+  const me = await mpFetch<{ id: number }>(token, "/users/me")
+  // Token de produção da própria conta não expira como o do OAuth; guardamos validade longa
+  await saveAccount(storeId, userId, { access_token: token, expires_in: 10 * 365 * 86400, user_id: me.id, live_mode: true })
+}
+
 async function saveAccount(storeId: string, userId: string | null, t: TokenResponse) {
   const values = {
     mpUserId: String(t.user_id),
