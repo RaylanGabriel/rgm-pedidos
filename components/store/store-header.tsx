@@ -1,7 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
-import { Bike, Clock, MapPin, MessageCircle, ShoppingBag, Store as StoreIcon } from "lucide-react"
-import { formatPhone, mapsLink, whatsappLink } from "@/lib/links"
+import { Bike, Clock, Facebook, Instagram, MapPin, ShoppingBag, Store as StoreIcon } from "lucide-react"
+import { facebookLink, formatPhone, instagramLink, mapsLink, whatsappLink } from "@/lib/links"
 import type { PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, type DeliveryConfig } from "@/lib/order-shared"
 
@@ -13,9 +13,58 @@ function deliveryLabel(d: DeliveryConfig) {
   return min > 0 ? `Entrega a partir de ${formatBRL(min)}` : "Entrega a partir de grátis"
 }
 
+/** Logo do WhatsApp (a lucide não tem): reconhecível mesmo sem o texto. */
+function WhatsappIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.4-1.48-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.21 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.7.63.71.23 1.36.2 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35M12.05 21.5h-.01a9.4 9.4 0 0 1-4.8-1.32l-.34-.2-3.57.94.95-3.48-.22-.36a9.4 9.4 0 0 1-1.45-5.03c0-5.2 4.24-9.44 9.45-9.44 2.52 0 4.9.99 6.68 2.77a9.37 9.37 0 0 1 2.76 6.68c0 5.21-4.24 9.44-9.45 9.44m8.04-17.48A11.3 11.3 0 0 0 12.04.7C5.78.7.68 5.8.68 12.06c0 2 .52 3.96 1.52 5.68L.6 23.6l6-1.57a11.3 11.3 0 0 0 5.43 1.38h.01c6.26 0 11.36-5.1 11.36-11.36 0-3.03-1.18-5.89-3.32-8.03" />
+    </svg>
+  )
+}
+
+type SocialStore = Pick<PublicStore, "phone" | "instagram" | "facebook">
+
+/** WhatsApp, Instagram e Facebook da loja (só os que o dono preencheu). */
+function socialLinks(store: SocialStore) {
+  return [
+    { key: "whatsapp", label: "WhatsApp", icon: WhatsappIcon, href: whatsappLink(store.phone) },
+    { key: "instagram", label: "Instagram", icon: Instagram, href: instagramLink(store.instagram) },
+    { key: "facebook", label: "Facebook", icon: Facebook, href: facebookLink(store.facebook) },
+  ].filter((l): l is typeof l & { href: string } => !!l.href)
+}
+
+/**
+ * Botões das redes sociais (alvo de toque de 40px, abre em outra aba).
+ * compact: no celular só o ícone (cabe numa linha no topo); o nome continua para leitor de tela.
+ */
+function SocialLinks({ store, compact = false, className = "" }: { store: SocialStore; compact?: boolean; className?: string }) {
+  const links = socialLinks(store)
+  if (links.length === 0) return null
+  return (
+    <ul className={`flex flex-wrap gap-2 ${className}`} aria-label="Redes sociais da loja">
+      {links.map(({ key, label, icon: Icon, href }) => (
+        <li key={key}>
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={compact ? label : undefined}
+            className={`inline-flex h-10 items-center justify-center gap-2 rounded-full border bg-card text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              compact ? "w-10 sm:w-auto sm:px-4" : "px-4"
+            }`}
+          >
+            <Icon className={compact ? "h-[18px] w-[18px] sm:h-4 sm:w-4" : "h-4 w-4"} aria-hidden />
+            <span className={compact ? "sr-only sm:not-sr-only" : ""}>{label}</span>
+            <span className="sr-only"> (abre em outra aba)</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** Topo do cardápio: capa na cor da loja, logo, nome, status e informações rápidas. */
 export function StoreHero({ store, delivery }: { store: PublicStore; delivery: DeliveryConfig }) {
-  const whats = whatsappLink(store.phone)
   const map = mapsLink(store.address)
   const chips = [
     { icon: Clock, text: `~${store.avgPrepMinutes} min` },
@@ -77,20 +126,8 @@ export function StoreHero({ store, delivery }: { store: PublicStore; delivery: D
               </a>
             </li>
           )}
-          {whats && (
-            <li>
-              <a
-                href={whats}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 font-medium text-primary hover:underline"
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden />
-                WhatsApp
-              </a>
-            </li>
-          )}
         </ul>
+        <SocialLinks store={store} compact className="mt-3" />
       </div>
     </header>
   )
@@ -124,18 +161,20 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "slug" | "name
   )
 }
 
-export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phone"> }) {
-  const whats = whatsappLink(store.phone)
+export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phone" | "instagram" | "facebook"> }) {
+  const hasLinks = socialLinks(store).length > 0
+  const phone = whatsappLink(store.phone) ? formatPhone(store.phone) : null
   return (
     <footer className="mt-16 border-t bg-card">
-      <div className="container mx-auto space-y-2 px-4 py-8 text-center text-sm text-muted-foreground">
-        {whats && (
-          <p>
-            Dúvidas? Fale com a loja:{" "}
-            <a className="font-medium text-primary hover:underline" href={whats} target="_blank" rel="noopener noreferrer">
-              WhatsApp {formatPhone(store.phone)}
-            </a>
-          </p>
+      <div className="container mx-auto space-y-3 px-4 py-8 text-center text-sm text-muted-foreground">
+        {hasLinks && (
+          <>
+            <p>
+              {phone ? `Dúvidas? Chame no WhatsApp ${phone}` : "Siga a loja nas redes"}
+              {phone && (store.instagram || store.facebook) ? " ou siga a loja nas redes" : ""}
+            </p>
+            <SocialLinks store={store} className="justify-center" />
+          </>
         )}
         <p>&copy; {new Date().getFullYear()} {store.name}</p>
       </div>

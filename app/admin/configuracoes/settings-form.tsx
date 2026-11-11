@@ -12,6 +12,8 @@ export interface SettingsValues {
   name: string
   phone: string | null
   address: string | null
+  instagram: string | null
+  facebook: string | null
   logoUrl: string | null
   coverUrl: string | null
   primaryColor: string
@@ -56,6 +58,32 @@ export function SettingsForm({ values }: { values: SettingsValues }) {
             autoComplete="street-address"
             error={s.fieldErrors?.address}
             hint="Para quem vai retirar: aparece no cardápio e no acompanhamento, com link para o mapa"
+          />
+
+          <Field
+            label="Instagram"
+            name="instagram"
+            placeholder="@sualoja"
+            defaultValue={values.instagram ? `@${values.instagram}` : ""}
+            maxLength={200}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            error={s.fieldErrors?.instagram}
+            hint="Digite o @ ou cole o link do perfil. Deixe vazio para não mostrar."
+          />
+
+          <Field
+            label="Facebook"
+            name="facebook"
+            placeholder="facebook.com/sualoja"
+            defaultValue={values.facebook ? `facebook.com/${values.facebook}` : ""}
+            maxLength={300}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            error={s.fieldErrors?.facebook}
+            hint="Cole o link da página da loja. Deixe vazio para não mostrar."
           />
 
           <Field

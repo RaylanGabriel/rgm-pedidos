@@ -134,6 +134,13 @@
       "when": 1794341418191,
       "tag": "0018_pix_mercado_pago",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794355281893,
+      "tag": "0019_social_links",
+      "breakpoints": true
     }
   ]
 }

@@ -168,6 +168,8 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - **Troco para R$ ___** no pagamento em dinheiro (`orders.change_for`): atalhos com as notas acima do total, mostra quanto
   levar; aparece na cozinha, impressão, acompanhamento, fechamento de caixa e planilha.
 - **Banco separado para testes** (branch `preview` do Neon) — ver Notas técnicas.
+- **Redes sociais da loja** (`stores.instagram`, `stores.facebook` + o WhatsApp que já existia): o dono digita o @ ou
+  cola o link em Configurações (o sistema limpa e confere); aparecem no topo do cardápio (só ícones no celular) e no rodapé.
 
 ## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
@@ -229,6 +231,6 @@ conseguir explicar sozinho numa entrevista:
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0018): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0019): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).

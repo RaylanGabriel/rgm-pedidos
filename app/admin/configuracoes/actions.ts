@@ -7,6 +7,7 @@ import { db } from "@/db"
 import { stores } from "@/db/schema"
 import { isOwner } from "@/lib/auth/session"
 import { isHexColor } from "@/lib/color"
+import { parseFacebook, parseInstagram } from "@/lib/links"
 import { formText, zodErrorState, type FormState } from "@/lib/form-state"
 import { deleteImage, fileFrom, uploadImage } from "@/lib/storage"
 
@@ -21,6 +22,22 @@ const settingsSchema = z.object({
     .string()
     .max(200, "Endereço muito longo")
     .transform((v) => v.replace(/\s+/g, " ").trim() || null),
+  instagram: z
+    .string()
+    .max(200)
+    .transform((v, ctx) => {
+      const r = parseInstagram(v)
+      if (r === null) ctx.addIssue({ code: "custom", message: "Instagram inválido: use @usuario ou o link do perfil" })
+      return r ?? null
+    }),
+  facebook: z
+    .string()
+    .max(300)
+    .transform((v, ctx) => {
+      const r = parseFacebook(v)
+      if (r === null) ctx.addIssue({ code: "custom", message: "Facebook inválido: cole o link da página" })
+      return r ?? null
+    }),
   primaryColor: z.string().refine(isHexColor, "Cor inválida"),
   avgPrepMinutes: z.coerce.number().int("Use minutos inteiros").min(1, "Mínimo 1 minuto").max(120, "Máximo 120 minutos"),
 })
@@ -33,6 +50,8 @@ export async function saveSettingsAction(_prev: FormState, fd: FormData): Promis
     name: formText(fd, "name"),
     phone: formText(fd, "phone"),
     address: formText(fd, "address"),
+    instagram: formText(fd, "instagram"),
+    facebook: formText(fd, "facebook"),
     primaryColor: formText(fd, "primaryColor").toLowerCase(),
     avgPrepMinutes: formText(fd, "avgPrepMinutes"),
   })

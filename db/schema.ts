@@ -66,6 +66,8 @@ export const stores = pgTable(
     primaryColor: text("primary_color").notNull().default("#f97316"),
     phone: text("phone"),
     address: text("address"), // endereço para retirada (mostrado ao cliente)
+    instagram: text("instagram"), // só o usuário, sem @ (ex.: "mrsmash")
+    facebook: text("facebook"), // caminho depois de facebook.com/ (ex.: "mrsmash" ou "profile.php?id=123")
     isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja
     active: boolean("active").notNull().default(true), // plataforma suspende (inadimplência)
     suspendedReason: text("suspended_reason"), // mensagem mostrada ao dono/equipe quando suspensa

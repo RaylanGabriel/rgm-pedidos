@@ -49,6 +49,8 @@ export function publicStore(s: StoreRow) {
     primaryColor: s.primaryColor,
     phone: s.phone,
     address: s.address,
+    instagram: s.instagram,
+    facebook: s.facebook,
     isOpen: s.isOpen,
     avgPrepMinutes: s.avgPrepMinutes,
   }
