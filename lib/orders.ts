@@ -274,14 +274,28 @@ async function attachPixCharge(storeId: string, publicToken: string): Promise<bo
   try {
     const mpToken = await storeAccessToken(storeId)
     if (!mpToken) return false
-    const [row] = await db
-      .select({ id: orders.id, orderNumber: orders.orderNumber, total: orders.total, storeName: stores.name })
-      .from(orders)
-      .innerJoin(stores, eq(stores.id, orders.storeId))
-      .where(and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)))
-      .limit(1)
+    const row = await db.query.orders.findFirst({
+      where: and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)),
+      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true },
+      with: { ...withItems, store: { columns: { name: true } } },
+    })
     if (!row) return false
-    const pix = await createPixCharge(mpToken, { ...row, total: Number(row.total) })
+    // Itens com os adicionais somados no preço unitário (o Mercado Pago confere: soma dos itens = total)
+    const items = row.items.map((i) => ({
+      title: i.nameSnapshot,
+      description: i.extras.length ? `+ ${i.extras.map((x) => (x.quantity > 1 ? `${x.quantity}x ${x.nameSnapshot}` : x.nameSnapshot)).join(", ")}` : null,
+      unitPrice: Number(i.unitPrice) + i.extras.reduce((s, x) => s + Number(x.unitPrice) * x.quantity, 0),
+      quantity: i.quantity,
+    }))
+    const pix = await createPixCharge(mpToken, {
+      id: row.id,
+      orderNumber: row.orderNumber,
+      total: Number(row.total),
+      storeName: row.store.name,
+      customerName: row.customerName,
+      items,
+      deliveryFee: Number(row.deliveryFee),
+    })
     await db
       .update(orders)
       .set({ mpOrderId: pix.mpOrderId, pixCode: pix.pixCode, pixExpiresAt: pix.expiresAt })

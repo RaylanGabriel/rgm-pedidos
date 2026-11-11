@@ -201,8 +201,9 @@ Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - **"Conectar Mercado Pago" (OAuth) de outras contas** dava "O aplicativo não está pronto para se conectar". O painel do
   Mercado Pago só considera o app pronto depois do 1º pagamento real (etapa 4, até 24 h). Testar de novo com a conta
   real de outra pessoa; se continuar, abrir chamado no suporte do Mercado Pago Developers.
-- Nota de qualidade do Mercado Pago (18/100): enviar `items` (título, quantidade, preço, categoria), `statement_descriptor`
-  (nome da loja no extrato) e nome/sobrenome do comprador. Device ID (script de segurança) e Platform ID (comercial do MP) depois.
+- ✅ Nota de qualidade: a cobrança agora envia `items` (lanche com adicionais no preço + "Taxa de entrega"; o Mercado Pago
+  recusa se a soma não bater, então sem itens nesse caso), `statement_descriptor` (nome da loja sem acento, até 22) e
+  nome/sobrenome do comprador. Falta: Device ID (script de segurança do MP, útil para cartão) e Platform ID (comercial do MP).
 - Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 
 ## 💭 6. Conta do cliente (opcional) com Google

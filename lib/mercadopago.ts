@@ -160,23 +160,60 @@ interface MpOrder {
 }
 
 /** Cria a cobrança Pix na conta da loja. Valor = total calculado pelo banco (nunca o do navegador). */
+export type PixItem = { title: string; description: string | null; unitPrice: number; quantity: number }
+
+/** "Mr. Smash Street" → "MR SMASH STREET" (nome no extrato: sem acento, até 22 caracteres). */
+const statementName = (s: string) =>
+  s.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^A-Za-z0-9 ]/g, "").replace(/\s+/g, " ").trim().toUpperCase().slice(0, 22)
+
+/**
+ * Itens no formato do Mercado Pago (melhora a análise do pagamento e mostra o que foi vendido no app do dono).
+ * Ele recusa a cobrança se a soma não bater com o total: nesse caso (arredondamento) manda sem itens.
+ */
+function mpItems(items: PixItem[], deliveryFee: number, total: number) {
+  const list = items.map((i, n) => ({
+    title: i.title.slice(0, 120),
+    ...(i.description ? { description: i.description.slice(0, 250) } : {}),
+    unit_price: i.unitPrice.toFixed(2),
+    quantity: i.quantity,
+    category_id: "others", // o Mercado Pago não tem categoria de comida
+    external_code: `item-${n + 1}`,
+  }))
+  if (deliveryFee > 0) list.push({ title: "Taxa de entrega", unit_price: deliveryFee.toFixed(2), quantity: 1, category_id: "services", external_code: "entrega" })
+  const cents = list.reduce((s, i) => s + Math.round(Number(i.unit_price) * 100) * i.quantity, 0)
+  return cents === Math.round(total * 100) ? list : null
+}
+
 export async function createPixCharge(
   token: string,
-  o: { id: string; orderNumber: number; total: number; storeName: string },
+  o: { id: string; orderNumber: number; total: number; storeName: string; customerName: string; items: PixItem[]; deliveryFee: number },
 ): Promise<{ mpOrderId: string; pixCode: string; expiresAt: Date }> {
   const amount = o.total.toFixed(2)
+  const [firstName, ...rest] = o.customerName.trim().split(/\s+/)
+  const items = mpItems(o.items, o.deliveryFee, o.total)
+  const descriptor = statementName(o.storeName)
   const body = {
     type: "online",
     processing_mode: "automatic",
     external_reference: o.id,
     total_amount: amount,
     description: `Pedido #${o.orderNumber} - ${o.storeName}`.slice(0, 120),
+    ...(items ? { items } : {}),
     payer: {
-      // Não pedimos e-mail ao cliente; o Mercado Pago exige um. Em teste, "APRO" aprova sozinho.
+      // Não pedimos e-mail ao cliente; o Mercado Pago exige um. Em teste, "APRO" no nome aprova sozinho.
       email: `pedido-${o.orderNumber}@rgm.dev.br`,
-      ...(mpTestMode() ? { first_name: "APRO" } : {}),
+      first_name: mpTestMode() ? "APRO" : firstName,
+      ...(rest.length ? { last_name: rest.join(" ").slice(0, 60) } : {}),
     },
-    transactions: { payments: [{ amount, payment_method: { id: "pix", type: "bank_transfer" }, expiration_time: `PT${PIX_MINUTES}M` }] },
+    transactions: {
+      payments: [
+        {
+          amount,
+          payment_method: { id: "pix", type: "bank_transfer", ...(descriptor ? { statement_descriptor: descriptor } : {}) },
+          expiration_time: `PT${PIX_MINUTES}M`,
+        },
+      ],
+    },
   }
   const mp = await mpFetch<MpOrder>(token, "/v1/orders", {
     method: "POST",
