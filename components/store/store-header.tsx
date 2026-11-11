@@ -3,12 +3,17 @@ import Link from "next/link"
 import { Bike, Clock, Facebook, Instagram, MapPin, ShoppingBag, Store as StoreIcon } from "lucide-react"
 import { facebookLink, instagramLink, mapsLink, whatsappLink } from "@/lib/links"
 import type { PublicStore } from "@/lib/orders"
-import { deliveryAvailable, formatBRL, type DeliveryConfig } from "@/lib/order-shared"
+import { deliveryAvailable, formatBRL, formatKm, type DeliveryConfig } from "@/lib/order-shared"
 
 /** Resumo da entrega para o topo da loja (o cliente sabe o custo antes de escolher). */
 function deliveryLabel(d: DeliveryConfig) {
   if (!deliveryAvailable(d)) return "Só retirada"
   if (d.pricing === "fixed") return d.fixedFee > 0 ? `Entrega ${formatBRL(d.fixedFee)}` : "Entrega grátis"
+  if (d.pricing === "distance") {
+    const first = d.tiers[0]
+    const max = d.tiers.at(-1)?.upToKm ?? 0
+    return first.fee === 0 ? `Entrega grátis até ${formatKm(first.upToKm)} · até ${formatKm(max)}` : `Entrega até ${formatKm(max)}`
+  }
   const min = Math.min(...d.zones.map((z) => z.fee))
   return min > 0 ? `Entrega a partir de ${formatBRL(min)}` : "Entrega a partir de grátis"
 }

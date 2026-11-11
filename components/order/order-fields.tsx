@@ -15,7 +15,9 @@ import {
   type DeliveryConfig,
   type OrderType,
   type PaymentMethod,
+  type QuoteView,
 } from "@/lib/order-shared"
+import { DistanceAddress, emptyAddressFields, type AddressFields } from "@/components/order/distance-address"
 
 export interface OrderFieldsValue {
   customerName: string
@@ -23,6 +25,8 @@ export interface OrderFieldsValue {
   type: OrderType
   deliveryAddress: string
   deliveryZoneId: string
+  /** Entrega por km: endereço por partes (CEP, rua, número…) */
+  address: AddressFields
   paymentMethod: PaymentMethod
   /** "Troco para" (texto digitado; só vale em dinheiro) */
   changeFor: string
@@ -35,6 +39,7 @@ export const emptyOrderFields: OrderFieldsValue = {
   type: "pickup",
   deliveryAddress: "",
   deliveryZoneId: "",
+  address: emptyAddressFields,
   paymentMethod: "pix",
   changeFor: "",
   notes: "",
@@ -111,6 +116,8 @@ export function OrderFields({
   delivery,
   total,
   pixOnline = false,
+  quote = null,
+  quoteLoading = false,
 }: {
   value: OrderFieldsValue
   onChange: (v: OrderFieldsValue) => void
@@ -122,6 +129,9 @@ export function OrderFields({
   total?: number
   /** Loja aceita Pix pelo site (Mercado Pago conectado) */
   pixOnline?: boolean
+  /** Entrega por km: cálculo da taxa para o endereço digitado (useDistanceQuote) */
+  quote?: QuoteView | null
+  quoteLoading?: boolean
 }) {
   const canDeliver = deliveryAvailable(delivery)
   const typeLabels = canDeliver
@@ -130,8 +140,13 @@ export function OrderFields({
   const typeHints: Partial<Record<OrderType, string>> = {}
   if (canDeliver) {
     const minZone = Math.min(...delivery.zones.map((z) => z.fee))
+    const minTier = Math.min(...delivery.tiers.map((t) => t.fee))
     typeHints.delivery =
-      delivery.pricing === "fixed"
+      delivery.pricing === "distance"
+        ? minTier > 0
+          ? `a partir de ${formatBRL(minTier)}`
+          : "conforme a distância"
+        : delivery.pricing === "fixed"
         ? delivery.fixedFee > 0
           ? `+ ${formatBRL(delivery.fixedFee)}`
           : "grátis"
@@ -203,7 +218,19 @@ export function OrderFields({
           </div>
         )}
 
-        {value.type === "delivery" && (
+        {value.type === "delivery" && delivery.pricing === "distance" && (
+          <DistanceAddress
+            value={value.address}
+            onChange={(patch) => onChange({ ...value, address: { ...value.address, ...patch } })}
+            delivery={delivery}
+            quote={quote}
+            loading={quoteLoading}
+            errors={errors}
+            disabled={disabled}
+          />
+        )}
+
+        {value.type === "delivery" && delivery.pricing !== "distance" && (
           <div>
             <Label htmlFor="deliveryAddress" className="mb-1.5">
               Endereço de entrega *

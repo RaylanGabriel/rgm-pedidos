@@ -5,10 +5,14 @@ import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
+import { distanceTiers, quoteDistance, quoteError } from "@/lib/geo"
 import { openStateLabel, parseHours, storeOpenState, weekSummary } from "@/lib/hours"
 import { categories, deliveryZones, ingredients, menuItemCategories, menuItems, orders, stores } from "@/db/schema"
 import {
+  addressLine,
   formatBRL,
+  formatKm,
+  type StoreLocation,
   orderInputSchema,
   type DeliveryConfig,
   type OrderInput,
@@ -148,12 +152,18 @@ export const getDeliveryConfig = cache(async (store: StoreRow): Promise<Delivery
           .where(and(eq(deliveryZones.storeId, store.id), eq(deliveryZones.active, true)))
           .orderBy(asc(sql`lower(${deliveryZones.name})`))
       : []
+  const tiers = store.deliveryPricing === "distance" ? await distanceTiers(store.id) : []
+  const loc = store.location as StoreLocation | null
   return {
     enabled: store.deliveryEnabled,
     pricing: store.deliveryPricing,
     fixedFee: Number(store.deliveryFixedFee),
     minOrder: Number(store.deliveryMinOrder),
     zones: zones.map((z) => ({ id: z.id, name: z.name, fee: Number(z.fee) })),
+    tiers,
+    hasLocation: typeof loc?.lat === "number",
+    city: loc?.city ?? "",
+    state: loc?.state ?? "",
   }
 })
 
@@ -191,6 +201,20 @@ export async function createOrder(
   const o = parsed.data
   const token = randomBytes(18).toString("base64url")
 
+  // Entrega por km: o servidor localiza o endereço e calcula a distância (o banco escolhe a faixa e a taxa)
+  let distanceKm: number | null = null
+  let deliveryAddress = o.type === "delivery" ? o.deliveryAddress : null
+  if (o.type === "delivery") {
+    const [st] = await db.select({ id: stores.id, pricing: stores.deliveryPricing, location: stores.location }).from(stores).where(eq(stores.id, storeId)).limit(1)
+    if (st?.pricing === "distance") {
+      if (!o.addressParts) return { ok: false, error: "Informe o endereço de entrega.", fieldErrors: { street: "Informe a rua" } }
+      const quote = await quoteDistance(st, o.addressParts)
+      if (!quote.ok) return { ok: false, error: quoteError(quote), fieldErrors: { street: quoteError(quote) } }
+      distanceKm = quote.km
+      deliveryAddress = addressLine(o.addressParts)
+    }
+  }
+
   // Loja aberta? A regra (horário automático + ajuste manual) fica em lib/hours.ts; o banco só confere se existe/está ativa.
   if (opts.requireOpen) {
     const [st] = await db
@@ -205,9 +229,9 @@ export async function createOrder(
     const res = await db.execute<{ result: { orderNumber: number; publicToken: string } }>(sql`
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
-        ${o.type === "delivery" ? o.deliveryAddress : null}, ${o.paymentMethod}::payment_method, ${o.notes},
+        ${deliveryAddress}, ${o.paymentMethod}::payment_method, ${o.notes},
         ${JSON.stringify(o.items)}::jsonb, ${token}, false,
-        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid
+        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid, ${distanceKm}::numeric
       ) as result`)
     const result = res.rows[0].result
     // Troco: só em dinheiro e só se a nota cobre o total calculado pelo banco
@@ -232,6 +256,9 @@ export async function createOrder(
       const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
       return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
     }
+    const range = msg.match(/OUT_OF_RANGE:([\d.]+)/)
+    if (range) return { ok: false, error: `Esse endereço fica fora da área de entrega (até ${formatKm(Number(range[1]))}). Escolha retirada.` }
+    if (msg.includes("DISTANCE_REQUIRED")) return { ok: false, error: "Informe o endereço de entrega completo." }
     const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
     if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
     const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
@@ -288,6 +315,7 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     type: o.type,
     deliveryAddress: o.deliveryAddress,
     deliveryZoneName: o.deliveryZoneName,
+    deliveryDistanceKm: o.deliveryDistanceKm === null ? null : Number(o.deliveryDistanceKm),
     status: o.status,
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,

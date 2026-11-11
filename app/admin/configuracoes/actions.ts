@@ -7,7 +7,9 @@ import { db } from "@/db"
 import { stores } from "@/db/schema"
 import { isOwner } from "@/lib/auth/session"
 import { isHexColor } from "@/lib/color"
+import { geocodeStoreAddress } from "@/lib/geo"
 import { parseFacebook, parseInstagram } from "@/lib/links"
+import type { StoreLocation } from "@/lib/order-shared"
 import { formText, zodErrorState, type FormState } from "@/lib/form-state"
 import { deleteImage, fileFrom, uploadImage } from "@/lib/storage"
 
@@ -83,7 +85,16 @@ export async function saveSettingsAction(_prev: FormState, fd: FormData): Promis
   if ("logoUrl" in images) await deleteImage(ctx.store.logoUrl)
   if ("coverUrl" in images) await deleteImage(ctx.store.coverUrl)
 
+  // Endereço mudou: acha o ponto da loja de novo (entrega por km). Ponto marcado pelo GPS do aparelho não é trocado.
+  let geoNote = ""
+  const loc = ctx.store.location as StoreLocation | null
+  if (parsed.data.address && parsed.data.address !== ctx.store.address && loc?.source !== "device") {
+    const found = await geocodeStoreAddress(parsed.data.address).catch(() => null)
+    if (found) await db.update(stores).set({ location: found }).where(eq(stores.id, ctx.store.id))
+    else if (ctx.store.deliveryPricing === "distance") geoNote = " Não achamos o novo endereço no mapa: confira a localização em Entrega."
+  }
+
   revalidatePath("/admin", "layout")
   revalidatePath(`/loja/${ctx.store.slug}`, "layout")
-  return { ok: true, message: "Configurações salvas." }
+  return { ok: true, message: `Configurações salvas.${geoNote}` }
 }

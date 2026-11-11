@@ -47,31 +47,20 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia · 📚 es
 - A taxa é calculada dentro de `create_order()` no banco (o navegador só manda o id do bairro).
 - ✅ Versão antiga de `create_order` removida (migration 0007).
 
-**3b. ⏳ Por distância em km (depois)**
-**Ideia:** o cliente informa o endereço completo, o site calcula a distância até o **endereço da loja** e cobra
-pela faixa que o dono configurou. Exemplo do dono:
-
-| Distância | Frete |
-|---|---|
-| até 3 km | grátis |
-| até 8 km | R$ 5,00 |
-| até 12 km | R$ 10,00 |
-| acima disso | não entrega |
-
-- Faixas sempre no formato **"até X km"**, em ordem — assim não sobra buraco (ex.: entre 8 e 10 km) sem preço.
-  A última faixa define o raio máximo de entrega.
-- Nova opção em `/admin/entrega`: `delivery_pricing = 'distance'` + tabela `delivery_distance_tiers` (`up_to_km`, `fee`),
-  ao lado de "fixa" e "por bairro" (continuam existindo).
-- **Endereço da loja vira coordenada** uma vez, ao salvar em Configurações (`stores.lat/lng`), com mapa para o dono
-  conferir o ponto.
-- **Endereço do cliente:** CEP → ViaCEP preenche rua/bairro/cidade (grátis) → cliente completa o número →
-  geocodificação (Nominatim/OpenStreetMap, grátis com limite de 1 consulta/s; alternativa paga: Google Maps).
-  Atalho "Usar minha localização" (GPS do navegador).
-- **Distância:** linha reta (Haversine) é grátis mas fica menor que o caminho real; aplicar um fator (~1,3×) ou usar
-  rota real (OSRM/Google) se precisar de precisão. Decidir na hora de implementar.
-- Segurança: o servidor recalcula a distância e a taxa dentro de `create_order()` (o navegador nunca manda o valor),
-  e o pedido guarda a distância e o endereço usados.
-- Se não achar o endereço: mostrar aviso e deixar o cliente escolher retirada (ou a loja combina pelo WhatsApp).
+**3b. ✅ Por distância em km**
+- `/admin/entrega` → "Por distância (km)": **ponto da loja** (pelo endereço das Configurações ou "Estou na loja: usar a
+  localização deste aparelho", o mais preciso) com mapa do OpenStreetMap para conferir; **faixas** "até X km → R$ Y"
+  (a última é o raio máximo). Trocar o endereço em Configurações localiza a loja de novo (menos se foi marcada pelo GPS).
+- **Cliente:** CEP → ViaCEP preenche rua/bairro/cidade → número → o servidor localiza (Nominatim/OpenStreetMap) e mostra
+  "Cerca de 4,2 km · entrega R$ 5,00" ou "fora da área (até 12 km)". Cidade da loja já vem sugerida. Endereço lembrado no aparelho.
+- **Segurança:** o servidor recalcula a distância ao criar o pedido e o `create_order()` escolhe a faixa no banco
+  (`delivery_distance_tiers`); o navegador nunca manda taxa nem distância. Pedido guarda `delivery_distance_km` e a faixa
+  ("Até 8 km") em `delivery_zone_name` (relatórios agrupam por faixa).
+- Distância = linha reta × 1,3 (`lib/geo.ts`). Cache dos endereços em `geocode_cache` (só o hash, não o endereço);
+  Nominatim: 1 consulta/s, limite de 40 cálculos por IP a cada 10 min.
+- ⚠️ **Limitação:** o OpenStreetMap quase não tem número de casa no Brasil → em geral calcula pelo **meio da rua** (o cliente
+  vê "estimada pela rua"). Em avenidas muito compridas o erro pode passar de 1–2 km. Se incomodar: Google Geocoding
+  (~10 mil consultas/mês grátis, depois pago) ou deixar o cliente marcar no mapa.
 
 ## ✅ 4. Cardápio mais completo + novo design
 Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`). Cor da marca: `#8d1a1e`.
@@ -242,6 +231,6 @@ conseguir explicar sozinho numa entrevista:
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0020): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0022): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).

@@ -11,7 +11,8 @@ import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/componen
 import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, useCart } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
-import { placeOrder } from "./actions"
+import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
+import { placeOrder, quoteDeliveryAction } from "./actions"
 
 export function CheckoutForm({
   store,
@@ -54,7 +55,9 @@ export function CheckoutForm({
   }, [])
 
   const isDelivery = fields.type === "delivery"
-  const fee = isDelivery ? previewDeliveryFee(delivery, fields.deliveryZoneId) : undefined
+  const byDistance = isDelivery && delivery.pricing === "distance"
+  const distance = useDistanceQuote(byDistance, fields.address, (parts) => quoteDeliveryAction(store.slug, parts))
+  const fee = isDelivery ? (byDistance ? distance.fee : previewDeliveryFee(delivery, fields.deliveryZoneId)) : undefined
   const subtotal = cartTotal(cart.lines)
   const total = subtotal + (fee ?? 0)
   const belowMin = isDelivery && delivery.minOrder > 0 && subtotal < delivery.minOrder
@@ -84,6 +87,7 @@ export function CheckoutForm({
     startTransition(async () => {
       const result = await placeOrder(store.slug, {
         ...fields,
+        ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
         items: cart.lines.map((l) => ({
           menuItemId: l.menuItemId,
           quantity: l.quantity,
@@ -115,7 +119,7 @@ export function CheckoutForm({
   ) : !store.isOpen ? (
     "Loja fechada no momento"
   ) : isDelivery && fee === null ? (
-    "Escolha o bairro"
+    byDistance ? (distance.loading ? "Calculando a entrega…" : distance.quote ? "Confira o endereço de entrega" : "Informe o endereço de entrega") : "Escolha o bairro"
   ) : (
     <>
       {pixOnline && fields.paymentMethod === "pix" ? "Confirmar e pagar com Pix" : "Confirmar pedido"} · {formatBRL(total)}
@@ -145,7 +149,7 @@ export function CheckoutForm({
         {/* Resumo (no celular vem primeiro; no computador fica fixo à direita) */}
         <aside className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm lg:sticky lg:top-20 lg:order-2" aria-label="Resumo do pedido">
           <h2 className="text-lg font-bold">Seu pedido</h2>
-          <CartSummary lines={cart.lines} onQuantity={cart.setQuantity} onRemove={cart.remove} deliveryFee={fee} />
+          <CartSummary lines={cart.lines} onQuantity={cart.setQuantity} onRemove={cart.remove} deliveryFee={fee} feePendingLabel={byDistance ? (distance.loading ? "calculando…" : "informe o endereço") : undefined} />
           <CartSuggestions menu={menu} lines={cart.lines} onAdd={cart.add} max={4} />
           <div className="hidden space-y-3 lg:block">
             <Button type="submit" size="lg" className="h-12 w-full rounded-full text-base font-semibold" disabled={!canSubmit}>
@@ -169,7 +173,7 @@ export function CheckoutForm({
           )}
 
           <div className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={total} pixOnline={pixOnline} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={total} pixOnline={pixOnline} quote={distance.quote} quoteLoading={distance.loading} />
 
             <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm">
               <input

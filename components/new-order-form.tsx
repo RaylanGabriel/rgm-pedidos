@@ -9,12 +9,24 @@ import { CartSummary, cartTotal } from "@/components/order/cart-summary"
 import { ItemPicker } from "@/components/order/item-picker"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
 import { createCounterOrderAction } from "@/app/admin/actions"
+import { quoteDeliveryAction } from "@/app/loja/[slug]/finalizar/actions"
+import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
 import type { CartLine } from "@/lib/cart"
 import type { MenuView } from "@/lib/orders"
 import { previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 
 /** Pedido lançado no balcão pelo painel. Carrinho só em memória (não usa o do site). */
-export function NewOrderForm({ menu, delivery, pixOnline = false }: { menu: MenuView; delivery: DeliveryConfig; pixOnline?: boolean }) {
+export function NewOrderForm({
+  menu,
+  delivery,
+  slug,
+  pixOnline = false,
+}: {
+  menu: MenuView
+  delivery: DeliveryConfig
+  slug: string
+  pixOnline?: boolean
+}) {
   const router = useRouter()
   const [lines, setLines] = useState<CartLine[]>([])
   const [fields, setFields] = useState<OrderFieldsValue>(emptyOrderFields)
@@ -24,7 +36,9 @@ export function NewOrderForm({ menu, delivery, pixOnline = false }: { menu: Menu
   // Pix com QR na tela (Mercado Pago conectado): o pedido só vai para a cozinha depois de pago
   const [pixQr, setPixQr] = useState(true)
   const showPixQr = pixOnline && fields.paymentMethod === "pix"
-  const fee = fields.type === "delivery" ? previewDeliveryFee(delivery, fields.deliveryZoneId) : undefined
+  const byDistance = fields.type === "delivery" && delivery.pricing === "distance"
+  const distance = useDistanceQuote(byDistance, fields.address, (parts) => quoteDeliveryAction(slug, parts))
+  const fee = fields.type === "delivery" ? (byDistance ? distance.fee : previewDeliveryFee(delivery, fields.deliveryZoneId)) : undefined
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +48,7 @@ export function NewOrderForm({ menu, delivery, pixOnline = false }: { menu: Menu
     startTransition(async () => {
       const result = await createCounterOrderAction({
         ...fields,
+        ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
         items: lines.map((l) => ({
           menuItemId: l.menuItemId,
           quantity: l.quantity,
@@ -67,6 +82,7 @@ export function NewOrderForm({ menu, delivery, pixOnline = false }: { menu: Menu
               onQuantity={(i, q) => setLines((p) => p.map((l, j) => (j === i ? { ...l, quantity: Math.min(20, Math.max(1, q)) } : l)))}
               onRemove={(i) => setLines((p) => p.filter((_, j) => j !== i))}
               deliveryFee={lines.length ? fee : undefined}
+              feePendingLabel={byDistance ? (distance.loading ? "calculando…" : "informe o endereço") : undefined}
             />
           </CardContent>
         </Card>
@@ -76,7 +92,7 @@ export function NewOrderForm({ menu, delivery, pixOnline = false }: { menu: Menu
             <CardTitle>Dados do pedido</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={lines.length ? cartTotal(lines) + (fee ?? 0) : undefined} />
+            <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={lines.length ? cartTotal(lines) + (fee ?? 0) : undefined} quote={distance.quote} quoteLoading={distance.loading} />
             {showPixQr && (
               <label className="flex items-start gap-3 rounded-xl border p-3 text-sm">
                 <input

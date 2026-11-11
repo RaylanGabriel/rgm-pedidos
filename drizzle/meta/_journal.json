@@ -148,6 +148,20 @@
       "when": 1794358607223,
       "tag": "0020_opening_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794397294187,
+      "tag": "0021_delivery_distance",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794397316791,
+      "tag": "0022_create_order_distance",
+      "breakpoints": true
     }
   ]
 }
