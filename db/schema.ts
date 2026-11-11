@@ -77,6 +77,7 @@ export const stores = pgTable(
     openingHours: jsonb("opening_hours"),
     manualUntil: timestamp("manual_until", { withTimezone: true }),
     active: boolean("active").notNull().default(true), // plataforma suspende (inadimplência)
+    isDemo: boolean("is_demo").notNull().default(false), // loja de demonstração para um possível cliente (npm run demo:loja)
     suspendedReason: text("suspended_reason"), // mensagem mostrada ao dono/equipe quando suspensa
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     avgPrepMinutes: integer("avg_prep_minutes").notNull().default(15),

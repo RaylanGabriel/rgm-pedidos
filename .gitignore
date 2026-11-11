@@ -26,3 +26,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# lojas de demonstração (dados de possíveis clientes)
+/demos/

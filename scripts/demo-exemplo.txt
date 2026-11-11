@@ -1,0 +1,39 @@
+// Modelo de loja de demonstração. Copie para demos/<nome>.txt, edite e rode:
+//   npm run demo:loja -- criar demos/<nome>.txt
+// Linhas com // são ignoradas. Só "nome" e o cardápio são obrigatórios.
+
+nome: Dogão do Zé
+slug: dogaodoze
+cor: #c2410c
+whatsapp: (42) 99999-0000
+instagram: @dogaodoze
+endereco: Rua XV de Novembro, 500 - Centro, Ponta Grossa - PR
+entrega: 5,00
+// logo: dogaodoze-logo.png   (arquivo na mesma pasta deste .txt; opcional)
+
+// Categorias começam com #. Itens: Nome | preço | descrição (opcional).
+// Um * antes do nome coloca o item também em "⭐ Mais pedidos".
+# Lanches
+*X-Burger | 22,90 | Pão, carne 120g, queijo e molho da casa
+*X-Bacon | 26,90 | Pão, carne 120g, bacon crocante e cheddar
+X-Salada | 24,90 | Carne 120g, queijo, alface e tomate
+X-Tudo Duplo | 34,90 | Duas carnes, queijo duplo, bacon, ovo e salada
+Dogão Completo | 18,90 | Salsicha dupla, purê, milho, batata palha e queijo
+
+# Porções
+*Batata Frita | 15,00 | 300g, crocante
+Batata Cheddar e Bacon | 24,90
+Onion Rings | 19,90
+
+# Combos
+Combo X-Bacon | 36,90 | X-Bacon + batata pequena + refri lata
+
+# Bebidas
+Coca-Cola lata | 6,00
+Guaraná lata | 6,00
+Suco de laranja | 9,00 | 500ml, natural
+Água mineral | 4,00
+
+# Sobremesas
+Milkshake de chocolate | 16,90
+Brownie com sorvete | 15,90

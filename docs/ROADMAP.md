@@ -241,6 +241,18 @@ muda preço, desconecta o Mercado Pago).
   configurações, entrega, horários, pagamentos nem edição do cardápio.
 - Avaliar com o cliente: um login por pessoa ou um "login do tablet da cozinha".
 
+## ✅ Ferramenta: loja de demonstração para possíveis clientes
+Para a visita comercial: monta em ~30 s a loja **do próprio cliente** (`<loja>.rgm.dev.br`) a partir de um arquivo de texto.
+- Modelo: `scripts/demo-exemplo.txt` (nome, slug, cor, WhatsApp, Instagram, endereço, taxa de entrega, logo opcional e o
+  cardápio: `# Categoria` e `Nome | preço | descrição`; `*` antes do nome = também em "⭐ Mais pedidos").
+- `npm run demo:loja -- criar demos/<loja>.txt` (site no ar) · `demo:loja:teste` (banco de testes).
+  Cria loja marcada como demonstração (`stores.is_demo`, selo na tela Lojas), capa na cor da loja, **ilustração automática
+  pelo nome** do item (hambúrguer/bacon/salada/duplo, batata, onion rings, nuggets, combo, latas, suco, água, milkshake,
+  brownie; sem correspondência = sem imagem), QR code em `demos/<slug>-qrcode.png` e link pronto para o WhatsApp do dono.
+- `listar` (há quantos dias cada demo existe, pedidos de teste) · `cliente <slug> --email --nome` (vira loja de verdade:
+  cria o login com senha provisória, apaga pedidos de teste, numeração volta ao #1) · `apagar <slug>` (só demos).
+- A pasta `demos/` fica fora do Git (dados de possíveis clientes).
+
 ## 💭 Depois
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
@@ -259,6 +271,6 @@ muda preço, desconecta o Mercado Pago).
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0022): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0023): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).

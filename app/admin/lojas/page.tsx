@@ -20,6 +20,7 @@ type StoreRow = {
   name: string
   slug: string
   active: boolean
+  is_demo: boolean
   is_open: boolean
   hours_enabled: boolean
   opening_hours: unknown
@@ -37,7 +38,7 @@ export default async function LojasPage() {
   const base = await storeUrl("{slug}")
 
   const { rows } = await db.execute<StoreRow>(sql`
-    SELECT s.id, s.name, s.slug, s.active, s.is_open, s.hours_enabled, s.opening_hours, s.manual_until, s.created_at, s.suspended_reason, s.suspended_at,
+    SELECT s.id, s.name, s.slug, s.active, s.is_demo, s.is_open, s.hours_enabled, s.opening_hours, s.manual_until, s.created_at, s.suspended_reason, s.suspended_at,
       COALESCE(
         (SELECT json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'role', m.role,
                                            'mustChangePassword', u.must_change_password) ORDER BY m.role, u.name)
@@ -87,6 +88,7 @@ export default async function LojasPage() {
                         <Store className="w-4 h-4 text-muted-foreground" aria-hidden />
                         {s.name}
                         {current && <Badge>Você está aqui</Badge>}
+                        {s.is_demo && <Badge variant="outline">Demonstração</Badge>}
                         {!s.active ? (
                           <Badge variant="destructive">Suspensa</Badge>
                         ) : (

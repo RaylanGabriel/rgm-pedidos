@@ -14,7 +14,9 @@
     "db:studio": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs studio",
     "db:sql": "node --env-file=.env.local db/run-sql.mjs",
     "user:create": "tsx --env-file=.env.local scripts/create-user.ts",
-    "demo:seed": "tsx --env-file=.env.local scripts/seed-demo.ts"
+    "demo:seed": "tsx --env-file=.env.local scripts/seed-demo.ts",
+    "demo:loja": "tsx --env-file=.env.local --env-file=.env.prod-db scripts/demo-loja.ts --producao",
+    "demo:loja:teste": "tsx --env-file=.env.local scripts/demo-loja.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
