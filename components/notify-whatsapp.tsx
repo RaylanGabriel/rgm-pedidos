@@ -25,16 +25,19 @@ export function notifyKind(o: Pick<OrderWithItemsView, "status" | "type">): Kind
   return "chat"
 }
 
-/** Mensagem pronta (o funcionário ainda pode editar no WhatsApp antes de enviar). */
+/**
+ * Mensagem pronta (o funcionário ainda pode editar no WhatsApp antes de enviar).
+ * Sem emoji: alguns aparelhos/WhatsApp Web trocam emoji vindo pelo link wa.me por "�".
+ */
 export function notifyMessage(o: OrderWithItemsView, storeName: string, kind: Kind, origin: string) {
   const first = o.customerName.trim().split(/\s+/)[0]
   const track = origin ? `\n\nAcompanhe aqui: ${origin}/pedido/${o.publicToken}` : ""
   if (kind === "ready") {
     return o.type === "dine_in"
-      ? `Olá, ${first}! Seu pedido #${o.orderNumber} da ${storeName} está pronto e já vai para a sua mesa. Bom apetite! 😋`
-      : `Olá, ${first}! Seu pedido #${o.orderNumber} da ${storeName} está pronto! 😋 Pode retirar no balcão, é só falar o número #${o.orderNumber}.`
+      ? `Olá, ${first}! Seu pedido #${o.orderNumber} da ${storeName} está pronto e já vai para a sua mesa. Bom apetite!`
+      : `Olá, ${first}! Seu pedido #${o.orderNumber} da ${storeName} está pronto! Pode retirar no balcão, é só falar o número #${o.orderNumber}.`
   }
-  if (kind === "out") return `Olá, ${first}! Seu pedido #${o.orderNumber} da ${storeName} saiu para entrega 🛵 Logo chega aí!${track}`
+  if (kind === "out") return `Olá, ${first}! Seu pedido #${o.orderNumber} da ${storeName} saiu para entrega e logo chega aí!${track}`
   return `Olá, ${first}! Aqui é da ${storeName}, sobre o seu pedido #${o.orderNumber}.${track}`
 }
 
