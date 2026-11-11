@@ -139,8 +139,8 @@ export function changeText(o: { paymentMethod: PaymentMethod; changeFor: number 
 
 // ---------- Campos do cliente ----------
 /**
- * Telefone enquanto digita: só números, no formato (42) 98434-7835 (celular) ou (42) 3434-7835 (fixo).
- * Aceita colar "+55 42 98434-7835" (tira o 55 do país).
+ * Telefone enquanto digita: só números, no formato (42) 99999-9999 (celular) ou (42) 3333-4444 (fixo).
+ * Aceita colar "+55 42 99999-9999" (tira o 55 do país).
  */
 export function maskPhone(v: string) {
   let d = v.replace(/\D/g, "")

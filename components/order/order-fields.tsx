@@ -281,7 +281,7 @@ export function OrderFields({
             id="customerPhone"
             type="tel"
             inputMode="tel"
-            placeholder="(42) 98434-7835"
+            placeholder="(42) 99999-9999"
             value={maskPhone(value.customerPhone)}
             onChange={(e) => set("customerPhone", maskPhone(e.target.value))}
             maxLength={16}
