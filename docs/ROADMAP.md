@@ -192,6 +192,7 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 **Falta:**
 - Testar o "Conectar Mercado Pago" de verdade com uma conta vendedora de teste (só funciona no endereço cadastrado).
 - Trocar `MP_REDIRECT_URI`/webhook para `painel.rgm.dev.br` quando o domínio entrar.
+- Link de acompanhamento do aviso no WhatsApp: usar o endereço da loja (`<loja>.rgm.dev.br/pedido/...`), não o do painel.
 - Ligar produção (`MP_TEST_MODE=false`) e fazer o primeiro Pix real de valor baixo.
 - Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 
