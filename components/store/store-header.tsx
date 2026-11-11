@@ -1,7 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Bike, Clock, Facebook, Instagram, MapPin, ShoppingBag, Store as StoreIcon } from "lucide-react"
-import { facebookLink, formatPhone, instagramLink, mapsLink, whatsappLink } from "@/lib/links"
+import { facebookLink, instagramLink, mapsLink, whatsappLink } from "@/lib/links"
 import type { PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, type DeliveryConfig } from "@/lib/order-shared"
 
@@ -161,22 +161,29 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "slug" | "name
   )
 }
 
-export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phone" | "instagram" | "facebook"> }) {
-  const hasLinks = socialLinks(store).length > 0
-  const phone = whatsappLink(store.phone) ? formatPhone(store.phone) : null
+/** Rodapé: nome + endereço (abre o mapa) à esquerda, redes sociais à direita. Some se a loja não tiver nenhum dos dois. */
+export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phone" | "address" | "instagram" | "facebook"> }) {
+  const map = mapsLink(store.address)
+  if (!map && socialLinks(store).length === 0) return <div className="mt-16" aria-hidden />
   return (
     <footer className="mt-16 border-t bg-card">
-      <div className="container mx-auto space-y-3 px-4 py-8 text-center text-sm text-muted-foreground">
-        {hasLinks && (
-          <>
-            <p>
-              {phone ? `Dúvidas? Chame no WhatsApp ${phone}` : "Siga a loja nas redes"}
-              {phone && (store.instagram || store.facebook) ? " ou siga a loja nas redes" : ""}
-            </p>
-            <SocialLinks store={store} className="justify-center" />
-          </>
-        )}
-        <p>&copy; {new Date().getFullYear()} {store.name}</p>
+      <div className="container mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div className="min-w-0 space-y-1">
+          <p className="font-bold">{store.name}</p>
+          {map && (
+            <a
+              href={map}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-balance text-sm text-muted-foreground hover:text-foreground hover:underline"
+            >
+              <MapPin className="mr-1 inline h-4 w-4 align-[-3px]" aria-hidden />
+              {store.address}
+              <span className="sr-only"> (abre o mapa)</span>
+            </a>
+          )}
+        </div>
+        <SocialLinks store={store} compact className="justify-center" />
       </div>
     </footer>
   )
