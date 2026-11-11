@@ -189,11 +189,20 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - ⚠️ **Sandbox do Mercado Pago não aprova Pix sozinho** (nov/2026: cobrança com `first_name: "APRO"` fica em
   `waiting_transfer`). A tela de "pago" foi testada simulando o pagamento no banco; o teste real fica para o primeiro Pix de produção.
 
+**✅ Em produção (11/11/2026):** `MP_TEST_MODE=false` em Production (Preview continua em teste). Primeiro Pix real
+(R$ 1, pedido #16 da Mr. Smash): QR → pago → webhook com assinatura válida em 1 s → pedido entrou na cozinha.
+- App atual no Mercado Pago: **RGMPEDIDOS** (Checkout Transparente, API de Orders). O antigo RGM_PEDIDOS foi excluído.
+- Endereço do OAuth: `auth.mercadopago.com.br` (o genérico `.com` recusava o app do Brasil).
+- Loja própria (Mr. Smash): ligada à **conta dona do app** pelo `MP_PROD_ACCESS_TOKEN` (botão só do super admin,
+  "Usar a conta dona da plataforma"), sem OAuth.
+- Em produção, conexão feita em modo de teste não gera Pix: o painel pede para reconectar.
+
 **Falta:**
-- Testar o "Conectar Mercado Pago" de verdade com uma conta vendedora de teste (só funciona no endereço cadastrado).
-- Trocar `MP_REDIRECT_URI`/webhook para `painel.rgm.dev.br` quando o domínio entrar.
-- Link de acompanhamento do aviso no WhatsApp: usar o endereço da loja (`<loja>.rgm.dev.br/pedido/...`), não o do painel.
-- Ligar produção (`MP_TEST_MODE=false`) e fazer o primeiro Pix real de valor baixo.
+- **"Conectar Mercado Pago" (OAuth) de outras contas** dava "O aplicativo não está pronto para se conectar". O painel do
+  Mercado Pago só considera o app pronto depois do 1º pagamento real (etapa 4, até 24 h). Testar de novo com a conta
+  real de outra pessoa; se continuar, abrir chamado no suporte do Mercado Pago Developers.
+- Nota de qualidade do Mercado Pago (18/100): enviar `items` (título, quantidade, preço, categoria), `statement_descriptor`
+  (nome da loja no extrato) e nome/sobrenome do comprador. Device ID (script de segurança) e Platform ID (comercial do MP) depois.
 - Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 
 ## 💭 6. Conta do cliente (opcional) com Google
