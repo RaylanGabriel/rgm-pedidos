@@ -224,6 +224,11 @@ conseguir explicar sozinho numa entrevista:
 - **Banco e deploy:** migrations, branches `production`/`preview` do Neon, preview da Vercel.
 - Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
 
+## ⏳ 8. Migrar para a Cloudflare (antes do 1º cliente real)
+O plano grátis da Vercel proíbe uso comercial (site que processa pedidos/pagamentos). Decisão: Cloudflare Workers Paid
+(US$ 5/mês) — mais segurança (WAF, Turnstile, rate limit), cron, R2 e aprendizado. Arquitetura completa e plano em
+fases em [`docs/ARQUITETURA-CLOUDFLARE.md`](ARQUITETURA-CLOUDFLARE.md).
+
 ## ⏳ 7. Equipe: o dono cria o login dos funcionários
 **Quando:** o primeiro cliente pedir ou antes da segunda loja pagante (o que vier antes). Até lá, o super admin cria
 pelo terminal: `npm run user:create -- --email x --name "Nome" --store <slug> --role staff`.
