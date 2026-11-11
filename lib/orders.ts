@@ -5,6 +5,7 @@ import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
+import { openStateLabel, parseHours, storeOpenState, weekSummary } from "@/lib/hours"
 import { categories, deliveryZones, ingredients, menuItemCategories, menuItems, orders, stores } from "@/db/schema"
 import {
   formatBRL,
@@ -40,6 +41,9 @@ export async function getSuspendedStoreName(slug: string) {
 
 /** Dados públicos da loja (sem contador interno etc.) para mandar ao navegador. */
 export function publicStore(s: StoreRow) {
+  const now = new Date()
+  const open = storeOpenState(s, now)
+  const hours = s.hoursEnabled ? parseHours(s.openingHours) : null
   return {
     id: s.id,
     slug: s.slug,
@@ -51,7 +55,9 @@ export function publicStore(s: StoreRow) {
     address: s.address,
     instagram: s.instagram,
     facebook: s.facebook,
-    isOpen: s.isOpen,
+    isOpen: open.open, // situação efetiva (horário automático ou botão manual)
+    openLabel: openStateLabel(open, now), // "Fecha às 23:30" / "Abre amanhã às 18:00"
+    weekHours: hours ? weekSummary(hours) : null,
     avgPrepMinutes: s.avgPrepMinutes,
   }
 }
@@ -153,7 +159,7 @@ export const getDeliveryConfig = cache(async (store: StoreRow): Promise<Delivery
 
 // ---------- Criar pedido ----------
 export type CreateOrderResult =
-  | { ok: true; orderNumber: number; publicToken: string }
+  | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean }
   | { ok: false; error: string; fieldErrors?: Record<string, string | undefined> }
 
 const DB_ERRORS: Record<string, string> = {
@@ -171,7 +177,7 @@ const DB_ERRORS: Record<string, string> = {
 export async function createOrder(
   storeId: string,
   rawInput: unknown,
-  opts: { requireOpen: boolean },
+  opts: { requireOpen: boolean; pixOnline: boolean },
 ): Promise<CreateOrderResult> {
   const parsed = orderInputSchema.safeParse(rawInput)
   if (!parsed.success) {
@@ -185,12 +191,22 @@ export async function createOrder(
   const o = parsed.data
   const token = randomBytes(18).toString("base64url")
 
+  // Loja aberta? A regra (horário automático + ajuste manual) fica em lib/hours.ts; o banco só confere se existe/está ativa.
+  if (opts.requireOpen) {
+    const [st] = await db
+      .select({ isOpen: stores.isOpen, hoursEnabled: stores.hoursEnabled, openingHours: stores.openingHours, manualUntil: stores.manualUntil })
+      .from(stores)
+      .where(eq(stores.id, storeId))
+      .limit(1)
+    if (st && !storeOpenState(st).open) return { ok: false, error: DB_ERRORS.STORE_CLOSED }
+  }
+
   try {
     const res = await db.execute<{ result: { orderNumber: number; publicToken: string } }>(sql`
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
         ${o.type === "delivery" ? o.deliveryAddress : null}, ${o.paymentMethod}::payment_method, ${o.notes},
-        ${JSON.stringify(o.items)}::jsonb, ${token}, ${opts.requireOpen},
+        ${JSON.stringify(o.items)}::jsonb, ${token}, false,
         ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid
       ) as result`)
     const result = res.rows[0].result
@@ -201,10 +217,10 @@ export async function createOrder(
         .set({ changeFor: o.changeFor.toFixed(2) })
         .where(and(eq(orders.publicToken, token), eq(orders.storeId, storeId), sql`${orders.total} < ${o.changeFor}`))
     }
-    // Pix online: só no pedido do cliente pelo site e se a loja conectou o Mercado Pago.
+    // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago.
     // Se falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
-    if (o.paymentMethod === "pix" && opts.requireOpen) await attachPixCharge(storeId, token)
-    return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken }
+    const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, token) : false
+    return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr }
   } catch (err) {
     // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
     // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
@@ -225,24 +241,27 @@ export async function createOrder(
   }
 }
 
-async function attachPixCharge(storeId: string, publicToken: string) {
+/** Gera a cobrança Pix no Mercado Pago e guarda no pedido. true = QR gerado. */
+async function attachPixCharge(storeId: string, publicToken: string): Promise<boolean> {
   try {
     const mpToken = await storeAccessToken(storeId)
-    if (!mpToken) return
+    if (!mpToken) return false
     const [row] = await db
       .select({ id: orders.id, orderNumber: orders.orderNumber, total: orders.total, storeName: stores.name })
       .from(orders)
       .innerJoin(stores, eq(stores.id, orders.storeId))
       .where(and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)))
       .limit(1)
-    if (!row) return
+    if (!row) return false
     const pix = await createPixCharge(mpToken, { ...row, total: Number(row.total) })
     await db
       .update(orders)
       .set({ mpOrderId: pix.mpOrderId, pixCode: pix.pixCode, pixExpiresAt: pix.expiresAt })
       .where(eq(orders.id, row.id))
+    return true
   } catch (err) {
     console.error("Pix: não foi possível gerar a cobrança no Mercado Pago:", err instanceof Error ? err.message : err)
+    return false
   }
 }
 

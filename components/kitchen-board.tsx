@@ -522,8 +522,17 @@ function AwaitingPix({ orders, now }: { orders: OrderWithItemsView[]; now: numbe
                 <span className="min-w-0 truncate">
                   <strong>#{o.orderNumber}</strong> {o.customerName} · {itemCount(o)} {itemCount(o) === 1 ? "item" : "itens"}
                 </span>
-                <span className="shrink-0 tabular-nums">
-                  {formatBRL(o.total)} <span className="text-xs opacity-75">· {minsLeft(o.pixExpiresAt)} min</span>
+                <span className="flex shrink-0 items-center gap-3 tabular-nums">
+                  <span>
+                    {formatBRL(o.total)} <span className="text-xs opacity-75">· {minsLeft(o.pixExpiresAt)} min</span>
+                  </span>
+                  <Link
+                    href={`/admin/pedidos/pix/${o.publicToken}`}
+                    className="rounded-md px-1.5 py-1 text-xs font-semibold underline underline-offset-2 hover:bg-sky-100 dark:hover:bg-sky-900"
+                    aria-label={`Mostrar o QR do Pix do pedido ${o.orderNumber}`}
+                  >
+                    QR
+                  </Link>
                 </span>
               </li>
             ))}

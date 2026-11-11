@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -68,7 +69,11 @@ export const stores = pgTable(
     address: text("address"), // endereço para retirada (mostrado ao cliente)
     instagram: text("instagram"), // só o usuário, sem @ (ex.: "mrsmash")
     facebook: text("facebook"), // caminho depois de facebook.com/ (ex.: "mrsmash" ou "profile.php?id=123")
-    isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja
+    isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja (no automático: o ajuste manual)
+    // Horário automático (lib/hours.ts): { "0": [["18:00","23:30"]], ... }; manual_until = até quando vale o "Fechar/Abrir agora"
+    hoursEnabled: boolean("hours_enabled").notNull().default(false),
+    openingHours: jsonb("opening_hours"),
+    manualUntil: timestamp("manual_until", { withTimezone: true }),
     active: boolean("active").notNull().default(true), // plataforma suspende (inadimplência)
     suspendedReason: text("suspended_reason"), // mensagem mostrada ao dono/equipe quando suspensa
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),

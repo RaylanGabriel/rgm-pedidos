@@ -201,6 +201,33 @@ export async function syncPixOrder(orderId: string): Promise<"paid" | "pending" 
   return "pending"
 }
 
+/**
+ * Desiste do Pix de um pedido (balcão: cliente pagou de outro jeito ou desistiu).
+ * Confere antes se já foi pago (nesse caso não cancela nada) e cancela a cobrança no Mercado Pago,
+ * para o QR não poder mais ser pago. "paid" = já tinha sido pago; "ok" = cobrança encerrada.
+ */
+export async function dropPixCharge(orderId: string): Promise<"paid" | "ok"> {
+  const status = await syncPixOrder(orderId).catch(() => "pending" as const)
+  if (status === "paid") return "paid"
+  const [o] = await db.select({ storeId: orders.storeId, mpOrderId: orders.mpOrderId }).from(orders).where(eq(orders.id, orderId)).limit(1)
+  if (o?.mpOrderId) {
+    const token = await storeAccessToken(o.storeId)
+    if (token) {
+      try {
+        await mpFetch<MpOrder>(token, `/v1/orders/${encodeURIComponent(o.mpOrderId)}/cancel`, {
+          method: "POST",
+          headers: { "X-Idempotency-Key": `cancel-${orderId}` },
+        })
+      } catch (err) {
+        // Pode já ter vencido/sido cancelada; se foi paga nesse meio-tempo, a nova consulta pega
+        console.warn("Pix: não foi possível cancelar a cobrança", err instanceof Error ? err.message : err)
+        if ((await syncPixOrder(orderId).catch(() => "pending")) === "paid") return "paid"
+      }
+    }
+  }
+  return "ok"
+}
+
 /** Pix não pago depois do prazo (+5 min de folga) vira cancelado. Roda ao ler pedidos, como a entrega automática. */
 export async function cancelOverduePix(storeId: string) {
   await db

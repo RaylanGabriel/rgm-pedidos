@@ -14,13 +14,16 @@ import type { MenuView } from "@/lib/orders"
 import { previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 
 /** Pedido lançado no balcão pelo painel. Carrinho só em memória (não usa o do site). */
-export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: DeliveryConfig }) {
+export function NewOrderForm({ menu, delivery, pixOnline = false }: { menu: MenuView; delivery: DeliveryConfig; pixOnline?: boolean }) {
   const router = useRouter()
   const [lines, setLines] = useState<CartLine[]>([])
   const [fields, setFields] = useState<OrderFieldsValue>(emptyOrderFields)
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  // Pix com QR na tela (Mercado Pago conectado): o pedido só vai para a cozinha depois de pago
+  const [pixQr, setPixQr] = useState(true)
+  const showPixQr = pixOnline && fields.paymentMethod === "pix"
   const fee = fields.type === "delivery" ? previewDeliveryFee(delivery, fields.deliveryZoneId) : undefined
 
   const submit = (e: React.FormEvent) => {
@@ -36,13 +39,13 @@ export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: Del
           quantity: l.quantity,
           extras: l.extras.map((x) => ({ ingredientId: x.ingredientId, quantity: x.quantity })),
         })),
-      })
+      }, showPixQr && pixQr)
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
         return
       }
-      router.push("/admin/pedidos")
+      router.push(result.pixQr ? `/admin/pedidos/pix/${result.publicToken}` : "/admin/pedidos")
     })
   }
 
@@ -74,6 +77,23 @@ export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: Del
           </CardHeader>
           <CardContent className="space-y-6">
             <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={lines.length ? cartTotal(lines) + (fee ?? 0) : undefined} />
+            {showPixQr && (
+              <label className="flex items-start gap-3 rounded-xl border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+                  checked={pixQr}
+                  onChange={(e) => setPixQr(e.target.checked)}
+                  disabled={pending}
+                />
+                <span>
+                  <span className="block font-semibold">Mostrar QR code do Pix para o cliente pagar agora</span>
+                  <span className="block text-muted-foreground">
+                    Confirmação automática: o pedido vai para a cozinha quando o Pix cair. Desmarque se o cliente já pagou na chave da loja.
+                  </span>
+                </span>
+              </label>
+            )}
             {error && (
               <div role="alert" className="p-3 rounded-lg bg-destructive/10 border border-destructive">
                 <p className="text-sm text-destructive">{error}</p>
@@ -86,7 +106,7 @@ export function NewOrderForm({ menu, delivery }: { menu: MenuView; delivery: Del
                   Criando pedido…
                 </>
               ) : (
-                "Criar pedido"
+                showPixQr && pixQr ? "Criar pedido e mostrar o QR" : "Criar pedido"
               )}
             </Button>
           </CardContent>

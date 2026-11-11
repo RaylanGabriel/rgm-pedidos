@@ -170,6 +170,10 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - **Banco separado para testes** (branch `preview` do Neon) — ver Notas técnicas.
 - **Redes sociais da loja** (`stores.instagram`, `stores.facebook` + o WhatsApp que já existia): o dono digita o @ ou
   cola o link em Configurações (o sistema limpa e confere); aparecem no topo do cardápio (só ícones no celular) e no rodapé.
+- **Horário de funcionamento automático** (`/admin/horarios`, `lib/hours.ts`): até 2 horários por dia (almoço e noite),
+  horário que passa da meia-noite (18:00 → 02:00), "copiar para todos". O cardápio mostra "Fecha às 23:30" / "Abre amanhã
+  às 18:00" e os horários no rodapé. "Fechar agora / Abrir agora" no painel vale só até o próximo horário
+  (`stores.manual_until`) e depois volta ao automático. A regra é conferida no servidor ao criar o pedido.
 
 ## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
@@ -186,12 +190,17 @@ Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - Confirmação pelo **webhook** `/api/mercado-pago/webhook` (assinatura `x-signature` conferida; status sempre
   consultado na API) e pela própria tela do pedido (consulta a cada 5 s).
 - Se o Mercado Pago falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
+- **Pix no pedido do balcão**: "Mostrar QR code" ao lançar o pedido → tela com QR grande para o cliente apontar a câmera,
+  muda sozinha para "Pix recebido". Se o cliente pagar de outro jeito (dinheiro, cartão, Pix na chave) ou desistir, a
+  cobrança é **cancelada no Mercado Pago** antes (o QR deixa de funcionar). Link "QR" na faixa "Aguardando Pix" da cozinha.
+- ⚠️ **Sandbox do Mercado Pago não aprova Pix sozinho** (nov/2026: cobrança com `first_name: "APRO"` fica em
+  `waiting_transfer`). A tela de "pago" foi testada simulando o pagamento no banco; o teste real fica para o primeiro Pix de produção.
 
 **Falta:**
 - Testar o "Conectar Mercado Pago" de verdade com uma conta vendedora de teste (só funciona no endereço cadastrado).
 - Trocar `MP_REDIRECT_URI`/webhook para `painel.rgm.dev.br` quando o domínio entrar.
 - Ligar produção (`MP_TEST_MODE=false`) e fazer o primeiro Pix real de valor baixo.
-- Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel, Pix também no pedido do balcão.
+- Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 
 ## 💭 6. Conta do cliente (opcional) com Google
 - Botão "Entrar com Google" no checkout, nunca obrigatório.
@@ -212,7 +221,6 @@ conseguir explicar sozinho numa entrevista:
 - Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
 
 ## 💭 Depois
-- Horário de funcionamento automático (abre/fecha sozinho).
 - Notificação no WhatsApp quando o pedido fica pronto.
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
@@ -231,6 +239,6 @@ conseguir explicar sozinho numa entrevista:
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0019): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0020): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).

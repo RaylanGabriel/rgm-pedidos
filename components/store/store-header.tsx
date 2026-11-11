@@ -108,6 +108,7 @@ export function StoreHero({ store, delivery }: { store: PublicStore; delivery: D
               <span className={`h-2 w-2 rounded-full ${store.isOpen ? "bg-green-600" : "bg-muted-foreground"}`} aria-hidden />
               {store.isOpen ? "Aberto agora" : "Fechado"}
             </span>
+            {store.openLabel && <span className="ml-2 text-xs font-medium text-muted-foreground">{store.openLabel}</span>}
           </div>
         </div>
         <h1 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">{store.name}</h1>
@@ -162,9 +163,13 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "slug" | "name
 }
 
 /** Rodapé: nome + endereço (abre o mapa) à esquerda, redes sociais à direita. Some se a loja não tiver nenhum dos dois. */
-export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phone" | "address" | "instagram" | "facebook"> }) {
+export function StoreFooter({
+  store,
+}: {
+  store: Pick<PublicStore, "name" | "phone" | "address" | "instagram" | "facebook" | "weekHours">
+}) {
   const map = mapsLink(store.address)
-  if (!map && socialLinks(store).length === 0) return <div className="mt-16" aria-hidden />
+  if (!map && !store.weekHours && socialLinks(store).length === 0) return <div className="mt-16" aria-hidden />
   return (
     <footer className="mt-16 border-t bg-card">
       <div className="container mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
@@ -181,6 +186,16 @@ export function StoreFooter({ store }: { store: Pick<PublicStore, "name" | "phon
               {store.address}
               <span className="sr-only"> (abre o mapa)</span>
             </a>
+          )}
+          {store.weekHours && (
+            <dl className="pt-1 text-sm text-muted-foreground">
+              {store.weekHours.map(([days, time]) => (
+                <div key={days} className="flex justify-center gap-2 sm:justify-start">
+                  <dt>{days}:</dt>
+                  <dd className="font-medium tabular-nums text-foreground/80">{time}</dd>
+                </div>
+              ))}
+            </dl>
           )}
         </div>
         <SocialLinks store={store} compact className="justify-center" />

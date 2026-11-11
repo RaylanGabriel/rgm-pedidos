@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ActionButton } from "@/components/admin/form-ui"
 import { db } from "@/db"
 import { requireSuperadmin } from "@/lib/auth/session"
+import { storeOpenState } from "@/lib/hours"
 import { siteUrl } from "@/lib/site-url"
 import { enterStoreAction, reactivateStoreAction } from "./actions"
 import { NewStoreForm, ResetPasswordForm, SuspendForm } from "./forms"
@@ -20,6 +21,9 @@ type StoreRow = {
   slug: string
   active: boolean
   is_open: boolean
+  hours_enabled: boolean
+  opening_hours: unknown
+  manual_until: string | null
   created_at: string
   suspended_reason: string | null
   suspended_at: string | null
@@ -33,7 +37,7 @@ export default async function LojasPage() {
   const base = await siteUrl()
 
   const { rows } = await db.execute<StoreRow>(sql`
-    SELECT s.id, s.name, s.slug, s.active, s.is_open, s.created_at, s.suspended_reason, s.suspended_at,
+    SELECT s.id, s.name, s.slug, s.active, s.is_open, s.hours_enabled, s.opening_hours, s.manual_until, s.created_at, s.suspended_reason, s.suspended_at,
       COALESCE(
         (SELECT json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'role', m.role,
                                            'mustChangePassword', u.must_change_password) ORDER BY m.role, u.name)
@@ -86,7 +90,14 @@ export default async function LojasPage() {
                         {!s.active ? (
                           <Badge variant="destructive">Suspensa</Badge>
                         ) : (
-                          <Badge variant="secondary">{s.is_open ? "Aberta" : "Fechada"}</Badge>
+                          <Badge variant="secondary">{storeOpenState({
+                            isOpen: s.is_open,
+                            hoursEnabled: s.hours_enabled,
+                            openingHours: s.opening_hours,
+                            manualUntil: s.manual_until ? new Date(s.manual_until) : null,
+                          }).open
+                            ? "Aberta"
+                            : "Fechada"}</Badge>
                         )}
                       </p>
                       <p className="text-sm text-muted-foreground">

@@ -13,5 +13,5 @@ export async function placeOrder(slug: string, input: unknown): Promise<CreateOr
     return { ok: false, error: "Muitos pedidos em sequência. Aguarde alguns minutos e tente de novo." }
   }
 
-  return createOrder(store.id, input, { requireOpen: true })
+  return createOrder(store.id, input, { requireOpen: true, pixOnline: true })
 }
