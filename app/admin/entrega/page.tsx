@@ -12,6 +12,9 @@ import { requireOwner } from "@/lib/auth/session"
 import { formatBRL } from "@/lib/order-shared"
 import { deleteZoneAction, toggleZoneAction } from "./actions"
 import { BulkZonesForm, DeliverySettingsForm, ZoneForm } from "./forms"
+import { DistanceTiersForm, StoreLocationPicker } from "./distance-forms"
+import { distanceTiers } from "@/lib/geo"
+import type { StoreLocation } from "@/lib/order-shared"
 
 export const metadata = { title: "Entrega" }
 
@@ -23,6 +26,9 @@ export default async function EntregaPage() {
     .where(eq(deliveryZones.storeId, store.id))
     .orderBy(asc(sql`lower(${deliveryZones.name})`))
   const byZone = store.deliveryPricing === "zones"
+  const byDistance = store.deliveryPricing === "distance"
+  const tiers = await distanceTiers(store.id)
+  const location = store.location as StoreLocation | null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
@@ -52,7 +58,24 @@ export default async function EntregaPage() {
                 minOrder: Number(store.deliveryMinOrder),
               }}
               zoneCount={zones.filter((z) => z.active).length}
+              tierCount={tiers.length}
+              hasLocation={!!location}
             />
+          </CardContent>
+        </Card>
+
+        <Card className={byDistance ? "" : "opacity-80"}>
+          <CardHeader>
+            <CardTitle>Entrega por distância</CardTitle>
+            <CardDescription>
+              {byDistance
+                ? "O cliente informa o endereço (com CEP) e o sistema calcula a distância até a loja e a taxa da faixa."
+                : "Usado só quando a cobrança é “Por distância (km)”. Você pode configurar antes e trocar depois."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            <StoreLocationPicker location={location} address={store.address} />
+            <DistanceTiersForm tiers={tiers} />
           </CardContent>
         </Card>
 

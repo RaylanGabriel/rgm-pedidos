@@ -35,7 +35,7 @@ export function printOrder(order: OrderWithItemsView, storeName: string) {
     <div class="num"><strong>#${order.orderNumber}</strong></div>
     <p><strong>Cliente:</strong> ${e(order.customerName)}</p>
     ${order.customerPhone ? `<p><strong>Tel:</strong> ${e(order.customerPhone)}</p>` : ""}
-    <p><strong>${TYPE_LABEL[order.type]}</strong> · ${PAYMENT_LABEL[order.paymentMethod]}</p>
+    <p><strong>${TYPE_LABEL[order.type]}</strong> · ${PAYMENT_LABEL[order.paymentMethod]}${order.paidAt ? " · <strong>PAGO</strong>" : ""}</p>
     ${changeText(order) ? `<div class="box"><strong>${e(changeText(order)!)}</strong></div>` : ""}
     <p>${formatDateTimeSP(order.createdAt)}</p>
     ${order.type === "delivery" ? `<div class="box"><strong>Entrega:</strong><br>${e(fullAddress(order))}</div>` : ""}

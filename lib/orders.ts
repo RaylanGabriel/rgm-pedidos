@@ -4,9 +4,15 @@ import { randomBytes } from "node:crypto"
 import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
+import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
+import { distanceTiers, quoteDistance, quoteError } from "@/lib/geo"
+import { openStateLabel, parseHours, storeOpenState, weekSummary } from "@/lib/hours"
 import { categories, deliveryZones, ingredients, menuItemCategories, menuItems, orders, stores } from "@/db/schema"
 import {
+  addressLine,
   formatBRL,
+  formatKm,
+  type StoreLocation,
   orderInputSchema,
   type DeliveryConfig,
   type OrderInput,
@@ -38,17 +44,25 @@ export async function getSuspendedStoreName(slug: string) {
 }
 
 /** Dados públicos da loja (sem contador interno etc.) para mandar ao navegador. */
-export function publicStore(s: StoreRow) {
+export function publicStore(s: StoreRow, base = `/loja/${s.slug}`) {
+  const now = new Date()
+  const open = storeOpenState(s, now)
+  const hours = s.hoursEnabled ? parseHours(s.openingHours) : null
   return {
     id: s.id,
     slug: s.slug,
+    base, // links internos: "" no endereço da loja, "/loja/<slug>" nos outros (lib/site-url → storeBase)
     name: s.name,
     logoUrl: s.logoUrl,
     coverUrl: s.coverUrl,
     primaryColor: s.primaryColor,
     phone: s.phone,
     address: s.address,
-    isOpen: s.isOpen,
+    instagram: s.instagram,
+    facebook: s.facebook,
+    isOpen: open.open, // situação efetiva (horário automático ou botão manual)
+    openLabel: openStateLabel(open, now), // "Fecha às 23:30" / "Abre amanhã às 18:00"
+    weekHours: hours ? weekSummary(hours) : null,
     avgPrepMinutes: s.avgPrepMinutes,
   }
 }
@@ -139,18 +153,24 @@ export const getDeliveryConfig = cache(async (store: StoreRow): Promise<Delivery
           .where(and(eq(deliveryZones.storeId, store.id), eq(deliveryZones.active, true)))
           .orderBy(asc(sql`lower(${deliveryZones.name})`))
       : []
+  const tiers = store.deliveryPricing === "distance" ? await distanceTiers(store.id) : []
+  const loc = store.location as StoreLocation | null
   return {
     enabled: store.deliveryEnabled,
     pricing: store.deliveryPricing,
     fixedFee: Number(store.deliveryFixedFee),
     minOrder: Number(store.deliveryMinOrder),
     zones: zones.map((z) => ({ id: z.id, name: z.name, fee: Number(z.fee) })),
+    tiers,
+    hasLocation: typeof loc?.lat === "number",
+    city: loc?.city ?? "",
+    state: loc?.state ?? "",
   }
 })
 
 // ---------- Criar pedido ----------
 export type CreateOrderResult =
-  | { ok: true; orderNumber: number; publicToken: string }
+  | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean }
   | { ok: false; error: string; fieldErrors?: Record<string, string | undefined> }
 
 const DB_ERRORS: Record<string, string> = {
@@ -168,7 +188,7 @@ const DB_ERRORS: Record<string, string> = {
 export async function createOrder(
   storeId: string,
   rawInput: unknown,
-  opts: { requireOpen: boolean },
+  opts: { requireOpen: boolean; pixOnline: boolean },
 ): Promise<CreateOrderResult> {
   const parsed = orderInputSchema.safeParse(rawInput)
   if (!parsed.success) {
@@ -182,13 +202,37 @@ export async function createOrder(
   const o = parsed.data
   const token = randomBytes(18).toString("base64url")
 
+  // Entrega por km: o servidor localiza o endereço e calcula a distância (o banco escolhe a faixa e a taxa)
+  let distanceKm: number | null = null
+  let deliveryAddress = o.type === "delivery" ? o.deliveryAddress : null
+  if (o.type === "delivery") {
+    const [st] = await db.select({ id: stores.id, pricing: stores.deliveryPricing, location: stores.location }).from(stores).where(eq(stores.id, storeId)).limit(1)
+    if (st?.pricing === "distance") {
+      if (!o.addressParts) return { ok: false, error: "Informe o endereço de entrega.", fieldErrors: { street: "Informe a rua" } }
+      const quote = await quoteDistance(st, o.addressParts)
+      if (!quote.ok) return { ok: false, error: quoteError(quote), fieldErrors: { street: quoteError(quote) } }
+      distanceKm = quote.km
+      deliveryAddress = addressLine(o.addressParts)
+    }
+  }
+
+  // Loja aberta? A regra (horário automático + ajuste manual) fica em lib/hours.ts; o banco só confere se existe/está ativa.
+  if (opts.requireOpen) {
+    const [st] = await db
+      .select({ isOpen: stores.isOpen, hoursEnabled: stores.hoursEnabled, openingHours: stores.openingHours, manualUntil: stores.manualUntil })
+      .from(stores)
+      .where(eq(stores.id, storeId))
+      .limit(1)
+    if (st && !storeOpenState(st).open) return { ok: false, error: DB_ERRORS.STORE_CLOSED }
+  }
+
   try {
     const res = await db.execute<{ result: { orderNumber: number; publicToken: string } }>(sql`
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
-        ${o.type === "delivery" ? o.deliveryAddress : null}, ${o.paymentMethod}::payment_method, ${o.notes},
-        ${JSON.stringify(o.items)}::jsonb, ${token}, ${opts.requireOpen},
-        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid
+        ${deliveryAddress}, ${o.paymentMethod}::payment_method, ${o.notes},
+        ${JSON.stringify(o.items)}::jsonb, ${token}, false,
+        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid, ${distanceKm}::numeric
       ) as result`)
     const result = res.rows[0].result
     // Troco: só em dinheiro e só se a nota cobre o total calculado pelo banco
@@ -198,7 +242,10 @@ export async function createOrder(
         .set({ changeFor: o.changeFor.toFixed(2) })
         .where(and(eq(orders.publicToken, token), eq(orders.storeId, storeId), sql`${orders.total} < ${o.changeFor}`))
     }
-    return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken }
+    // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago.
+    // Se falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
+    const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, token) : false
+    return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr }
   } catch (err) {
     // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
     // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
@@ -210,12 +257,39 @@ export async function createOrder(
       const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
       return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
     }
+    const range = msg.match(/OUT_OF_RANGE:([\d.]+)/)
+    if (range) return { ok: false, error: `Esse endereço fica fora da área de entrega (até ${formatKm(Number(range[1]))}). Escolha retirada.` }
+    if (msg.includes("DISTANCE_REQUIRED")) return { ok: false, error: "Informe o endereço de entrega completo." }
     const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
     if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
     const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
     if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
     console.error("Erro ao criar pedido:", err)
     return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." }
+  }
+}
+
+/** Gera a cobrança Pix no Mercado Pago e guarda no pedido. true = QR gerado. */
+async function attachPixCharge(storeId: string, publicToken: string): Promise<boolean> {
+  try {
+    const mpToken = await storeAccessToken(storeId)
+    if (!mpToken) return false
+    const [row] = await db
+      .select({ id: orders.id, orderNumber: orders.orderNumber, total: orders.total, storeName: stores.name })
+      .from(orders)
+      .innerJoin(stores, eq(stores.id, orders.storeId))
+      .where(and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)))
+      .limit(1)
+    if (!row) return false
+    const pix = await createPixCharge(mpToken, { ...row, total: Number(row.total) })
+    await db
+      .update(orders)
+      .set({ mpOrderId: pix.mpOrderId, pixCode: pix.pixCode, pixExpiresAt: pix.expiresAt })
+      .where(eq(orders.id, row.id))
+    return true
+  } catch (err) {
+    console.error("Pix: não foi possível gerar a cobrança no Mercado Pago:", err instanceof Error ? err.message : err)
+    return false
   }
 }
 
@@ -242,6 +316,7 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     type: o.type,
     deliveryAddress: o.deliveryAddress,
     deliveryZoneName: o.deliveryZoneName,
+    deliveryDistanceKm: o.deliveryDistanceKm === null ? null : Number(o.deliveryDistanceKm),
     status: o.status,
     paymentMethod: o.paymentMethod,
     paymentStatus: o.paymentStatus,
@@ -256,6 +331,9 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
     customerConfirmedAt: o.customerConfirmedAt?.toISOString() ?? null,
     outForDeliveryAt: o.outForDeliveryAt?.toISOString() ?? null,
     autoDelivered: o.autoDelivered,
+    pixCode: o.pixCode,
+    pixExpiresAt: o.pixExpiresAt?.toISOString() ?? null,
+    paidAt: o.paidAt?.toISOString() ?? null,
     items: o.items.map((i) => ({
       id: i.id,
       name: i.nameSnapshot,
@@ -285,6 +363,19 @@ export async function getOrderByToken(token: string) {
   if (row?.status === "out_for_delivery") {
     await autoCompleteDeliveries(row.storeId)
     row = await find()
+  }
+  // Pix aguardando: confere no Mercado Pago (a tela atualiza a cada poucos segundos; o webhook também confirma)
+  if (row && row.mpOrderId && row.paymentStatus === "pending" && row.status === "pending") {
+    try {
+      const result = await syncPixOrder(row.id)
+      if (result !== "pending") row = await find()
+      else if (row.pixExpiresAt && row.pixExpiresAt.getTime() < Date.now() - 5 * 60_000) {
+        await cancelOverduePix(row.storeId)
+        row = await find()
+      }
+    } catch (err) {
+      console.error("Pix: falha ao consultar o Mercado Pago:", err instanceof Error ? err.message : err)
+    }
   }
   if (!row) return null
   return { order: toView(row), store: publicStore(row.store) }
@@ -317,7 +408,7 @@ export async function listOrders(
   storeId: string,
   filter: { from?: Date; to?: Date; statuses?: OrderStatus[]; limit?: number; offset?: number } = {},
 ) {
-  await autoCompleteDeliveries(storeId)
+  await Promise.all([autoCompleteDeliveries(storeId), cancelOverduePix(storeId)])
   const rows = await db.query.orders.findMany({
     where: and(
       eq(orders.storeId, storeId),

@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache"
 import { and, eq, not } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { deliveryZones, stores } from "@/db/schema"
+import { deliveryDistanceTiers, deliveryZones, stores } from "@/db/schema"
 import { isOwner } from "@/lib/auth/session"
 import { formText, priceSchema, zodErrorState, type FormState } from "@/lib/form-state"
+import { geocodeStoreAddress, reverseStoreLocation } from "@/lib/geo"
+import { rateLimit } from "@/lib/rate-limit-server"
 
 /* Entrega: só o dono altera. Tudo filtrado pelo store_id da sessão. */
 
@@ -21,7 +23,7 @@ function refresh(slug: string) {
 // ---------- Regras ----------
 const settingsSchema = z.object({
   deliveryEnabled: z.boolean(),
-  deliveryPricing: z.enum(["fixed", "zones"], { message: "Escolha como cobrar a entrega" }),
+  deliveryPricing: z.enum(["fixed", "zones", "distance"], { message: "Escolha como cobrar a entrega" }),
   deliveryFixedFee: priceSchema,
   deliveryMinOrder: priceSchema,
 })
@@ -138,4 +140,73 @@ export async function deleteZoneAction(id: string) {
   // Pedidos antigos guardam o nome do bairro e a taxa, então apagar não altera o histórico
   await db.delete(deliveryZones).where(and(eq(deliveryZones.id, id), eq(deliveryZones.storeId, ctx.store.id)))
   refresh(ctx.store.slug)
+}
+
+// ---------- Entrega por distância ----------
+const tiersSchema = z
+  .array(
+    z.object({
+      upToKm: z.coerce.number({ message: "Distância inválida" }).min(0.5, "Mínimo 0,5 km").max(100, "Máximo 100 km"),
+      fee: z.string().pipe(priceSchema),
+    }),
+  )
+  .min(1, "Cadastre pelo menos uma faixa")
+  .max(10, "No máximo 10 faixas")
+
+/** Troca todas as faixas da loja de uma vez (a lista inteira vem do formulário). */
+export async function saveTiersAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const ctx = await isOwner()
+  if (!ctx) return NO_PERMISSION
+  let raw: unknown
+  try {
+    raw = JSON.parse(String(fd.get("tiers") ?? "[]"))
+  } catch {
+    return { error: "Não foi possível ler as faixas. Recarregue a página." }
+  }
+  const parsed = tiersSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Verifique as faixas." }
+  const tiers = parsed.data
+    .map((t) => ({ upToKm: Math.round(t.upToKm * 10) / 10, fee: t.fee }))
+    .sort((a, b) => a.upToKm - b.upToKm)
+  if (new Set(tiers.map((t) => t.upToKm)).size !== tiers.length) return { error: "Duas faixas com a mesma distância. Ajuste e salve de novo." }
+
+  await db.delete(deliveryDistanceTiers).where(eq(deliveryDistanceTiers.storeId, ctx.store.id))
+  await db.insert(deliveryDistanceTiers).values(tiers.map((t) => ({ storeId: ctx.store.id, upToKm: t.upToKm.toFixed(1), fee: t.fee })))
+  refresh(ctx.store.slug)
+  return { ok: true, message: "Faixas salvas." }
+}
+
+/** Localiza a loja pelo endereço das Configurações. */
+export async function locateFromAddressAction(): Promise<FormState> {
+  const ctx = await isOwner()
+  if (!ctx) return NO_PERMISSION
+  if (!ctx.store.address) return { error: "Cadastre o endereço da loja em Configurações primeiro." }
+  if (!(await rateLimit(`geo:${ctx.store.id}`, 20, 60 * 60 * 1000))) return { error: "Muitas tentativas. Tente de novo mais tarde." }
+  try {
+    const loc = await geocodeStoreAddress(ctx.store.address)
+    if (!loc) return { error: "Não encontramos esse endereço no mapa. Inclua a cidade e o estado em Configurações, ou use a localização do aparelho." }
+    await db.update(stores).set({ location: loc }).where(eq(stores.id, ctx.store.id))
+  } catch {
+    return { error: "O serviço de mapas não respondeu. Tente de novo em instantes." }
+  }
+  refresh(ctx.store.slug)
+  return { ok: true, message: "Localização encontrada. Confira o ponto no mapa." }
+}
+
+const deviceSchema = z.object({
+  lat: z.number().min(-34).max(6), // dentro do Brasil
+  lng: z.number().min(-74).max(-34),
+})
+
+/** Dono na loja: usa o GPS do aparelho (o ponto mais preciso). */
+export async function locateFromDeviceAction(lat: number, lng: number): Promise<FormState> {
+  const ctx = await isOwner()
+  if (!ctx) return NO_PERMISSION
+  const parsed = deviceSchema.safeParse({ lat, lng })
+  if (!parsed.success) return { error: "Localização fora do Brasil ou inválida." }
+  if (!(await rateLimit(`geo:${ctx.store.id}`, 20, 60 * 60 * 1000))) return { error: "Muitas tentativas. Tente de novo mais tarde." }
+  const loc = await reverseStoreLocation(parsed.data.lat, parsed.data.lng)
+  await db.update(stores).set({ location: loc }).where(eq(stores.id, ctx.store.id))
+  refresh(ctx.store.slug)
+  return { ok: true, message: "Localização da loja salva pelo aparelho." }
 }

@@ -11,16 +11,26 @@ const money = (v: number) => (v ? v.toFixed(2).replace(".", ",") : "")
 
 export interface DeliverySettings {
   enabled: boolean
-  pricing: "fixed" | "zones"
+  pricing: "fixed" | "zones" | "distance"
   fixedFee: number
   minOrder: number
 }
 
-export function DeliverySettingsForm({ values, zoneCount }: { values: DeliverySettings; zoneCount: number }) {
+export function DeliverySettingsForm({
+  values,
+  zoneCount,
+  tierCount,
+  hasLocation,
+}: {
+  values: DeliverySettings
+  zoneCount: number
+  tierCount: number
+  hasLocation: boolean
+}) {
   const [enabled, setEnabled] = useState(values.enabled)
   const [pricing, setPricing] = useState(values.pricing)
 
-  const option = (value: "fixed" | "zones", title: string, text: string) => (
+  const option = (value: DeliverySettings["pricing"], title: string, text: string) => (
     <label
       className={`flex-1 min-w-56 cursor-pointer rounded-lg border-2 p-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
         pricing === value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
@@ -57,6 +67,7 @@ export function DeliverySettingsForm({ values, zoneCount }: { values: DeliverySe
               <div className="flex flex-wrap gap-3" role="radiogroup">
                 {option("fixed", "Taxa fixa", "O mesmo valor para qualquer endereço.")}
                 {option("zones", "Por bairro", "Cada bairro tem seu valor; o cliente escolhe o dele numa lista.")}
+                {option("distance", "Por distância (km)", "O cliente informa o endereço e o sistema calcula a distância até a loja.")}
               </div>
             </div>
 
@@ -87,6 +98,12 @@ export function DeliverySettingsForm({ values, zoneCount }: { values: DeliverySe
           {enabled && pricing === "zones" && zoneCount === 0 && (
             <p className="text-sm text-amber-700 dark:text-amber-400">
               Cadastre pelo menos um bairro abaixo: sem bairros, a opção de entrega não aparece para o cliente.
+            </p>
+          )}
+          {enabled && pricing === "distance" && (!hasLocation || tierCount === 0) && (
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              {!hasLocation ? "Marque a localização da loja" : "Cadastre as faixas de distância"} logo abaixo: sem isso, a opção de entrega
+              não aparece para o cliente.
             </p>
           )}
           {s.fieldErrors?.deliveryPricing && <p className="text-sm text-destructive">{s.fieldErrors.deliveryPricing}</p>}

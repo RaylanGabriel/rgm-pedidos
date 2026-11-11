@@ -3,7 +3,7 @@
 Plano do produto (cardápio digital + pedidos para lanchonetes e carrinhos, multi-loja).
 Cada item é entregue sozinho: branch → implementa → testa → commit → preview → aprovado → `main`.
 
-Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
+Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia · 📚 estudo
 
 ---
 
@@ -47,31 +47,20 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia
 - A taxa é calculada dentro de `create_order()` no banco (o navegador só manda o id do bairro).
 - ✅ Versão antiga de `create_order` removida (migration 0007).
 
-**3b. ⏳ Por distância em km (depois)**
-**Ideia:** o cliente informa o endereço completo, o site calcula a distância até o **endereço da loja** e cobra
-pela faixa que o dono configurou. Exemplo do dono:
-
-| Distância | Frete |
-|---|---|
-| até 3 km | grátis |
-| até 8 km | R$ 5,00 |
-| até 12 km | R$ 10,00 |
-| acima disso | não entrega |
-
-- Faixas sempre no formato **"até X km"**, em ordem — assim não sobra buraco (ex.: entre 8 e 10 km) sem preço.
-  A última faixa define o raio máximo de entrega.
-- Nova opção em `/admin/entrega`: `delivery_pricing = 'distance'` + tabela `delivery_distance_tiers` (`up_to_km`, `fee`),
-  ao lado de "fixa" e "por bairro" (continuam existindo).
-- **Endereço da loja vira coordenada** uma vez, ao salvar em Configurações (`stores.lat/lng`), com mapa para o dono
-  conferir o ponto.
-- **Endereço do cliente:** CEP → ViaCEP preenche rua/bairro/cidade (grátis) → cliente completa o número →
-  geocodificação (Nominatim/OpenStreetMap, grátis com limite de 1 consulta/s; alternativa paga: Google Maps).
-  Atalho "Usar minha localização" (GPS do navegador).
-- **Distância:** linha reta (Haversine) é grátis mas fica menor que o caminho real; aplicar um fator (~1,3×) ou usar
-  rota real (OSRM/Google) se precisar de precisão. Decidir na hora de implementar.
-- Segurança: o servidor recalcula a distância e a taxa dentro de `create_order()` (o navegador nunca manda o valor),
-  e o pedido guarda a distância e o endereço usados.
-- Se não achar o endereço: mostrar aviso e deixar o cliente escolher retirada (ou a loja combina pelo WhatsApp).
+**3b. ✅ Por distância em km**
+- `/admin/entrega` → "Por distância (km)": **ponto da loja** (pelo endereço das Configurações ou "Estou na loja: usar a
+  localização deste aparelho", o mais preciso) com mapa do OpenStreetMap para conferir; **faixas** "até X km → R$ Y"
+  (a última é o raio máximo). Trocar o endereço em Configurações localiza a loja de novo (menos se foi marcada pelo GPS).
+- **Cliente:** CEP → ViaCEP preenche rua/bairro/cidade → número → o servidor localiza (Nominatim/OpenStreetMap) e mostra
+  "Cerca de 4,2 km · entrega R$ 5,00" ou "fora da área (até 12 km)". Cidade da loja já vem sugerida. Endereço lembrado no aparelho.
+- **Segurança:** o servidor recalcula a distância ao criar o pedido e o `create_order()` escolhe a faixa no banco
+  (`delivery_distance_tiers`); o navegador nunca manda taxa nem distância. Pedido guarda `delivery_distance_km` e a faixa
+  ("Até 8 km") em `delivery_zone_name` (relatórios agrupam por faixa).
+- Distância = linha reta × 1,3 (`lib/geo.ts`). Cache dos endereços em `geocode_cache` (só o hash, não o endereço);
+  Nominatim: 1 consulta/s, limite de 40 cálculos por IP a cada 10 min.
+- ⚠️ **Limitação:** o OpenStreetMap quase não tem número de casa no Brasil → em geral calcula pelo **meio da rua** (o cliente
+  vê "estimada pela rua"). Em avenidas muito compridas o erro pode passar de 1–2 km. Se incomodar: Google Geocoding
+  (~10 mil consultas/mês grátis, depois pago) ou deixar o cliente marcar no mapa.
 
 ## ✅ 4. Cardápio mais completo + novo design
 Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/skills/`). Cor da marca: `#8d1a1e`.
@@ -168,20 +157,64 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - **Troco para R$ ___** no pagamento em dinheiro (`orders.change_for`): atalhos com as notas acima do total, mostra quanto
   levar; aparece na cozinha, impressão, acompanhamento, fechamento de caixa e planilha.
 - **Banco separado para testes** (branch `preview` do Neon) — ver Notas técnicas.
+- **Redes sociais da loja** (`stores.instagram`, `stores.facebook` + o WhatsApp que já existia): o dono digita o @ ou
+  cola o link em Configurações (o sistema limpa e confere); aparecem no topo do cardápio (só ícones no celular) e no rodapé.
+- **Horário de funcionamento automático** (`/admin/horarios`, `lib/hours.ts`): até 2 horários por dia (almoço e noite),
+  horário que passa da meia-noite (18:00 → 02:00), "copiar para todos". O cardápio mostra "Fecha às 23:30" / "Abre amanhã
+  às 18:00" e os horários no rodapé. "Fechar agora / Abrir agora" no painel vale só até o próximo horário
+  (`stores.manual_until`) e depois volta ao automático. A regra é conferida no servidor ao criar o pedido.
+- **Avisar o cliente no WhatsApp** pela cozinha (`components/notify-whatsapp.tsx`): botão verde "Avisar que pode retirar" /
+  "Avisar que saiu para entrega" abre o WhatsApp com a mensagem pronta (+ link de acompanhamento na entrega). Grátis: quem
+  envia é o funcionário, sem a API paga. Depois de tocar mostra "Avisado" (lembrado no aparelho). Nas outras etapas, atalho
+  com o ícone do WhatsApp para conversar.
 
-## 💭 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
-- OAuth "Conectar Mercado Pago" → token por loja, criptografado no banco.
-- Pedido Pix → cobrança na conta do dono → QR + copia e cola → webhook confirma (revalidando na API) → "Pago".
-- Pix não pago expira (~15 min). Possível comissão da plataforma (`marketplace_fee`).
+## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
+Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
+
+**Feito (em teste — `MP_TEST_MODE=true`):**
+- `/admin/pagamentos`: "Conectar Mercado Pago" (OAuth com `state` anti-CSRF em cookie), desconectar; super admin pode
+  usar a conta de teste da plataforma em modo de teste.
+- Tokens da loja **criptografados** (AES-256-GCM, `MP_TOKEN_KEY`) em `store_payment_accounts`; renovação automática
+  pelo refresh token quando faltar menos de 7 dias.
+- Pedido com Pix pelo site → cobrança na conta da loja (valor do banco, `X-Idempotency-Key` por pedido) → tela com
+  **copiar código Pix**, QR code e contagem de 30 min.
+- **Pedido só entra na cozinha depois de pago** (faixa "Aguardando Pix"); a espera conta a partir do pagamento.
+  Pix vencido (+5 min) é cancelado sozinho.
+- Confirmação pelo **webhook** `/api/mercado-pago/webhook` (assinatura `x-signature` conferida; status sempre
+  consultado na API) e pela própria tela do pedido (consulta a cada 5 s).
+- Se o Mercado Pago falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
+- **Pix no pedido do balcão**: "Mostrar QR code" ao lançar o pedido → tela com QR grande para o cliente apontar a câmera,
+  muda sozinha para "Pix recebido". Se o cliente pagar de outro jeito (dinheiro, cartão, Pix na chave) ou desistir, a
+  cobrança é **cancelada no Mercado Pago** antes (o QR deixa de funcionar). Link "QR" na faixa "Aguardando Pix" da cozinha.
+- ⚠️ **Sandbox do Mercado Pago não aprova Pix sozinho** (nov/2026: cobrança com `first_name: "APRO"` fica em
+  `waiting_transfer`). A tela de "pago" foi testada simulando o pagamento no banco; o teste real fica para o primeiro Pix de produção.
+
+**Falta:**
+- Testar o "Conectar Mercado Pago" de verdade com uma conta vendedora de teste (só funciona no endereço cadastrado).
+- Trocar `MP_REDIRECT_URI`/webhook para `painel.rgm.dev.br` quando o domínio entrar.
+- Link de acompanhamento do aviso no WhatsApp: usar o endereço da loja (`<loja>.rgm.dev.br/pedido/...`), não o do painel.
+- Ligar produção (`MP_TEST_MODE=false`) e fazer o primeiro Pix real de valor baixo.
+- Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 
 ## 💭 6. Conta do cliente (opcional) com Google
 - Botão "Entrar com Google" no checkout, nunca obrigatório.
 - Endereços salvos, histórico de pedidos, base para fidelidade.
 - Exige política de privacidade (LGPD) e opção de apagar a conta.
 
+## 📚 Estudo: entender o que foi construído (depois das demandas atuais)
+Quando terminarmos o domínio e o Pix em produção, o Claude explica passo a passo, com o código aberto, para o Raylan
+conseguir explicar sozinho numa entrevista:
+- **Pix ponta a ponta:** do botão "Confirmar e pagar com Pix" até o pedido entrar na cozinha (`createPixCharge`,
+  `X-Idempotency-Key`, `expiration_time`, por que o valor vem do banco).
+- **Webhook:** o que é, por que o Mercado Pago chama a gente, como a assinatura `x-signature` (HMAC-SHA256) é conferida,
+  por que nunca confiamos no conteúdo do aviso e consultamos a API (`syncPixOrder`), por que responder 500 faz ele tentar de novo.
+- **OAuth:** como o dono conecta a conta sem passar a senha, o `state` anti-CSRF, access token × refresh token.
+- **Criptografia dos tokens:** AES-256-GCM, IV, tag de autenticação, por que a chave fica fora do banco.
+- **Segurança geral:** preço calculado no servidor (`create_order()`), sessão com hash, rate limit, `store_id` em tudo.
+- **Banco e deploy:** migrations, branches `production`/`preview` do Neon, preview da Vercel.
+- Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
+
 ## 💭 Depois
-- Horário de funcionamento automático (abre/fecha sozinho).
-- Notificação no WhatsApp quando o pedido fica pronto.
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
 
@@ -192,12 +225,13 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - Categorias de teste ("Teste 1/2/3", "Teste") podem ser apagadas quando quiser.
 
 ## Notas técnicas
-- **Dois bancos (branches do Neon, projeto "Hamburguerias")**:
+- Repositório: **github.com/RaylanGabriel/rgm-pedidos** (antes `v0-mr-smash-street-website`; o GitHub redireciona o nome antigo).
+- **Dois bancos (branches do Neon, projeto "rgm-pedidos", antes "Hamburguerias")**:
   - `production` → só o site no ar (variável `DATABASE_URL` de Production na Vercel; local em `.env.prod-db`).
   - `preview` → previews da Vercel e testes locais (`.env.local`). É uma cópia da produção: testes não sujam o site no ar.
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0017): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0022): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).

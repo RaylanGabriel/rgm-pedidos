@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { PAYMENT_LABEL, TYPE_LABEL, type OrderType, type PaymentMethod } from "@/lib/order-shared"
+import type { AddressFields } from "@/components/order/distance-address"
 
 /**
  * Carrinho do cliente, guardado no localStorage por loja (chave cart:<slug>).
@@ -106,12 +107,27 @@ export interface SavedCustomer {
   type: OrderType
   deliveryAddress: string
   deliveryZoneId: string
+  /** Endereço por partes (lojas com entrega por km) */
+  address: AddressFields
   paymentMethod: PaymentMethod
 }
 
 const CUSTOMER_KEY = "customer:v1"
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "")
+
+function readAddress(raw: unknown): AddressFields {
+  const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>
+  return {
+    cep: str(a.cep, 9),
+    street: str(a.street, 120),
+    number: str(a.number, 10),
+    district: str(a.district, 80),
+    city: str(a.city, 80),
+    state: str(a.state, 2),
+    complement: str(a.complement, 120),
+  }
+}
 
 export function loadCustomer(): SavedCustomer | null {
   const raw = read<Record<string, unknown> | null>(CUSTOMER_KEY, null)
@@ -126,6 +142,7 @@ export function loadCustomer(): SavedCustomer | null {
     type: (type in TYPE_LABEL ? type : "pickup") as OrderType,
     deliveryAddress: str(raw.deliveryAddress, 300),
     deliveryZoneId: str(raw.deliveryZoneId, 36), // conferido contra os bairros da loja no checkout
+    address: readAddress(raw.address),
     paymentMethod: (paymentMethod in PAYMENT_LABEL ? paymentMethod : "pix") as PaymentMethod,
   }
 }
@@ -137,6 +154,7 @@ export function saveCustomer(c: SavedCustomer) {
     type: c.type,
     deliveryAddress: c.deliveryAddress.trim(),
     deliveryZoneId: c.deliveryZoneId,
+    address: readAddress(c.address),
     paymentMethod: c.paymentMethod,
   })
 }

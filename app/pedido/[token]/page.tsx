@@ -8,9 +8,12 @@ import { brandStyle } from "@/lib/color"
 import { formatDateTimeSP, formatTimeSP } from "@/lib/dates"
 import { mapsLink, whatsappLink } from "@/lib/links"
 import { getOrderByToken } from "@/lib/orders"
-import { changeText, formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
+import { storeBase } from "@/lib/site-url"
+import QRCode from "qrcode"
+import { awaitingPix, changeText, formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
 import { ConfirmDelivery } from "./confirm-delivery"
+import { PixPayment } from "./pix-payment"
 
 export const metadata = { title: "Acompanhar pedido", robots: { index: false } }
 
@@ -28,7 +31,8 @@ const SHORT_LABEL: Partial<Record<OrderStatus, string>> = { out_for_delivery: "A
 export default async function PedidoPage({ params }: { params: Promise<{ token: string }> }) {
   const data = await getOrderByToken((await params).token)
   if (!data) notFound()
-  const { order, store } = data
+  const { order } = data
+  const store = { ...data.store, base: await storeBase(data.store.slug) }
   const finished = order.status === "delivered" || order.status === "cancelled"
   const steps = orderSteps(order.type) // mesma sequência do quadro da cozinha
   const step = steps.indexOf(order.status)
@@ -47,6 +51,12 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
     delivered: { title: "Pedido entregue", text: "Bom apetite! Obrigado pela preferência." },
     cancelled: { title: "Pedido cancelado", text: "Em caso de dúvida, fale com a loja." },
   }
+  // Pix online ainda não pago: o pedido só vai para a cozinha depois do pagamento
+  const pixWaiting = awaitingPix(order)
+  const pixExpired = order.status === "cancelled" && !!order.pixCode && order.paymentStatus === "pending"
+  if (pixWaiting) headline.pending = { title: "Falta só pagar o Pix", text: "Assim que o pagamento for confirmado, a loja recebe o pedido." }
+  if (pixExpired) headline.cancelled = { title: "O Pix venceu", text: "O pagamento não foi feito a tempo e o pedido foi cancelado. Você pode fazer um novo pedido." }
+  const qrSvg = pixWaiting && order.pixCode ? await QRCode.toString(order.pixCode, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) : ""
   const { title, text } = headline[order.status]
   const Icon = STEP_ICON[order.status]
 
@@ -55,11 +65,15 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
 
   return (
     <div style={brandStyle(store.primaryColor)} className="flex min-h-screen flex-col bg-background">
-      {!finished && <AutoRefresh seconds={10} />}
+      {!finished && <AutoRefresh seconds={pixWaiting ? 5 : 10} />}
       <StoreHeader store={store} />
 
       <main className="flex-1">
         <div className="container mx-auto max-w-xl space-y-4 px-4 py-6">
+          {pixWaiting && order.pixCode && order.pixExpiresAt && (
+            <PixPayment code={order.pixCode} qrSvg={qrSvg} expiresAt={order.pixExpiresAt} total={order.total} />
+          )}
+
           {/* Status */}
           <section
             className={cn(
@@ -86,7 +100,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
               </div>
             </div>
 
-            {order.status !== "cancelled" && (
+            {order.status !== "cancelled" && !pixWaiting && (
               <div className="px-5 pb-5">
                 <ol className={cn("grid gap-1.5", steps.length === 5 ? "grid-cols-5" : "grid-cols-4")} aria-label="Andamento do pedido">
                   {steps.map((s, i) => (
@@ -204,7 +218,8 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
                 <span className="tabular-nums">{formatBRL(order.total)}</span>
               </div>
               <p className="text-muted-foreground">
-                {TYPE_LABEL[order.type]} · {PAYMENT_LABEL[order.paymentMethod]} · pagamento direto com a loja
+                {TYPE_LABEL[order.type]} · {PAYMENT_LABEL[order.paymentMethod]} ·{" "}
+                {order.paidAt ? `pago pelo app às ${formatTimeSP(order.paidAt)} ✓` : order.pixCode ? "pagamento pelo app" : "pagamento direto com a loja"}
               </p>
               {changeText(order) && <p className="font-medium">{changeText(order)}</p>}
               {order.notes && <p className="pt-1 text-muted-foreground">Obs.: {order.notes}</p>}
@@ -213,7 +228,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
 
           <div className="pt-2 text-center">
             <Button asChild variant="outline" className="h-11 rounded-full px-6">
-              <Link href={`/loja/${store.slug}`}>Fazer outro pedido</Link>
+              <Link href={store.base || "/"}>Fazer outro pedido</Link>
             </Button>
           </div>
         </div>

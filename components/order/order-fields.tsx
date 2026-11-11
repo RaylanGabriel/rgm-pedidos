@@ -6,14 +6,18 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
   deliveryAvailable,
+  cleanName,
   formatBRL,
+  maskPhone,
   parseMoneyBR,
   PAYMENT_LABEL,
   TYPE_LABEL,
   type DeliveryConfig,
   type OrderType,
   type PaymentMethod,
+  type QuoteView,
 } from "@/lib/order-shared"
+import { DistanceAddress, emptyAddressFields, type AddressFields } from "@/components/order/distance-address"
 
 export interface OrderFieldsValue {
   customerName: string
@@ -21,6 +25,8 @@ export interface OrderFieldsValue {
   type: OrderType
   deliveryAddress: string
   deliveryZoneId: string
+  /** Entrega por km: endereço por partes (CEP, rua, número…) */
+  address: AddressFields
   paymentMethod: PaymentMethod
   /** "Troco para" (texto digitado; só vale em dinheiro) */
   changeFor: string
@@ -33,6 +39,7 @@ export const emptyOrderFields: OrderFieldsValue = {
   type: "pickup",
   deliveryAddress: "",
   deliveryZoneId: "",
+  address: emptyAddressFields,
   paymentMethod: "pix",
   changeFor: "",
   notes: "",
@@ -108,6 +115,9 @@ export function OrderFields({
   phoneRequired,
   delivery,
   total,
+  pixOnline = false,
+  quote = null,
+  quoteLoading = false,
 }: {
   value: OrderFieldsValue
   onChange: (v: OrderFieldsValue) => void
@@ -117,6 +127,11 @@ export function OrderFields({
   delivery: DeliveryConfig
   /** Total previsto do pedido (para calcular o troco) */
   total?: number
+  /** Loja aceita Pix pelo site (Mercado Pago conectado) */
+  pixOnline?: boolean
+  /** Entrega por km: cálculo da taxa para o endereço digitado (useDistanceQuote) */
+  quote?: QuoteView | null
+  quoteLoading?: boolean
 }) {
   const canDeliver = deliveryAvailable(delivery)
   const typeLabels = canDeliver
@@ -125,8 +140,13 @@ export function OrderFields({
   const typeHints: Partial<Record<OrderType, string>> = {}
   if (canDeliver) {
     const minZone = Math.min(...delivery.zones.map((z) => z.fee))
+    const minTier = Math.min(...delivery.tiers.map((t) => t.fee))
     typeHints.delivery =
-      delivery.pricing === "fixed"
+      delivery.pricing === "distance"
+        ? minTier > 0
+          ? `a partir de ${formatBRL(minTier)}`
+          : "conforme a distância"
+        : delivery.pricing === "fixed"
         ? delivery.fixedFee > 0
           ? `+ ${formatBRL(delivery.fixedFee)}`
           : "grátis"
@@ -198,7 +218,19 @@ export function OrderFields({
           </div>
         )}
 
-        {value.type === "delivery" && (
+        {value.type === "delivery" && delivery.pricing === "distance" && (
+          <DistanceAddress
+            value={value.address}
+            onChange={(patch) => onChange({ ...value, address: { ...value.address, ...patch } })}
+            delivery={delivery}
+            quote={quote}
+            loading={quoteLoading}
+            errors={errors}
+            disabled={disabled}
+          />
+        )}
+
+        {value.type === "delivery" && delivery.pricing !== "distance" && (
           <div>
             <Label htmlFor="deliveryAddress" className="mb-1.5">
               Endereço de entrega *
@@ -229,7 +261,7 @@ export function OrderFields({
           <Input
             id="customerName"
             value={value.customerName}
-            onChange={(e) => set("customerName", e.target.value)}
+            onChange={(e) => set("customerName", cleanName(e.target.value))}
             maxLength={100}
             autoComplete="name"
             placeholder="Como chamamos você no balcão"
@@ -249,10 +281,10 @@ export function OrderFields({
             id="customerPhone"
             type="tel"
             inputMode="tel"
-            placeholder="(11) 98765-4321"
-            value={value.customerPhone}
-            onChange={(e) => set("customerPhone", e.target.value)}
-            maxLength={20}
+            placeholder="(42) 98434-7835"
+            value={maskPhone(value.customerPhone)}
+            onChange={(e) => set("customerPhone", maskPhone(e.target.value))}
+            maxLength={16}
             autoComplete="tel"
             required={phoneRequired}
             disabled={disabled}
@@ -280,7 +312,11 @@ export function OrderFields({
           disabled={disabled}
         />
         {value.paymentMethod === "cash" && <ChangeField value={value.changeFor} total={total} error={errors.changeFor} disabled={disabled} onChange={(v) => set("changeFor", v)} />}
-        <p className="text-xs text-muted-foreground">O pagamento é feito direto com a loja.</p>
+        <p className="text-xs text-muted-foreground">
+          {pixOnline && value.paymentMethod === "pix"
+            ? "Na próxima tela aparece o Pix (copia e cola ou QR code). Seu pedido vai para a cozinha assim que o pagamento cair."
+            : "O pagamento é feito direto com a loja."}
+        </p>
       </Section>
 
       <Section title="Observações">

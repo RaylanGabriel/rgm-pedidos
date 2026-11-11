@@ -32,6 +32,7 @@ export interface OrderView {
   customerPhone: string | null
   type: OrderType
   deliveryAddress: string | null
+  deliveryDistanceKm: number | null
   deliveryZoneName: string | null
   status: OrderStatus
   paymentMethod: PaymentMethod
@@ -50,7 +51,15 @@ export interface OrderView {
   outForDeliveryAt: string | null
   /** Fechado sozinho 1h depois de sair para entrega */
   autoDelivered: boolean
+  /** Pix online (Mercado Pago): copia e cola, validade e quando foi pago */
+  pixCode: string | null
+  pixExpiresAt: string | null
+  paidAt: string | null
 }
+
+/** Pedido com Pix online ainda não pago: não entra na fila da cozinha. */
+export const awaitingPix = (o: Pick<OrderView, "pixCode" | "paymentStatus" | "status">) =>
+  !!o.pixCode && o.paymentStatus === "pending" && o.status === "pending"
 
 export type OrderWithItemsView = OrderView & { items: OrderItemView[] }
 
@@ -128,15 +137,50 @@ export function changeText(o: { paymentMethod: PaymentMethod; changeFor: number 
   return back > 0 ? `Troco para ${formatBRL(o.changeFor)} (levar ${formatBRL(back)})` : null
 }
 
+// ---------- Campos do cliente ----------
+/**
+ * Telefone enquanto digita: só números, no formato (42) 98434-7835 (celular) ou (42) 3434-7835 (fixo).
+ * Aceita colar "+55 42 98434-7835" (tira o 55 do país).
+ */
+export function maskPhone(v: string) {
+  let d = v.replace(/\D/g, "")
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2)
+  d = d.slice(0, 11)
+  if (d.length === 0) return ""
+  if (d.length <= 2) return `(${d}`
+  const ddd = d.slice(0, 2)
+  const rest = d.slice(2)
+  const split = rest[0] === "9" ? 5 : 4 // celular (começa com 9) tem 9 dígitos; fixo tem 8
+  if (rest.length <= split) return `(${ddd}) ${rest}` // sem traço sobrando: apagar funciona normal
+  return `(${ddd}) ${rest.slice(0, split)}-${rest.slice(split)}`
+}
+
+/** Nome: só letras (com acento), espaço, apóstrofo, hífen e ponto — ex.: "Ana-Maria D'Ávila Jr." */
+export const NAME_ALLOWED = /^[\p{L}\s'.-]+$/u
+export const cleanName = (v: string) => v.replace(/[^\p{L}\s'.-]/gu, "").replace(/\s{2,}/g, " ").replace(/^\s+/, "")
+
 // ---------- Entrega ----------
 /** Regras de entrega da loja (públicas: vão para o navegador montar o checkout). */
 export interface DeliveryConfig {
   enabled: boolean
-  pricing: "fixed" | "zones"
+  pricing: "fixed" | "zones" | "distance"
   fixedFee: number
   minOrder: number
   zones: { id: string; name: string; fee: number }[]
+  /** Entrega por km: faixas "até X km → R$ Y" (em ordem) */
+  tiers: { upToKm: number; fee: number }[]
+  /** Entrega por km: a loja tem o ponto no mapa? (sem ele não dá para calcular) */
+  hasLocation: boolean
+  /** Cidade/UF da loja: sugestão para o endereço do cliente */
+  city: string
+  state: string
 }
+
+/** Ponto da loja (stores.location). */
+export type StoreLocation = { lat: number; lng: number; label: string; city: string; state: string; source: "address" | "device" }
+
+/** 4.2 → "4,2 km"; 8 → "8 km" */
+export const formatKm = (km: number) => `${(Math.round(km * 10) / 10).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`
 
 /**
  * Taxa prevista para mostrar no checkout (o valor cobrado é o que create_order calcula no banco).
@@ -144,15 +188,66 @@ export interface DeliveryConfig {
  */
 export function previewDeliveryFee(config: DeliveryConfig, zoneId: string | null | undefined): number | null {
   if (config.pricing === "fixed") return config.fixedFee
+  if (config.pricing === "distance") return null // vem do orçamento (endereço localizado no servidor)
   return config.zones.find((z) => z.id === zoneId)?.fee ?? null
 }
 
 /** A loja consegue entregar? (por bairro sem nenhum bairro cadastrado = não) */
-export const deliveryAvailable = (c: DeliveryConfig) => c.enabled && (c.pricing === "fixed" || c.zones.length > 0)
+export const deliveryAvailable = (c: DeliveryConfig) =>
+  c.enabled && (c.pricing === "fixed" || (c.pricing === "zones" ? c.zones.length > 0 : c.tiers.length > 0 && c.hasLocation))
 
 /** Endereço com o bairro, para a cozinha, a impressão e o cliente. */
-export const fullAddress = (o: { deliveryAddress: string | null; deliveryZoneName: string | null }) =>
-  [o.deliveryAddress, o.deliveryZoneName].filter(Boolean).join(" — ")
+export const fullAddress = (o: { deliveryAddress: string | null; deliveryZoneName: string | null; deliveryDistanceKm?: number | null }) =>
+  [o.deliveryAddress, o.deliveryDistanceKm != null ? formatKm(o.deliveryDistanceKm) : o.deliveryZoneName].filter(Boolean).join(" — ")
+
+// ---------- Endereço por partes (entrega por km) ----------
+export type AddressParts = {
+  cep: string | null
+  street: string
+  number: string
+  district: string | null
+  city: string
+  state: string
+  complement: string | null
+}
+
+const partText = (min: number, max: number, msg: string) => z.string().transform(sanitizeString).pipe(z.string().min(min, msg).max(max, msg))
+const partOptional = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .nullable()
+    .optional()
+    .transform((v) => (v ? sanitizeString(v) : "") || null)
+
+export const addressPartsSchema = z.object({
+  cep: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => (v ?? "").replace(/\D/g, ""))
+    .pipe(z.string().refine((v) => v === "" || v.length === 8, "CEP inválido"))
+    .transform((v) => v || null),
+  street: partText(2, 120, "Informe a rua"),
+  number: partText(1, 10, "Informe o número (ou s/n)"),
+  district: partOptional(80),
+  city: partText(2, 80, "Informe a cidade"),
+  state: z
+    .string()
+    .transform((v) => v.trim().toUpperCase())
+    .pipe(z.string().regex(/^[A-Z]{2}$/, "UF inválida")),
+  complement: partOptional(120),
+})
+
+/** Resultado do cálculo da entrega por km mostrado no checkout. */
+export type QuoteView = { ok: true; km: number; fee: number; precise: boolean } | { ok: false; error: string }
+
+/** Endereço em uma linha (vai para a cozinha, a impressão e o cliente). */
+export function addressLine(p: AddressParts) {
+  const cep = p.cep ? ` · CEP ${p.cep.slice(0, 5)}-${p.cep.slice(5)}` : ""
+  const comp = p.complement ? ` (${p.complement})` : ""
+  return `${p.street}, ${p.number}${comp}${p.district ? ` — ${p.district}` : ""}, ${p.city}/${p.state}${cep}`
+}
 
 // ---------- Validação da entrada de pedido ----------
 const uuid = z.string().uuid()
@@ -186,7 +281,13 @@ export const orderInputSchema = z
     customerName: z
       .string()
       .transform(sanitizeString)
-      .pipe(z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(100, "Nome muito longo")),
+      .pipe(
+        z
+          .string()
+          .min(2, "Nome deve ter no mínimo 2 caracteres")
+          .max(100, "Nome muito longo")
+          .regex(NAME_ALLOWED, "Use só letras no nome"),
+      ),
     customerPhone: z
       .string()
       .optional()
@@ -200,6 +301,8 @@ export const orderInputSchema = z
       .optional()
       .transform((v) => (v ? v : null))
       .pipe(z.string().uuid("Escolha um bairro da lista").nullable()),
+    // Entrega por km: endereço por partes (o servidor localiza e calcula a distância)
+    addressParts: addressPartsSchema.nullable().optional().transform((v) => v ?? null),
     paymentMethod: z.enum(["pix", "cash", "card_on_delivery"]).default("pix"),
     changeFor: z
       .string()

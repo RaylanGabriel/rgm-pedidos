@@ -38,6 +38,8 @@ export default async function ConfiguracoesPage() {
                 name: store.name,
                 phone: store.phone,
                 address: store.address,
+                instagram: store.instagram,
+                facebook: store.facebook,
                 logoUrl: store.logoUrl,
                 coverUrl: store.coverUrl,
                 primaryColor: store.primaryColor,
@@ -70,7 +72,7 @@ export default async function ConfiguracoesPage() {
                   </a>
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={`/loja/${store.slug}`} target="_blank">
+                  <Link href={storeUrl} target="_blank">
                     <ExternalLink className="w-4 h-4" />
                     Abrir cardápio
                   </Link>

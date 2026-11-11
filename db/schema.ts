@@ -1,8 +1,10 @@
 import { relations, sql } from "drizzle-orm"
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -38,6 +40,7 @@ export const memberRole = pgEnum("member_role", ["owner", "staff"])
 export const deliveryPricing = pgEnum("delivery_pricing", [
   "fixed", // mesma taxa para qualquer endereço
   "zones", // taxa por bairro (tabela delivery_zones)
+  "distance", // taxa por distância em km (tabela delivery_distance_tiers + stores.location)
 ])
 
 // ---------- Plataforma ----------
@@ -66,7 +69,13 @@ export const stores = pgTable(
     primaryColor: text("primary_color").notNull().default("#f97316"),
     phone: text("phone"),
     address: text("address"), // endereço para retirada (mostrado ao cliente)
-    isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja
+    instagram: text("instagram"), // só o usuário, sem @ (ex.: "mrsmash")
+    facebook: text("facebook"), // caminho depois de facebook.com/ (ex.: "mrsmash" ou "profile.php?id=123")
+    isOpen: boolean("is_open").notNull().default(true), // dono abre/fecha a loja (no automático: o ajuste manual)
+    // Horário automático (lib/hours.ts): { "0": [["18:00","23:30"]], ... }; manual_until = até quando vale o "Fechar/Abrir agora"
+    hoursEnabled: boolean("hours_enabled").notNull().default(false),
+    openingHours: jsonb("opening_hours"),
+    manualUntil: timestamp("manual_until", { withTimezone: true }),
     active: boolean("active").notNull().default(true), // plataforma suspende (inadimplência)
     suspendedReason: text("suspended_reason"), // mensagem mostrada ao dono/equipe quando suspensa
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
@@ -77,6 +86,8 @@ export const stores = pgTable(
     deliveryPricing: deliveryPricing("delivery_pricing").notNull().default("fixed"),
     deliveryFixedFee: numeric("delivery_fixed_fee", { precision: 10, scale: 2 }).notNull().default("0"),
     deliveryMinOrder: numeric("delivery_min_order", { precision: 10, scale: 2 }).notNull().default("0"),
+    // Ponto da loja para a entrega por km: { lat, lng, label, city, state, source: "address" | "device" }
+    location: jsonb("location"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("stores_slug_unique").on(t.slug)],
@@ -209,7 +220,50 @@ export const deliveryZones = pgTable(
   (t) => [uniqueIndex("delivery_zones_store_name_unique").on(t.storeId, sql`lower(${t.name})`)],
 )
 
+/** Faixas da entrega por distância: "até X km → R$ Y" (quando stores.delivery_pricing = 'distance'). */
+export const deliveryDistanceTiers = pgTable(
+  "delivery_distance_tiers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    upToKm: numeric("up_to_km", { precision: 5, scale: 1 }).notNull(),
+    fee: numeric("fee", { precision: 10, scale: 2 }).notNull(),
+  },
+  (t) => [uniqueIndex("delivery_distance_tiers_store_km_unique").on(t.storeId, t.upToKm)],
+)
+
+/**
+ * Endereços já localizados (OpenStreetMap/Nominatim), para não consultar de novo (limite de 1/s) e para o
+ * servidor chegar na mesma distância do orçamento ao criar o pedido. A chave é um hash: não guarda o endereço.
+ */
+export const geocodeCache = pgTable("geocode_cache", {
+  key: text("key").primaryKey(), // sha256 do endereço normalizado
+  lat: doublePrecision("lat"), // null = não encontrado (evita repetir a consulta)
+  lng: doublePrecision("lng"),
+  precise: boolean("precise").notNull().default(false), // achou o número da casa (senão, o meio da rua)
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+})
+
 // ---------- Pedidos ----------
+/**
+ * Conta do Mercado Pago conectada pela loja (OAuth). Tokens criptografados (AES-256-GCM, lib/crypto.ts).
+ * Uma conta por loja; o Pix do pedido cai direto na conta do dono.
+ */
+export const storePaymentAccounts = pgTable("store_payment_accounts", {
+  storeId: uuid("store_id")
+    .primaryKey()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  mpUserId: text("mp_user_id").notNull(), // id do vendedor no Mercado Pago (chega nos webhooks)
+  accessTokenEnc: text("access_token_enc").notNull(),
+  refreshTokenEnc: text("refresh_token_enc"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  liveMode: boolean("live_mode").notNull().default(false), // false = conta/credencial de teste
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+  connectedBy: uuid("connected_by").references(() => users.id, { onDelete: "set null" }),
+})
+
 export const orders = pgTable(
   "orders",
   {
@@ -224,6 +278,7 @@ export const orders = pgTable(
     type: orderType("type").notNull().default("pickup"),
     deliveryAddress: text("delivery_address"),
     deliveryZoneName: text("delivery_zone_name"), // bairro no momento do pedido (cópia)
+    deliveryDistanceKm: numeric("delivery_distance_km", { precision: 6, scale: 2 }), // entrega por km: distância calculada
     status: orderStatus("status").notNull().default("pending"),
     paymentMethod: paymentMethod("payment_method").notNull().default("pix"),
     paymentStatus: paymentStatus("payment_status").notNull().default("pending"),
@@ -231,6 +286,11 @@ export const orders = pgTable(
     deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }).notNull().default("0"),
     total: numeric("total", { precision: 10, scale: 2 }).notNull(),
     changeFor: numeric("change_for", { precision: 10, scale: 2 }), // dinheiro: "troco para R$ ___"
+    // Pix online (Mercado Pago da loja)
+    mpOrderId: text("mp_order_id"), // id da order no Mercado Pago
+    pixCode: text("pix_code"), // Pix copia e cola
+    pixExpiresAt: timestamp("pix_expires_at", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     estimatedWaitMinutes: integer("estimated_wait_minutes").notNull(),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -243,6 +303,7 @@ export const orders = pgTable(
   (t) => [
     uniqueIndex("orders_store_number_unique").on(t.storeId, t.orderNumber),
     uniqueIndex("orders_public_token_unique").on(t.publicToken),
+    index("orders_mp_order_idx").on(t.mpOrderId),
     index("orders_store_status_created_idx").on(t.storeId, t.status, t.createdAt),
   ],
 )

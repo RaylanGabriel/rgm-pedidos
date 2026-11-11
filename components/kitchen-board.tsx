@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { NotifyWhatsApp, notifyKind } from "@/components/notify-whatsapp"
 import { updateOrderStatusAction } from "@/app/admin/actions"
 import { formatTimeSP } from "@/lib/dates"
 import { formatPhone } from "@/lib/links"
@@ -87,14 +88,23 @@ function chime() {
   }
 }
 
+/** Pedido entra na fila quando foi feito — ou, no Pix online, quando foi pago. */
+const queuedAt = (o: OrderWithItemsView) => o.paidAt ?? o.createdAt
+
 export function KitchenBoard({
   storeName,
   active,
   finished,
+  awaitingPayment = [],
+  publicOrigin = null,
 }: {
   storeName: string
+  /** Endereço público da loja (mrsmash.rgm.dev.br) para o link de acompanhamento no WhatsApp */
+  publicOrigin?: string | null
   active: OrderWithItemsView[]
   finished: OrderWithItemsView[]
+  /** Pix online gerado e ainda não pago: não entra na fila até pagar */
+  awaitingPayment?: OrderWithItemsView[]
 }) {
   const router = useRouter()
   const now = useNow()
@@ -115,7 +125,7 @@ export function KitchenBoard({
       const col = COLUMN_OF[o.status]
       if (col) g[col].push(o)
     }
-    for (const k of Object.keys(g) as Column[]) g[k].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) // mais antigo primeiro
+    for (const k of Object.keys(g) as Column[]) g[k].sort((a, b) => queuedAt(a).localeCompare(queuedAt(b))) // mais antigo primeiro (Pix: desde o pagamento)
     return g
   }, [orders])
 
@@ -255,6 +265,8 @@ export function KitchenBoard({
         </div>
       </header>
 
+      {awaitingPayment.length > 0 && <AwaitingPix orders={awaitingPayment} now={now} />}
+
       {error && (
         <div role="alert" className="mx-3 mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive sm:mx-4">
           {error}
@@ -282,7 +294,7 @@ export function KitchenBoard({
                     {c.status === "pending" ? "Nenhum pedido novo. Assim que chegar, aparece aqui." : "Nada por aqui."}
                   </p>
                 ) : (
-                  list.map((o) => <OrderCard key={o.id} order={o} now={now} storeName={storeName} onMove={move} />)
+                  list.map((o) => <OrderCard key={o.id} order={o} now={now} storeName={storeName} publicOrigin={publicOrigin} onMove={move} />)
                 )}
               </div>
             </section>
@@ -332,15 +344,17 @@ function OrderCard({
   order,
   now,
   storeName,
+  publicOrigin,
   onMove,
 }: {
   order: OrderWithItemsView
   now: number
   storeName: string
+  publicOrigin: string | null
   onMove: (order: OrderWithItemsView, status: OrderStatus) => void
 }) {
   const status = order.status
-  const waited = minutesSince(order.createdAt, now)
+  const waited = minutesSince(queuedAt(order), now)
   const cooking = status === "pending" || status === "preparing"
   const late = cooking && waited >= order.estimatedWaitMinutes
   const veryLate = cooking && waited >= order.estimatedWaitMinutes + 10
@@ -437,7 +451,11 @@ function OrderCard({
       )}
 
       <div className="mt-3 flex items-center justify-between px-4 text-xs text-muted-foreground">
-        <span>{PAYMENT_LABEL[order.paymentMethod]}</span>
+        {order.paidAt ? (
+          <span className="rounded-full bg-green-100 px-2 py-0.5 font-semibold text-green-900 dark:bg-green-950 dark:text-green-200">✓ Pix pago</span>
+        ) : (
+          <span>{PAYMENT_LABEL[order.paymentMethod]}</span>
+        )}
         <span className="text-sm font-bold text-foreground tabular-nums">{formatBRL(order.total)}</span>
       </div>
       {changeText(order) && (
@@ -447,15 +465,18 @@ function OrderCard({
       )}
 
       <div className="space-y-2 p-4 pt-3">
+        {/* Pronto/saiu: o próximo passo é avisar o cliente, então o aviso vem antes do botão de concluir */}
+        {notifyKind(order) !== "chat" && <NotifyWhatsApp order={order} storeName={storeName} publicOrigin={publicOrigin} />}
         <Button className={cn("h-12 w-full rounded-xl text-base font-bold", primary.cls)} onClick={() => next && onMove(order, next)}>
           <primary.icon className="h-5 w-5" aria-hidden />
           {primary.label}
         </Button>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => printOrder(order, storeName)}>
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>
+          {notifyKind(order) === "chat" && <NotifyWhatsApp order={order} storeName={storeName} publicOrigin={publicOrigin} />}
           {prev && (
             <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => onMove(order, prev)} title={`Voltar para "${STATUS_LABEL[prev]}"`}>
               <Undo2 className="h-4 w-4" />
@@ -469,5 +490,65 @@ function OrderCard({
         </div>
       </div>
     </article>
+  )
+}
+
+/**
+ * Pix gerado e ainda não pago: uma linha só (quantidade + valor + o que vence primeiro), que abre a lista ao tocar.
+ * Não ocupa o quadro — são pedidos que talvez nem sejam pagos.
+ */
+const itemCount = (o: OrderWithItemsView) => o.items.reduce((n, i) => n + i.quantity, 0)
+
+function AwaitingPix({ orders, now }: { orders: OrderWithItemsView[]; now: number }) {
+  const [open, setOpen] = useState(false)
+  const list = [...orders].sort((a, b) => (a.pixExpiresAt ?? "").localeCompare(b.pixExpiresAt ?? ""))
+  const total = list.reduce((s, o) => s + o.total, 0)
+  const next = list[0]?.pixExpiresAt
+  const minsLeft = (iso: string | null) => (iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - now) / 60_000)) : null)
+  return (
+    <div className="border-b bg-sky-50 text-sky-950 dark:bg-sky-950 dark:text-sky-100">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm sm:px-4"
+      >
+        <span aria-hidden>💳</span>
+        <span className="min-w-0 flex-1 truncate">
+          <strong>
+            {list.length} aguardando Pix
+          </strong>{" "}
+          · {formatBRL(total)}
+          {next && <span className="opacity-80"> · próximo vence em {minsLeft(next)} min</span>}
+        </span>
+        <span className="shrink-0 text-xs font-semibold underline underline-offset-2">{open ? "Esconder" : "Ver"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 sm:px-4">
+          <ul className="max-h-60 divide-y divide-sky-200 overflow-y-auto rounded-lg bg-white/70 text-sm dark:divide-sky-900 dark:bg-black/20">
+            {list.map((o) => (
+              <li key={o.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="min-w-0 truncate">
+                  <strong>#{o.orderNumber}</strong> {o.customerName} · {itemCount(o)} {itemCount(o) === 1 ? "item" : "itens"}
+                </span>
+                <span className="flex shrink-0 items-center gap-3 tabular-nums">
+                  <span>
+                    {formatBRL(o.total)} <span className="text-xs opacity-75">· {minsLeft(o.pixExpiresAt)} min</span>
+                  </span>
+                  <Link
+                    href={`/admin/pedidos/pix/${o.publicToken}`}
+                    className="rounded-md px-1.5 py-1 text-xs font-semibold underline underline-offset-2 hover:bg-sky-100 dark:hover:bg-sky-900"
+                    aria-label={`Mostrar o QR do Pix do pedido ${o.orderNumber}`}
+                  >
+                    QR
+                  </Link>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs opacity-80">Entram em Novos sozinhos quando o pagamento cair. Se vencer, são cancelados.</p>
+        </div>
+      )}
+    </div>
   )
 }

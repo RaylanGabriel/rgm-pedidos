@@ -39,7 +39,13 @@ export function proxy(request: NextRequest) {
       const panel = panelOrigin()
       if (panel) return redirect(`${panel}${pathname}${search}`)
     }
-    const isGlobal = GLOBAL_PREFIXES.some((p) => pathname.startsWith(p)) || pathname.startsWith("/loja/")
+    // Link no formato antigo (/loja/<slug>/...): mesma loja → caminho curto; outra loja → endereço dela
+    const legacyPath = pathname.match(/^\/loja\/([a-z0-9-]+)(\/.*)?$/)
+    if (legacyPath) {
+      const target = legacyPath[1] === host.slug ? `https://${request.headers.get("host")}` : storeOrigin(legacyPath[1])
+      if (target) return redirect(`${target}${legacyPath[2] ?? "/"}${search}`)
+    }
+    const isGlobal = GLOBAL_PREFIXES.some((p) => pathname.startsWith(p))
     if (!isGlobal) {
       const url = request.nextUrl.clone()
       url.pathname = `/loja/${host.slug}${pathname === "/" ? "" : pathname}`
@@ -47,7 +53,13 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  if (host.kind === "panel" && pathname === "/") return redirect(`${panelOrigin()}/admin`)
+  if (host.kind === "panel") {
+    if (pathname === "/") return redirect(`${panelOrigin()}/admin`)
+    // Cardápio aberto pelo painel → endereço da loja
+    const m = pathname.match(/^\/loja\/([a-z0-9-]+)(\/.*)?$/)
+    const store = m && storeOrigin(m[1])
+    if (store) return redirect(`${store}${m[2] ?? "/"}${search}`)
+  }
 
   const isAdmin = pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")
   return withHeaders(

@@ -1,14 +1,29 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog } from "lucide-react"
+import { Clock, ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog, Wallet } from "lucide-react"
 import { toggleStoreOpenAction } from "./actions"
 import Image from "next/image"
 import { requireStore } from "@/lib/auth/session"
+import { storeUrl } from "@/lib/site-url"
+import { storeOpenState, whenLabel } from "@/lib/hours"
 import { Button } from "@/components/ui/button"
 
 export default async function AdminPage() {
   const { store, user, role, isSupport } = await requireStore()
   const canManage = role === "owner" || user.isSuperadmin
+  const menuUrl = await storeUrl(store.slug)
+  const now = new Date()
+  const openState = storeOpenState(store, now)
+  const isOpen = openState.open
+  const when = openState.changeAt ? whenLabel(openState.changeAt, now) : null
+  const statusText = openState.manual
+    ? `${isOpen ? "Aberta" : "Fechada"} por você até ${when}; depois volta ao horário automático.`
+    : openState.auto
+      ? `Horário automático · ${isOpen ? "fecha" : "abre"} ${when}.`
+      : isOpen
+        ? "Recebendo pedidos pelo site."
+        : "O site mostra o cardápio, mas não aceita pedidos."
+  const toggleLabel = openState.manual ? "Voltar ao horário" : store.hoursEnabled ? (isOpen ? "Fechar agora" : "Abrir agora") : isOpen ? "Fechar loja" : "Abrir loja"
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
@@ -64,26 +79,32 @@ export default async function AdminPage() {
           <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span
-                className={`h-3 w-3 rounded-full shrink-0 ${store.isOpen ? "bg-green-500" : "bg-muted-foreground"}`}
+                className={`h-3 w-3 rounded-full shrink-0 ${isOpen ? "bg-green-500" : "bg-muted-foreground"}`}
                 aria-hidden
               />
               <div>
-                <p className="font-semibold">{store.isOpen ? "Loja aberta" : "Loja fechada"}</p>
-                <p className="text-sm text-muted-foreground">
-                  {store.isOpen ? "Recebendo pedidos pelo site." : "O site mostra o cardápio, mas não aceita pedidos."}
-                </p>
+                <p className="font-semibold">{isOpen ? "Loja aberta" : "Loja fechada"}</p>
+                <p className="text-sm text-muted-foreground">{statusText}</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline" size="sm">
-                <Link href={`/loja/${store.slug}`} target="_blank">
+                <Link href={menuUrl} target="_blank">
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Ver cardápio
                 </Link>
               </Button>
+              {canManage && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/admin/horarios">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Horários
+                  </Link>
+                </Button>
+              )}
               <form action={toggleStoreOpenAction}>
-                <Button type="submit" size="sm" variant={store.isOpen ? "outline" : "default"}>
-                  {store.isOpen ? "Fechar loja" : "Abrir loja"}
+                <Button type="submit" size="sm" variant={isOpen || openState.manual ? "outline" : "default"}>
+                  {toggleLabel}
                 </Button>
               </form>
             </div>
@@ -197,6 +218,23 @@ export default async function AdminPage() {
             </Link>
           )}
 
+          {canManage && (
+            <Link href="/admin/pagamentos" className="group">
+              <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-accent">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
+                    <Wallet className="w-6 h-6 text-accent-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Pagamentos</CardTitle>
+                  <CardDescription>Pix pelo Mercado Pago</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Conecte sua conta: o cliente paga o Pix pelo site e o pedido só entra na cozinha depois de pago</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
           {user.isSuperadmin && (
             <Link href="/admin/lojas" className="group">
               <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 border-dashed hover:border-primary">
@@ -216,7 +254,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="mt-12 text-center">
-          <Link href={`/loja/${store.slug}`} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link href={menuUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Ver site do cliente →
           </Link>
         </div>

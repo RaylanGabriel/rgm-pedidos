@@ -5,6 +5,7 @@ import { Store } from "lucide-react"
 import { getDeliveryConfig, getMenu, getStoreBySlug, getSuspendedStoreName, publicStore } from "@/lib/orders"
 import { StoreFooter, StoreHero } from "@/components/store/store-header"
 import { StoreMenu } from "./store-menu"
+import { storeBase } from "@/lib/site-url"
 
 type Props = { params: Promise<{ slug: string }> }
 
@@ -30,7 +31,7 @@ export default async function LojaPage({ params }: Props) {
     )
   }
   const [menu, delivery] = await Promise.all([getMenu(store.id), getDeliveryConfig(store)])
-  const pub = publicStore(store)
+  const pub = publicStore(store, await storeBase(slug))
 
   return (
     <div style={brandStyle(pub.primaryColor)} className="min-h-screen flex flex-col bg-background">

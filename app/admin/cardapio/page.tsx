@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ActionButton } from "@/components/admin/form-ui"
 import { requireStore } from "@/lib/auth/session"
+import { storeUrl } from "@/lib/site-url"
 import { formatBRL } from "@/lib/order-shared"
 import {
   deleteCategoryAction,
@@ -62,7 +63,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/loja/${store.slug}`} target="_blank">
+            <Link href={await storeUrl(store.slug)} target="_blank">
               <ExternalLink className="w-4 h-4 mr-2" />
               Ver como cliente
             </Link>

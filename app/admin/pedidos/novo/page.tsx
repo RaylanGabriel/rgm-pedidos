@@ -3,13 +3,14 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { NewOrderForm } from "@/components/new-order-form"
 import { requireStore } from "@/lib/auth/session"
+import { getAccountInfo } from "@/lib/mercadopago"
 import { getDeliveryConfig, getMenu } from "@/lib/orders"
 
 export const metadata = { title: "Novo pedido" }
 
 export default async function NovoPedidoPage() {
   const { store } = await requireStore()
-  const [menu, delivery] = await Promise.all([getMenu(store.id), getDeliveryConfig(store)])
+  const [menu, delivery, mp] = await Promise.all([getMenu(store.id), getDeliveryConfig(store), getAccountInfo(store.id)])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
@@ -26,7 +27,7 @@ export default async function NovoPedidoPage() {
           <p className="text-muted-foreground">Lançar um pedido feito no balcão.</p>
         </div>
 
-        <NewOrderForm menu={menu} delivery={delivery} />
+        <NewOrderForm menu={menu} delivery={delivery} slug={store.slug} pixOnline={!!mp} />
       </div>
     </div>
   )

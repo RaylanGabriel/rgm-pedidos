@@ -18,7 +18,7 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
   const [cartOpen, setCartOpen] = useState(false)
   const count = cart.lines.reduce((s, l) => s + l.quantity, 0)
   const total = cartTotal(cart.lines)
-  const checkoutHref = `/loja/${store.slug}/finalizar`
+  const checkoutHref = `${store.base}/finalizar`
 
   const checkoutButton = store.isOpen ? (
     <Button asChild size="lg" className="h-12 w-full rounded-full text-base font-semibold">
@@ -36,8 +36,8 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
     <div className={`container mx-auto max-w-6xl px-4 pb-8 ${count > 0 ? "pb-32 lg:pb-8" : ""}`}>
       {!store.isOpen && (
         <div role="status" className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-          <p className="font-semibold">A loja está fechada agora</p>
-          <p className="text-sm text-muted-foreground">Dá para ver o cardápio, mas os pedidos estão pausados.</p>
+          <p className="font-semibold">A loja está fechada agora{store.openLabel ? ` · ${store.openLabel.toLowerCase()}` : ""}</p>
+          <p className="text-sm text-muted-foreground">Dá para ver o cardápio e montar o carrinho; o pedido é feito quando a loja abrir.</p>
         </div>
       )}
 
