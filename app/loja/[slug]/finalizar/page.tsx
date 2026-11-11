@@ -18,7 +18,7 @@ export default async function FinalizarPage({ params }: { params: Promise<{ slug
     <div style={brandStyle(pub.primaryColor)} className="min-h-screen flex flex-col bg-background">
       <StoreHeader store={pub} />
       <main className="flex-1">
-        <CheckoutForm store={pub} menu={menu} delivery={delivery} pixOnline={!!mp} />
+        <CheckoutForm store={pub} menu={menu} delivery={delivery} pixOnline={!!mp && !mp.needsReconnect} />
       </main>
       <StoreFooter store={pub} />
     </div>

@@ -27,7 +27,7 @@ export default async function NovoPedidoPage() {
           <p className="text-muted-foreground">Lançar um pedido feito no balcão.</p>
         </div>
 
-        <NewOrderForm menu={menu} delivery={delivery} slug={store.slug} pixOnline={!!mp} />
+        <NewOrderForm menu={menu} delivery={delivery} slug={store.slug} pixOnline={!!mp && !mp.needsReconnect} />
       </div>
     </div>
   )

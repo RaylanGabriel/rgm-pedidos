@@ -25,7 +25,10 @@ type SP = Promise<{ ok?: string; erro?: string }>
 export default async function PagamentosPage({ searchParams }: { searchParams: SP }) {
   const { store, user } = await requireOwner()
   const sp = await searchParams
-  const account = await getAccountInfo(store.id)
+  const connected = await getAccountInfo(store.id)
+  // Conectada no modo de teste com a plataforma já em produção: vale como "não conectada" (precisa reconectar)
+  const stale = connected?.needsReconnect ? connected : null
+  const account = stale ? null : connected
   const msg = sp.ok ? MESSAGES[`ok=${sp.ok}`] : sp.erro ? MESSAGES[`erro=${sp.erro}`] : undefined
   const configured = mpConfigured()
 
@@ -57,6 +60,18 @@ export default async function PagamentosPage({ searchParams }: { searchParams: S
           <p className="rounded-lg bg-amber-100 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
             <strong>Modo de teste:</strong> os Pix gerados são de mentira e se aprovam sozinhos. Nenhum dinheiro de verdade é cobrado.
           </p>
+        )}
+
+        {stale && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-100 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+            <span>
+              <strong>Reconecte o Mercado Pago:</strong> a conta ligada era de teste e não recebe Pix de verdade. Enquanto isso, o Pix é
+              pago direto com a loja.
+            </span>
+            <ActionButton action={disconnectMercadoPagoAction} variant="outline" size="sm">
+              Remover conta de teste
+            </ActionButton>
+          </div>
         )}
 
         <Card>
@@ -93,6 +108,7 @@ export default async function PagamentosPage({ searchParams }: { searchParams: S
                   <li>• O dinheiro cai na <strong className="text-foreground">sua</strong> conta do Mercado Pago, não passa pela plataforma.</li>
                   <li>• O pedido só vai para a cozinha depois de pago: acabou o "paguei, mas não caiu".</li>
                   <li>• Você não precisa conferir comprovante.</li>
+                  <li>• Sua conta do Mercado Pago precisa ter uma <strong className="text-foreground">chave Pix</strong> cadastrada.</li>
                 </ul>
                 {configured ? (
                   <Button asChild size="lg" className="w-full sm:w-auto">

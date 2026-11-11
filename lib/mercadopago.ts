@@ -90,19 +90,22 @@ export async function disconnectStore(storeId: string) {
   await db.delete(storePaymentAccounts).where(eq(storePaymentAccounts.storeId, storeId))
 }
 
+/** Conta conectada (para mostrar no painel). needsReconnect = conectada em teste, mas a plataforma já está em produção. */
 export async function getAccountInfo(storeId: string) {
   const [row] = await db
     .select({ mpUserId: storePaymentAccounts.mpUserId, liveMode: storePaymentAccounts.liveMode, connectedAt: storePaymentAccounts.connectedAt, expiresAt: storePaymentAccounts.expiresAt })
     .from(storePaymentAccounts)
     .where(eq(storePaymentAccounts.storeId, storeId))
     .limit(1)
-  return row ?? null
+  return row ? { ...row, needsReconnect: !mpTestMode() && !row.liveMode } : null
 }
 
 /** Token válido da loja (renova sozinho quando faltar menos de 7 dias). null = loja sem Mercado Pago. */
 export async function storeAccessToken(storeId: string): Promise<string | null> {
   const [row] = await db.select().from(storePaymentAccounts).where(eq(storePaymentAccounts.storeId, storeId)).limit(1)
   if (!row) return null
+  // Em produção, conexão feita no modo de teste não vale (geraria Pix de mentira): a loja precisa reconectar
+  if (!mpTestMode() && !row.liveMode) return null
   const soon = Date.now() + 7 * 86400_000
   if (row.expiresAt.getTime() > soon || !row.refreshTokenEnc) return decryptSecret(row.accessTokenEnc)
   try {
