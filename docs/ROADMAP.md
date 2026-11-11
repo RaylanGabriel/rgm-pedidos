@@ -214,6 +214,18 @@ conseguir explicar sozinho numa entrevista:
 - **Banco e deploy:** migrations, branches `production`/`preview` do Neon, preview da Vercel.
 - Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
 
+## ⏳ 7. Equipe: o dono cria o login dos funcionários
+**Quando:** o primeiro cliente pedir ou antes da segunda loja pagante (o que vier antes). Até lá, o super admin cria
+pelo terminal: `npm run user:create -- --email x --name "Nome" --store <slug> --role staff`.
+**Por que importa:** sem isso o dono deixa o próprio login aberto no tablet da cozinha (qualquer um vê faturamento,
+muda preço, desconecta o Mercado Pago).
+- Tela `/admin/equipe` (só dono): adicionar funcionário (nome + e-mail) com **senha provisória** mostrada uma vez e troca
+  obrigatória no 1º acesso (já existe `must_change_password`); lista com quem já entrou; gerar nova senha; remover acesso
+  (apaga as sessões na hora); opcional: promover a dono (sócio).
+- Permissões de funcionário já existem: cozinha, balcão (com Pix), esgotado/disponível, abrir/fechar. Não vê relatórios,
+  configurações, entrega, horários, pagamentos nem edição do cardápio.
+- Avaliar com o cliente: um login por pessoa ou um "login do tablet da cozinha".
+
 ## 💭 Depois
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
