@@ -174,6 +174,10 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
   horário que passa da meia-noite (18:00 → 02:00), "copiar para todos". O cardápio mostra "Fecha às 23:30" / "Abre amanhã
   às 18:00" e os horários no rodapé. "Fechar agora / Abrir agora" no painel vale só até o próximo horário
   (`stores.manual_until`) e depois volta ao automático. A regra é conferida no servidor ao criar o pedido.
+- **Avisar o cliente no WhatsApp** pela cozinha (`components/notify-whatsapp.tsx`): botão verde "Avisar que pode retirar" /
+  "Avisar que saiu para entrega" abre o WhatsApp com a mensagem pronta (+ link de acompanhamento na entrega). Grátis: quem
+  envia é o funcionário, sem a API paga. Depois de tocar mostra "Avisado" (lembrado no aparelho). Nas outras etapas, atalho
+  com o ícone do WhatsApp para conversar.
 
 ## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 Aplicação **RGM_PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
@@ -221,7 +225,6 @@ conseguir explicar sozinho numa entrevista:
 - Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
 
 ## 💭 Depois
-- Notificação no WhatsApp quando o pedido fica pronto.
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
 

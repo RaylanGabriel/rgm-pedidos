@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { NotifyWhatsApp, notifyKind } from "@/components/notify-whatsapp"
 import { updateOrderStatusAction } from "@/app/admin/actions"
 import { formatTimeSP } from "@/lib/dates"
 import { formatPhone } from "@/lib/links"
@@ -459,15 +460,18 @@ function OrderCard({
       )}
 
       <div className="space-y-2 p-4 pt-3">
+        {/* Pronto/saiu: o próximo passo é avisar o cliente, então o aviso vem antes do botão de concluir */}
+        {notifyKind(order) !== "chat" && <NotifyWhatsApp order={order} storeName={storeName} />}
         <Button className={cn("h-12 w-full rounded-xl text-base font-bold", primary.cls)} onClick={() => next && onMove(order, next)}>
           <primary.icon className="h-5 w-5" aria-hidden />
           {primary.label}
         </Button>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => printOrder(order, storeName)}>
             <Printer className="h-4 w-4" />
             Imprimir
           </Button>
+          {notifyKind(order) === "chat" && <NotifyWhatsApp order={order} storeName={storeName} />}
           {prev && (
             <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => onMove(order, prev)} title={`Voltar para "${STATUS_LABEL[prev]}"`}>
               <Undo2 className="h-4 w-4" />
