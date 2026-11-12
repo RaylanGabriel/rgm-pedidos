@@ -20,10 +20,13 @@ DNS e produção na Cloudflare de uma vez; a Vercel sai depois.
 - [x] Zona ativa (16:45 UTC); certificado Let's Encrypt `rgm.dev.br` + `*.rgm.dev.br` saiu ~15 min depois. Teste HTTPS
       de todos os domínios ok (raiz/www → painel; painel → login; loja, finalizar, links antigos, 404s; webhook 401/401)
 - [x] Domínio `fotos.rgm.dev.br` ligado ao bucket `rgm-pedidos-fotos` (`wrangler r2 bucket domain add`)
-- [ ] **A rota `*.rgm.dev.br/*` do Worker intercepta `fotos.rgm.dev.br`** (404 do Next; aparece no tail). Correção: rota
-      mais específica `fotos.rgm.dev.br/*` **sem Worker** (Raylan, no painel). Conferir foto 200 sem passar pelo Worker
-- [ ] Fotos: `fotos:r2 -- copiar`, `conferir`, `trocar-urls --valer`
-- [ ] Testes: raiz, `www`, `painel`, loja, fotos, login, pedido com Pix de teste no preview, webhook do Mercado Pago, "Conectar Mercado Pago"
+- [x] **A rota `*.rgm.dev.br/*` do Worker interceptava `fotos.rgm.dev.br`** (404 do Next; aparecia no tail). Corrigido
+      com a rota mais específica `fotos.rgm.dev.br/*` **sem Worker** (Raylan, no painel). Foto: 200, `image/webp`, cache de
+      1 ano, SHA igual ao do Blob, nenhum acesso no Worker
+- [x] Fotos: `copiar` (19 iguais), `conferir` (0 divergentes), `trocar-urls --valer` (19; backup em `backups/`).
+      Cardápio: 0 fotos do Blob, 19 do R2, todas 200
+- [x] Testes: raiz, `www`, `painel`, loja, fotos, webhook, Pix real. "Conectar Mercado Pago" de terceiros continua
+      dependendo da etapa 4 do Mercado Pago (não muda com a Cloudflare)
 - [x] Raylan: Pix real (R$ 0,70, 12/nov 16:54 UTC): pedido criado na Cloudflare, webhook do Mercado Pago chegou
       (200) e marcou pago em 47 s; status mudado no painel. Logs: 2 exceções "Network connection lost" em pré-carregamento
       `_rsc` do painel, cancelado pelo navegador (a mesma página abriu com 200 um segundo depois); não é bug

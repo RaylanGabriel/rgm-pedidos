@@ -4,11 +4,10 @@ Plano para levar o RGM Pedidos da Vercel para a Cloudflare **antes do primeiro c
 funciona (domínios por loja, Pix, webhook, fotos) e ganhando segurança, tarefas agendadas e custo menor.
 Nada é desligado na Vercel até a Cloudflare estar testada e no ar — dá para voltar atrás em minutos.
 
-> Status (11/nov/2026): **fases 1 e 2 prontas; fase 3 em teste.** Branch `feat/cloudflare-workers` no ar em
-> https://rgm-pedidos-preview.raylanmiranda1.workers.dev (banco `preview`, Pix de teste), publicada pelo Workers Builds.
-> Testado lá: cardápio, checkout, painel inteiro, Excel, token MP, webhook 401, cache dos estáticos e upload/exclusão
-> de foto no R2. Domínios testados no runtime local. Worker: 2,6 MB comprimido, início em 15 ms.
-> Ver "Decisões tomadas na fase 2" no fim.
+> Status (12/nov/2026): **produção na Cloudflare.** Como o site ainda não tinha clientes, o corte foi direto, sem
+> transição gradual nem reserva na Vercel. `rgm.dev.br` e `*.rgm.dev.br` → Worker `rgm-pedidos` (rotas); fotos em
+> `fotos.rgm.dev.br` (bucket R2). Testado em produção: todos os domínios, HTTPS, Pix real aprovado via webhook,
+> 19 fotos servidas pelo R2. Falta a faxina (tirar a Vercel do código e da conta). Ver seções 10 e 11.
 
 ---
 
@@ -205,3 +204,21 @@ No dia do corte, nesta ordem:
 
 Conectar o repositório não dispara build: só o próximo push. Para consultar builds pela API há um token só de leitura
 em `.env.cloudflare` (fora do Git e não lido pelo Next).
+
+## 11. O corte (12/nov/2026)
+
+| Peça | Como ficou |
+|---|---|
+| Zona `rgm.dev.br` | Cloudflare Free; nameservers `cody`/`margot.ns.cloudflare.com` no registro.br; DNSSEC desligado |
+| DNS | `AAAA 100::` **com proxy** em `@` e `*` (endereço vazio: quem responde é o Worker) + 3 `CAA` (letsencrypt, pki.goog, sectigo). `fotos` é criado pelo R2 |
+| Certificado | Universal SSL (Let's Encrypt) para `rgm.dev.br` e `*.rgm.dev.br`, saiu ~15 min após a ativação |
+| Rotas | `rgm.dev.br/*` e `*.rgm.dev.br/*` → `rgm-pedidos` (no `wrangler.jsonc`); **`fotos.rgm.dev.br/*` → nenhum Worker** (criada no painel) |
+| Fotos | domínio `fotos.rgm.dev.br` no bucket `rgm-pedidos-fotos`; 19 URLs trocadas no banco (backup `backups/fotos-urls-producao-2026-11-12T17-12-16-891Z.json`) |
+| Segredos de produção | 7 no Worker; `DATABASE_URL` copiado do `.env.prod-db` (na Vercel é "sensível" e o `vercel env pull` vem vazio) |
+
+**Armadilha:** a rota curinga `*.rgm.dev.br/*` passa na frente do domínio do R2 (a foto dava o 404 do Next).
+Qualquer subdomínio que **não** for do Worker (fotos, e-mail, outro projeto) precisa de uma rota própria
+`<sub>.rgm.dev.br/*` sem Worker. A rota mais específica vence. Essa rota fica fora do `wrangler.jsonc` e o deploy não mexe nela.
+
+Ao vivo: Pix real de R$ 0,70 aprovado em 47 s (webhook do Mercado Pago → 200 → pedido pago). Imagens do Next
+são `unoptimized`, então `/_next/image` não é usado.
