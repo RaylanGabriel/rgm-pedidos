@@ -8,7 +8,7 @@
   ao Mercado Pago/ViaCEP/Nominatim, Neon em São Paulo).
 - Compromisso novo, que vira processo manual: apagar os pedidos de uma loja em até 90 dias depois que ela sai.
 - Links: rodapé de toda loja, aviso no checkout (abre em outra aba), tela de login.
-- [ ] Teste no preview · [ ] OK do Raylan · [ ] merge · [ ] conferir `mrsmash.rgm.dev.br/termos` e `rgm.dev.br/privacidade`
+- [x] Teste no preview (páginas 200, 8 e 9 seções, rodapé, aviso no checkout em outra aba, login; visual no celular ok) · [ ] OK do Raylan · [ ] merge · [ ] conferir `mrsmash.rgm.dev.br/termos` e `rgm.dev.br/privacidade`
 
 ## Achado fora da lista: IP forjável (branch `fix/ip-cloudflare`, aguardando OK)
 - `clientIp()` lia o 1º valor do `x-forwarded-for`, que na Cloudflare vem do visitante → limites por IP burláveis
