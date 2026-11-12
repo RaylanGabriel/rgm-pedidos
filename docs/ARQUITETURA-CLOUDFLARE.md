@@ -173,10 +173,11 @@ estrutura do código e o fluxo de trabalho (branch → preview → aprovação �
 | **Variáveis públicas** | em `wrangler.jsonc` (`vars`), versionadas. Segredos via `wrangler secret` | `ROOT_DOMAIN`, `SITE_URL` etc. não são segredo; ficam revisáveis no Git |
 
 **Segredos por Worker** (mesmos nomes da Vercel): `DATABASE_URL`, `MP_CLIENT_ID`, `MP_CLIENT_SECRET`, `MP_WEBHOOK_SECRET`,
-`MP_TOKEN_KEY`, `MP_TEST_ACCESS_TOKEN`; só na produção: `MP_PROD_ACCESS_TOKEN` e, até o fim da fase 4,
-`BLOB_READ_WRITE_TOKEN` (para apagar fotos antigas do Blob).
-O preview **não** tem `BLOB_READ_WRITE_TOKEN` de propósito: o banco `preview` é cópia da produção e aponta para fotos do
-mesmo Blob — com o token, trocar a foto de um item num teste apagaria a foto real da loja.
+`MP_TOKEN_KEY`, `MP_TEST_ACCESS_TOKEN`; só na produção: `MP_PROD_ACCESS_TOKEN`.
+**Nenhum Worker tem `BLOB_READ_WRITE_TOKEN`:** o `@vercel/blob` traz o `undici`, que compila WebAssembly ao carregar
+(proibido no Workers — aparecia como "Wasm code generation disallowed" no log). Por isso `lib/storage.ts` só carrega o
+pacote quando usado (Vercel/`next dev`) e, na Cloudflare, não apaga fotos antigas do Blob — o Blob inteiro é apagado
+depois do corte. Bônus: um teste no preview nunca apaga foto real (o banco `preview` é cópia da produção).
 
 **Build no CI:** o banco é conectado no primeiro uso (`db/index.ts`), não na importação — o build da Cloudflare roda
 sem `DATABASE_URL`.
