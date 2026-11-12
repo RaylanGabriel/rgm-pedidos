@@ -5,7 +5,7 @@
 // - rgm-pedidos-preview  → testes/branches (banco Neon `preview`, Pix de teste)
 //
 // Aqui ficam só valores públicos. Segredos (DATABASE_URL, MP_CLIENT_SECRET, MP_TOKEN_KEY, ...) nunca entram neste arquivo.
-// Atenção: "vars", "services" e "r2_buckets" NÃO são herdados pelo env "preview" — mantenha os dois blocos alinhados.
+// Atenção: "routes" É herdado (por isso o preview zera); "vars", "services" e "r2_buckets" NÃO são herdados pelo env "preview" — mantenha os dois blocos alinhados.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rgm-pedidos",
@@ -14,7 +14,12 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
-  // Endereços próprios só depois da troca de DNS (fase 5); até lá, só *.workers.dev
+  // Domínio próprio: a zona rgm.dev.br está na Cloudflare com registros AAAA 100:: (com proxy) para @ e *.
+  // A rota * cobre painel, www e todas as lojas; fotos.rgm.dev.br é domínio do bucket R2 (não passa pelo Worker).
+  "routes": [
+    { "pattern": "rgm.dev.br/*", "zone_name": "rgm.dev.br" },
+    { "pattern": "*.rgm.dev.br/*", "zone_name": "rgm.dev.br" },
+  ],
   "workers_dev": true,
   "preview_urls": true,
 
@@ -32,6 +37,8 @@
   "env": {
     "preview": {
       "name": "rgm-pedidos-preview",
+      // "routes" é herdado: vazio de propósito para o preview nunca responder no domínio de produção
+      "routes": [],
       "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos-preview" }],
       // Bucket separado: um teste nunca apaga foto de loja real
       "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos-preview" }],

@@ -1,3 +1,26 @@
+# Fase 5 — corte direto para a Cloudflare (12/nov/2026)
+
+Decisão do Raylan: o site ainda não é usado por ninguém → **sem transição gradual nem reserva na Vercel**.
+DNS e produção na Cloudflare de uma vez; a Vercel sai depois.
+
+## Plano
+- [x] Zona `rgm.dev.br` na Cloudflare (Free, pendente). Nameservers: `cody.ns.cloudflare.com`, `margot.ns.cloudflare.com`
+- [x] Token só de DNS da zona (`CLOUDFLARE_DNS_TOKEN` em `.env.cloudflare`, expira em 30 dias)
+- [x] DNS: apagados os 6 `A` e o `CNAME _domainconnect` da Vercel; criados `AAAA 100::` com proxy em `@` e `*`; mantidos os 3 `CAA`
+- [x] `wrangler.jsonc`: rotas `rgm.dev.br/*` e `*.rgm.dev.br/*` na produção; preview com `routes: []` (conferido lendo a config)
+- [ ] Merge `feat/cloudflare-workers` → `main` (OK do Raylan em 12/nov; sem migração de banco)
+- [ ] Segredos do Worker `rgm-pedidos` copiados da produção da Vercel (sem o token do Blob), conferindo que o banco é o `production`
+- [ ] Raylan: Workers Builds no `rgm-pedidos` (branch `main`, builds de preview desligados); preview passa a seguir a `main`
+- [ ] Primeiro build de produção ok; teste no `rgm-pedidos.raylanmiranda1.workers.dev`
+- [ ] Raylan: nameservers no registro.br (DNSSEC desligado antes)
+- [ ] Zona ativa → domínio `fotos.rgm.dev.br` no bucket `rgm-pedidos-fotos`; conferir que a rota `*` do Worker não o intercepta
+- [ ] Fotos: `fotos:r2 -- copiar`, `conferir`, `trocar-urls --valer`
+- [ ] Testes: raiz, `www`, `painel`, loja, fotos, login, pedido com Pix de teste no preview, webhook do Mercado Pago, "Conectar Mercado Pago"
+- [ ] Raylan: Pix real de R$ 1
+- [ ] Faxina: tirar Blob/Analytics/endereço da Vercel do código, `demo:*` para o R2, apagar projeto e Blob na Vercel
+
+---
+
 # Fase 4 — fotos do Vercel Blob para o R2 (12/nov/2026)
 
 Inventário (produção, só leitura): 19 fotos no Blob (1 capa + 18 itens, 1 host); logo da loja é arquivo local
