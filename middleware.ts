@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { classifyHost, panelOrigin, storeOrigin } from "@/lib/domains"
+import { LEGAL_PATHS } from "@/lib/legal"
 
 const SESSION_COOKIE = "sid" // mesmo nome de lib/auth/session.ts
 
@@ -17,6 +18,8 @@ export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const host = classifyHost(request.headers.get("host"))
   const redirect = (url: string) => withHeaders(NextResponse.redirect(url, 308))
+  // Termos e privacidade abrem em qualquer endereço (loja, painel, raiz), sem reescrita nem redirecionamento
+  if (LEGAL_PATHS.includes(pathname)) return withHeaders(NextResponse.next())
 
   if (host.kind === "root") {
     const panel = panelOrigin()

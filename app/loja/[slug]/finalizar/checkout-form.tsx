@@ -188,6 +188,18 @@ export function CheckoutForm({
                 <span className="block text-muted-foreground">Na próxima compra o formulário já vem preenchido. Desmarque em celular compartilhado.</span>
               </span>
             </label>
+
+            <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
+              Ao confirmar, seus dados vão para a {store.name} preparar e entregar o pedido, e você concorda com os{" "}
+              <Link href="/termos" target="_blank" className="underline underline-offset-2 hover:text-foreground">
+                Termos de uso
+              </Link>{" "}
+              e a{" "}
+              <Link href="/privacidade" target="_blank" className="underline underline-offset-2 hover:text-foreground">
+                Política de privacidade
+              </Link>
+              .
+            </p>
           </div>
 
           {belowMin && (
