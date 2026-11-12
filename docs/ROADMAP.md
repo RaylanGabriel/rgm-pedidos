@@ -229,14 +229,14 @@ O plano grátis da Vercel proíbe uso comercial (site que processa pedidos/pagam
 (US$ 5/mês) — mais segurança (WAF, Turnstile, rate limit), cron, R2 e aprendizado. Arquitetura completa e plano em
 fases em [`docs/ARQUITETURA-CLOUDFLARE.md`](ARQUITETURA-CLOUDFLARE.md).
 
-## ⏳ 7. Equipe: o dono cria o login dos funcionários
-**Quando:** o primeiro cliente pedir ou antes da segunda loja pagante (o que vier antes). Até lá, o super admin cria
-pelo terminal: `npm run user:create -- --email x --name "Nome" --store <slug> --role staff`.
+## ✅ 7. Equipe: o dono cria o login dos funcionários (nov/2026, antes do 1º cliente)
 **Por que importa:** sem isso o dono deixa o próprio login aberto no tablet da cozinha (qualquer um vê faturamento,
 muda preço, desconecta o Mercado Pago).
 - Tela `/admin/equipe` (só dono): adicionar funcionário (nome + e-mail) com **senha provisória** mostrada uma vez e troca
-  obrigatória no 1º acesso (já existe `must_change_password`); lista com quem já entrou; gerar nova senha; remover acesso
-  (apaga as sessões na hora); opcional: promover a dono (sócio).
+  obrigatória no 1º acesso; lista com último login; **nova senha** (desconecta os aparelhos); **remover** (sai na hora;
+  sem outra loja, a conta é apagada). E-mail que já tem conta só é vinculado.
+- O dono só mexe em funcionários: nunca em outro dono nem em si mesmo; nova senha de quem também está em outra loja
+  fica com o suporte. Promover a dono (sócio) continua com o super admin.
 - Permissões de funcionário já existem: cozinha, balcão (com Pix), esgotado/disponível, abrir/fechar. Não vê relatórios,
   configurações, entrega, horários, pagamentos nem edição do cardápio.
 - Avaliar com o cliente: um login por pessoa ou um "login do tablet da cozinha".

@@ -26,6 +26,15 @@
 - Teste: preview da branch com sessão de dono → adicionar → entrar como funcionário (troca de senha, vê só cozinha/
   cardápio) → nova senha → remover (sessão do funcionário cai na hora).
 
+### Revisão do item 2
+- `tsc` ok. Teste no navegador (`feat-equipe-rgm-pedidos-preview…`), banco preview, 22 verificações ok: card e tela só
+  para o dono; senha provisória mostrada; e-mail repetido recusado; 1º acesso do funcionário cai em `/admin/conta`
+  (o primeiro teste conferia o endereço cedo demais); funcionário vê só Cozinha/Cardápio/Novo Pedido e é mandado de volta
+  ao painel em Equipe/Relatórios/Pagamentos/Configurações; último login na lista; nova senha desconecta o funcionário;
+  remover → aviso no topo, some da lista, sessão cai, login recusado, conta apagada; sem botões na linha do dono.
+- Achado no teste e corrigido: ao remover, a mensagem sumia junto com a linha da pessoa → agora aparece no topo.
+- Contas de teste apagadas do banco preview.
+
 ---
 
 # Faxina — tirar a Vercel do código (12/nov/2026, branch `chore/remove-vercel`)
