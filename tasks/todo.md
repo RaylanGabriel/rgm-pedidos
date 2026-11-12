@@ -1,3 +1,22 @@
+# Item 3 — termos de uso e política de privacidade (12/nov/2026, branch `feat/termos`)
+
+- `/termos` e `/privacidade` abrem em qualquer endereço (middleware: sem reescrita na loja, sem redirecionar na raiz).
+- Responsável e contato num lugar só (`lib/legal.ts`): Raylan Gabriel dos Santos Miranda, `contato@rgm.dev.br`,
+  **CPF não publicado** (nome + contato bastam; com MEI, entra o CNPJ). Sugestões minhas, a confirmar com o Raylan.
+- Papéis LGPD: loja = controladora dos dados do pedido; plataforma = operadora (e controladora das contas do painel).
+- Cada afirmação confere com o código (IP 24 h, sessão 30 dias, hash do endereço, sem cookie no cardápio, o que vai
+  ao Mercado Pago/ViaCEP/Nominatim, Neon em São Paulo).
+- Compromisso novo, que vira processo manual: apagar os pedidos de uma loja em até 90 dias depois que ela sai.
+- Links: rodapé de toda loja, aviso no checkout (abre em outra aba), tela de login.
+- [ ] Teste no preview · [ ] OK do Raylan · [ ] merge · [ ] conferir `mrsmash.rgm.dev.br/termos` e `rgm.dev.br/privacidade`
+
+## Achado fora da lista: IP forjável (branch `fix/ip-cloudflare`, aguardando OK)
+- `clientIp()` lia o 1º valor do `x-forwarded-for`, que na Cloudflare vem do visitante → limites por IP burláveis
+  (pedidos, cálculo de entrega, login por IP). Comprovado no preview (login errado registrado como `ip:9.9.9.9`).
+  Corrigido para `cf-connecting-ip`; retestado: registra o IPv6 real mesmo com o cabeçalho forjado.
+
+---
+
 # Faxina — tirar a Vercel do código (12/nov/2026, branch `chore/remove-vercel`)
 
 Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Vercel, para o Raylan apagar o projeto e o Blob.
