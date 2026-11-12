@@ -1,3 +1,19 @@
+# Item 4 — cron da Cloudflare (12/nov/2026, branch `feat/cron`)
+
+- `worker.ts` (novo `main`): Worker do OpenNext + `scheduled`, que chama POST `/api/cron` com o segredo `CRON_SECRET`
+  (aleatório, diferente em cada Worker, nunca exibido). Sem o segredo certo → 404. Cron `*/5 * * * *` nos dois Workers.
+- `lib/maintenance.ts`: para todas as lojas → fecha entregas esquecidas (1 h), cancela Pix vencido, apaga sessões
+  vencidas e tentativas com mais de 24 h (a política de privacidade promete). Um passo falhar não impede os outros.
+- **Correção de risco achada no caminho:** `cancelOverduePix` cancelava sem consultar o Mercado Pago → um Pix PAGO cujo
+  webhook falhasse seria cancelado pela cozinha. Agora consulta antes: pago → cozinha; falha de rede/MP → não cancela e
+  tenta de novo; cobrança inexistente (404) → cancela.
+- [x] Teste local (`wrangler dev --test-scheduled`, banco preview): rota sem segredo/segredo errado → 404; cron →
+      `{"entregasFechadas":1,"pixVencidosCancelados":1,"sessoesVencidasApagadas":1,"tentativasAntigasApagadas":1}`;
+      2ª execução → tudo 0. Dados de teste, `.dev.vars` e `.open-next` apagados.
+- [ ] Preview da branch · [ ] OK do Raylan · [ ] merge · [ ] confirmar nos logs da produção que o cron rodou
+
+---
+
 # Faxina — tirar a Vercel do código (12/nov/2026, branch `chore/remove-vercel`)
 
 Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Vercel, para o Raylan apagar o projeto e o Blob.

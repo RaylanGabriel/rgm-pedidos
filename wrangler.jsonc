@@ -9,7 +9,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rgm-pedidos",
-  "main": ".open-next/worker.js",
+  // worker.ts = Worker gerado pelo OpenNext (.open-next/worker.js) + o handler do cron
+  "main": "worker.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
@@ -22,6 +23,9 @@
   ],
   "workers_dev": true,
   "preview_urls": true,
+  // Manutenção a cada 5 min (lib/maintenance.ts): entregas esquecidas, Pix vencido, sessões e tentativas antigas.
+  // Precisa do segredo CRON_SECRET no Worker. Herdado pelo preview (que roda no banco de testes).
+  "triggers": { "crons": ["*/5 * * * *"] },
 
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos" }],
   "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos" }],
