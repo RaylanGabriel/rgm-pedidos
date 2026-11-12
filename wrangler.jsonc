@@ -39,8 +39,8 @@
         // Sem ROOT_DOMAIN: lojas pelo caminho /loja/<slug>, como no preview da Vercel
         "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
         "MP_TEST_MODE": "true",
-        // Endereço público r2.dev do bucket de preview (preencher na fase 3)
-        "FOTOS_PUBLIC_URL": "",
+        // Endereço público r2.dev do bucket de preview (só para testes: tem limite de acessos)
+        "FOTOS_PUBLIC_URL": "https://pub-7178be0af245478695ef3fdfe20096af.r2.dev",
       },
     },
   },
