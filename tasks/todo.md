@@ -16,8 +16,12 @@ DNS e produção na Cloudflare de uma vez; a Vercel sai depois.
       cardápio do banco de produção, checkout, login, `/admin` sem sessão → login, 404s, webhook 401/401, cache do
       estático, cabeçalhos de segurança; logs: 13 eventos, 0 erros. Domínio real só testável com a zona ativa
       (zona pendente devolve o `100::` cru, sem proxy)
-- [ ] Raylan: nameservers no registro.br (DNSSEC desligado antes)
-- [ ] Zona ativa → domínio `fotos.rgm.dev.br` no bucket `rgm-pedidos-fotos`; conferir que a rota `*` do Worker não o intercepta
+- [x] Raylan: nameservers no registro.br (12/nov 16:37 UTC; RDAP: delegação correta, DNSSEC desligado) → aguardando ativação
+- [x] Zona ativa (16:45 UTC); certificado Let's Encrypt `rgm.dev.br` + `*.rgm.dev.br` saiu ~15 min depois. Teste HTTPS
+      de todos os domínios ok (raiz/www → painel; painel → login; loja, finalizar, links antigos, 404s; webhook 401/401)
+- [x] Domínio `fotos.rgm.dev.br` ligado ao bucket `rgm-pedidos-fotos` (`wrangler r2 bucket domain add`)
+- [ ] **A rota `*.rgm.dev.br/*` do Worker intercepta `fotos.rgm.dev.br`** (404 do Next; aparece no tail). Correção: rota
+      mais específica `fotos.rgm.dev.br/*` **sem Worker** (Raylan, no painel). Conferir foto 200 sem passar pelo Worker
 - [ ] Fotos: `fotos:r2 -- copiar`, `conferir`, `trocar-urls --valer`
 - [ ] Testes: raiz, `www`, `painel`, loja, fotos, login, pedido com Pix de teste no preview, webhook do Mercado Pago, "Conectar Mercado Pago"
 - [ ] Raylan: Pix real de R$ 1
