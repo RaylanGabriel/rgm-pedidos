@@ -175,3 +175,13 @@ estrutura do código e o fluxo de trabalho (branch → preview → aprovação �
 `BLOB_READ_WRITE_TOKEN` (para apagar fotos antigas do Blob).
 
 **Comandos:** `npm run cf:preview` (build + Worker local com o env `preview`, em http://localhost:8787).
+
+**Workers Builds** (painel → Worker → Settings → Build), repositório `RaylanGabriel/rgm-pedidos`, path `/`:
+
+| Worker | Branch de deploy | Build | Deploy | Branches de preview |
+|---|---|---|---|---|
+| `rgm-pedidos-preview` | `feat/cloudflare-workers` (vira `main` após o merge) | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy --env preview` | ligado: `npx opennextjs-cloudflare upload --env preview` |
+| `rgm-pedidos` (fase 6) | `main` | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy` | **desligado** (uma versão de branch usaria os segredos e o banco de produção) |
+
+Conectar o repositório não dispara build: só o próximo push. Para consultar builds pela API há um token só de leitura
+em `.env.cloudflare` (fora do Git e não lido pelo Next).
