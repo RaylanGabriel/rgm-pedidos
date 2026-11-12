@@ -12,6 +12,15 @@
       2ª execução → tudo 0. Dados de teste, `.dev.vars` e `.open-next` apagados.
 - [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [ ] OK do Raylan · [ ] merge · [ ] confirmar nos logs da produção que o cron rodou
 
+# Item 1 — "Conectar Mercado Pago" de terceiros (12/nov/2026, teste do Raylan)
+
+- Erro "O aplicativo não está pronto para se conectar a Mercado Pago" com outra conta, na produção.
+- `GET /applications/8056007801718825` (só campos seguros): ativo, não bloqueado, URL de retorno certa
+  (`painel.rgm.dev.br/admin/mercado-pago/retorno`), `sandbox_mode=false`, `certification_status=not_certified`,
+  **`allow_flow=[]`** (nenhum fluxo de autorização liberado) → causa provável; relatos de outros devs batem.
+- Caminho: Raylan confere o app no painel do MP (pendências, Configurações avançadas, permissões); se continuar vazio,
+  chamado no suporte do MP Developers com esses dados. PKCE só se o MP exigir (aí implementamos o `code_verifier`).
+
 
 
 ---
