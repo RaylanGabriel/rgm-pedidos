@@ -18,7 +18,9 @@
     "user:create": "tsx --env-file=.env.local scripts/create-user.ts",
     "demo:seed": "tsx --env-file=.env.local scripts/seed-demo.ts",
     "demo:loja": "tsx --env-file=.env.local --env-file=.env.prod-db scripts/demo-loja.ts --producao",
-    "demo:loja:teste": "tsx --env-file=.env.local scripts/demo-loja.ts"
+    "demo:loja:teste": "tsx --env-file=.env.local scripts/demo-loja.ts",
+    "fotos:r2": "tsx --env-file=.env.local --env-file=.env.prod-db scripts/fotos-para-r2.ts --producao",
+    "fotos:r2:teste": "tsx --env-file=.env.local scripts/fotos-para-r2.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

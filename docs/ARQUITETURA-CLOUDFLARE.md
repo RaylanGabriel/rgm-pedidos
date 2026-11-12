@@ -191,5 +191,17 @@ sem `DATABASE_URL`.
 | `rgm-pedidos-preview` | `feat/cloudflare-workers` (vira `main` após o merge) | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy --env preview` | ligado: `npx opennextjs-cloudflare upload --env preview` |
 | `rgm-pedidos` (fase 6) | `main` | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy` | **desligado** (uma versão de branch usaria os segredos e o banco de produção) |
 
+**Fotos (fase 4) — `scripts/fotos-para-r2.ts`:** 12/nov: as 19 fotos do Blob usadas na produção (1 capa + 18 itens; o
+logo é `/logo.png`) foram copiadas para `rgm-pedidos-fotos` com a mesma chave e conferidas por SHA-256. As URLs no banco
+**ainda apontam para o Blob** — a troca é no corte, porque `fotos.rgm.dev.br` só existe depois do DNS. Ciclo completo
+(copiar → trocar → site mostrando as fotos do R2 → desfazer) testado no banco `preview`.
+
+No dia do corte, nesta ordem:
+1. `npm run fotos:r2 -- copiar` (pega fotos enviadas depois de 12/nov) e `npm run fotos:r2 -- conferir` → 0 erros
+2. Conferir que `https://fotos.rgm.dev.br/<chave>` responde 200 (domínio do bucket ligado na fase 5)
+3. `npm run fotos:r2 -- trocar-urls --valer` → backup em `backups/` (fora do Git). Para voltar:
+   `npm run fotos:r2 -- desfazer backups/<arquivo>.json`
+4. Até desligar o Blob: **`demo:loja` e `demo:seed` ainda gravam fotos no Blob** — adaptar para o R2 antes.
+
 Conectar o repositório não dispara build: só o próximo push. Para consultar builds pela API há um token só de leitura
 em `.env.cloudflare` (fora do Git e não lido pelo Next).

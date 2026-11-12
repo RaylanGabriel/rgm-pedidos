@@ -34,3 +34,6 @@ next-env.d.ts
 
 # lojas de demonstração (dados de possíveis clientes)
 /demos/
+
+# backups gerados por scripts (ex.: URLs das fotos antes da migração para o R2)
+/backups/

@@ -1,3 +1,31 @@
+# Fase 4 — fotos do Vercel Blob para o R2 (12/nov/2026)
+
+Inventário (produção, só leitura): 19 fotos no Blob (1 capa + 18 itens, 1 host); logo da loja é arquivo local
+(`/logo.png`), não migra. Bucket de destino: `rgm-pedidos-fotos` (público em `fotos.rgm.dev.br` só após o DNS).
+
+## Plano
+- [x] `scripts/fotos-para-r2.ts` + `npm run fotos:r2 -- <modo>` (banco de produção via `.env.prod-db`):
+  - `copiar`: baixa cada foto referenciada no banco e grava no R2 com a **mesma chave**, tipo e cache de 1 ano.
+    Idempotente (pula o que já está igual) — roda de novo no dia do corte para pegar fotos novas.
+  - `conferir`: compara o hash SHA-256 de cada foto no R2 com a original do Blob.
+  - `trocar-urls` (**só no corte**): sem `--valer` só mostra o que faria; com `--valer` salva backup JSON das URLs
+    antigas em `backups/` (fora do Git) e troca a origem para `https://fotos.rgm.dev.br`.
+  - `desfazer <backup.json>`: volta as URLs do backup.
+- [x] Rodar `copiar` e `conferir` agora (banco de produção só leitura; nada no ar muda)
+- [x] Testar `trocar-urls` + `desfazer` no banco `preview` (nunca na produção antes do corte)
+- [x] Atualizar o documento (passo a passo do corte) e anotar: scripts `demo:loja`/`demo:seed` ainda gravam no Blob
+      → adaptar para o R2 antes de desligar o Blob
+
+## Revisão
+- Produção: 19/19 fotos no `rgm-pedidos-fotos`, SHA-256 igual ao original; URLs do banco **não** foram mexidas.
+- Preview: ciclo completo testado — copiar (19), copiar de novo (19 iguais, nada reenviado), simulação, troca (19),
+  cardápio servindo as 19 fotos do R2 com 200 e nenhuma do Blob, desfazer (19), desfazer de novo (0, seguro).
+  Bucket de preview e backup de teste apagados depois.
+- Tropeço: `Select-Object -First 3` interrompeu a primeira cópia na produção (lição registrada); rodada de novo inteira.
+- Pendente para o corte: passos 1–4 em docs/ARQUITETURA-CLOUDFLARE.md (seção 10, "Fotos").
+
+---
+
 # Teste geral do preview na Cloudflare (12/nov/2026)
 
 Alvo: https://rgm-pedidos-preview.raylanmiranda1.workers.dev (banco `preview`, Pix de teste).

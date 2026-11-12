@@ -18,6 +18,13 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   **Nunca rodar comandos com `--debug`/verbose de CLIs autenticadas (vercel, wrangler, neonctl) mostrando a saída.**
   Se precisar diagnosticar, filtrar por lista do que é seguro mostrar (ex.: só `Target URL`), nunca por lista do que esconder.
 
+## Windows / PowerShell
+
+- **`| Select-Object -First N` encerra o comando depois de N linhas** — num script longo (cópia de fotos), ele para no
+  meio sem erro. (12/nov/2026: a cópia para o R2 parou na 3ª linha.) Regra: para scripts que gravam algo, guardar a
+  saída inteira (`$o = cmd 2>&1`) e só então filtrar, ou usar `-Last`.
+- Estatísticas do R2 (`wrangler r2 bucket info`: object_count) chegam com atraso; para conferir, ler os objetos.
+
 ## Windows / Git Bash
 
 - Caminhos que começam com `/` viram caminho do Windows no Git Bash (`/loja` → `C:/Program Files/Git/loja`).
