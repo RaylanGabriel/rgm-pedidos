@@ -13,7 +13,6 @@ import { randomUUID } from "node:crypto"
 import { mkdirSync, readFileSync, existsSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { parseArgs } from "node:util"
-import { del, put } from "@vercel/blob"
 import { count, eq, inArray, sql } from "drizzle-orm"
 import QRCode from "qrcode"
 import sharp from "sharp"
@@ -24,11 +23,12 @@ import { isReservedSlug } from "../lib/domains"
 import { parseFacebook, parseInstagram } from "../lib/links"
 import { SLUG_RE, slugify } from "../lib/slug"
 import * as art from "./demo-art"
+import { fotosR2 } from "./r2"
 
 const DOMAIN = process.env.ROOT_DOMAIN || "rgm.dev.br"
-const isOurBlob = (url: string | null) => !!url && URL.canParse(url) && new URL(url).hostname.endsWith(".public.blob.vercel-storage.com")
 let PRODUCAO = false // npm run demo:loja (site no ar) passa --producao; demo:loja:teste não
 const ambiente = () => (PRODUCAO ? "SITE NO AR (produção)" : "banco de TESTES")
+let fotos: ReturnType<typeof fotosR2> // bucket de produção ou de teste, definido em main()
 
 // ---------- Arquivo da demo ----------
 type Item = { name: string; price: string; description: string | null; featured: boolean }
@@ -147,18 +147,11 @@ const extrasFor = (categoryName: string) => !/bebida|refri|suco|sobremesa|doce|s
 
 async function uploadSvg(storeId: string, svg: string, folder: string, width: number, height: number) {
   const webp = await sharp(Buffer.from(svg)).resize(width, height).webp({ quality: 82 }).toBuffer()
-  const blob = await put(`stores/${storeId}/${folder}/${randomUUID()}.webp`, webp, {
-    access: "public",
-    contentType: "image/webp",
-    addRandomSuffix: false,
-    cacheControlMaxAge: 60 * 60 * 24 * 365,
-  })
-  return blob.url
+  return fotos.putWebp(`stores/${storeId}/${folder}`, webp)
 }
 
 // ---------- Comandos ----------
 async function criar(path: string) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("BLOB_READ_WRITE_TOKEN ausente no .env.local")
   const d = readDemoFile(path)
   if (d.logo && !existsSync(d.logo)) throw new Error(`Logo não encontrada: ${d.logo}`)
   const [taken] = await db.select({ id: stores.id }).from(stores).where(eq(stores.slug, d.slug)).limit(1)
@@ -187,7 +180,7 @@ async function criar(path: string) {
     let logoUrl: string | null = null
     if (d.logo) {
       const webp = await sharp(readFileSync(d.logo)).resize(512, 512, { fit: "contain", background: "#ffffff" }).webp({ quality: 85 }).toBuffer()
-      logoUrl = (await put(`stores/${storeId}/logo/${randomUUID()}.webp`, webp, { access: "public", contentType: "image/webp", addRandomSuffix: false })).url
+      logoUrl = await fotos.putWebp(`stores/${storeId}/logo`, webp)
     }
     await db.update(stores).set({ coverUrl, logoUrl }).where(eq(stores.id, storeId))
 
@@ -239,10 +232,8 @@ async function criar(path: string) {
 async function removeStore(storeId: string) {
   const [s] = await db.select({ logoUrl: stores.logoUrl, coverUrl: stores.coverUrl }).from(stores).where(eq(stores.id, storeId)).limit(1)
   const items = await db.select({ imageUrl: menuItems.imageUrl }).from(menuItems).where(eq(menuItems.storeId, storeId))
-  const urls = [s?.logoUrl ?? null, s?.coverUrl ?? null, ...items.map((i) => i.imageUrl)].filter(isOurBlob) as string[]
   await db.delete(stores).where(eq(stores.id, storeId)) // cardápio, pedidos e vínculos saem junto (cascade)
-  if (urls.length) await del(urls).catch(() => {})
-  return urls.length
+  return fotos.del([s?.logoUrl, s?.coverUrl, ...items.map((i) => i.imageUrl)])
 }
 
 async function demoBySlug(slug: string) {
@@ -308,6 +299,7 @@ async function main() {
     options: { email: { type: "string" }, nome: { type: "string" }, producao: { type: "boolean", default: false } },
   })
   PRODUCAO = values.producao
+  fotos = fotosR2(PRODUCAO)
   const [cmd, arg] = positionals
   if (cmd === "criar" && arg) return criar(arg)
   if (cmd === "listar") return listar()

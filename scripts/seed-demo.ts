@@ -1,5 +1,5 @@
 /**
- * Preenche uma loja com o cardápio de demonstração (categorias, itens e ilustrações no Vercel Blob).
+ * Preenche uma loja do banco de TESTES com o cardápio de demonstração (categorias, itens e ilustrações no R2 de teste).
  *
  * Uso:
  *   npm run demo:seed -- --store mr-smash [--cover | --only-cover]
@@ -9,19 +9,16 @@
  *
  * - Categorias e itens são encontrados pelo nome: os que já existem são atualizados (descrição, preço,
  *   ordem e imagem), os que faltam são criados. Nada é apagado.
- * - A imagem antiga do item (se estiver no nosso Blob) é apagada ao trocar.
+ * - A imagem antiga do item (se estiver no nosso bucket) é apagada ao trocar.
  */
-import { randomUUID } from "node:crypto"
 import { parseArgs } from "node:util"
-import { del, put } from "@vercel/blob"
 import { and, eq, sql } from "drizzle-orm"
 import sharp from "sharp"
 import { db } from "../db"
 import { categories, menuItemCategories, menuItems, stores } from "../db/schema"
 import { cover } from "./demo-art"
 import { DEMO_FEATURED, DEMO_MENU } from "./demo-menu"
-
-const isOurBlob = (url: string | null) => !!url && URL.canParse(url) && new URL(url).hostname.endsWith(".public.blob.vercel-storage.com")
+import { fotosR2 } from "./r2"
 
 async function main() {
   const { values } = parseArgs({ options: {
@@ -30,26 +27,20 @@ async function main() {
       "only-cover": { type: "boolean", default: false },
     }, })
   if (!values.store) throw new Error("Informe --store <slug>")
-  if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("BLOB_READ_WRITE_TOKEN ausente no .env.local")
+  const fotos = fotosR2(false) // banco de testes (.env.local) → bucket de teste
 
   const [store] = await db.select().from(stores).where(eq(stores.slug, values.store)).limit(1)
   if (!store) throw new Error(`Loja "${values.store}" não encontrada`)
 
   const upload = async (svg: string, folder: string, width: number, height: number) => {
     const webp = await sharp(Buffer.from(svg)).resize(width, height).webp({ quality: 82 }).toBuffer()
-    const blob = await put(`stores/${store.id}/${folder}/${randomUUID()}.webp`, webp, {
-      access: "public",
-      contentType: "image/webp",
-      addRandomSuffix: false,
-      cacheControlMaxAge: 60 * 60 * 24 * 365,
-    })
-    return { url: blob.url, kb: Math.round(webp.length / 1024) }
+    return { url: await fotos.putWebp(`stores/${store.id}/${folder}`, webp), kb: Math.round(webp.length / 1024) }
   }
 
   const setCover = async () => {
     const c = await upload(cover(store.primaryColor), "cover", 1800, 560)
     await db.update(stores).set({ coverUrl: c.url }).where(eq(stores.id, store.id))
-    if (isOurBlob(store.coverUrl)) await del(store.coverUrl!)
+    await fotos.del([store.coverUrl])
     console.log(`capa        ${c.kb} KB`)
   }
   if (values["only-cover"]) return setCover()
@@ -77,13 +68,13 @@ async function main() {
     else [category] = await db.insert(categories).values({ storeId: store.id, name: cat.name, sortOrder: ci, extrasEnabled: cat.extras }).returning()
 
     for (const [ii, item] of cat.items.entries()) {
-      const blob = await upload(item.svg(), "items", 1000, 750)
+      const image = await upload(item.svg(), "items", 1000, 750)
 
       const values = {
         categoryId: category.id,
         description: item.description,
         price: item.price,
-        imageUrl: blob.url,
+        imageUrl: image.url,
         sortOrder: ii,
         active: true,
         available: true,
@@ -95,11 +86,11 @@ async function main() {
         .limit(1)
       if (existing) {
         await db.update(menuItems).set(values).where(eq(menuItems.id, existing.id))
-        if (isOurBlob(existing.imageUrl)) await del(existing.imageUrl!)
+        await fotos.del([existing.imageUrl])
       } else {
         await db.insert(menuItems).values({ ...values, storeId: store.id, name: item.name })
       }
-      console.log(`${existing ? "atualizado" : "criado   "}  ${cat.name} › ${item.name} (${blob.kb} KB)`)
+      console.log(`${existing ? "atualizado" : "criado   "}  ${cat.name} › ${item.name} (${image.kb} KB)`)
     }
   }
 

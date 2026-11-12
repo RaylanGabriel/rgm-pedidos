@@ -1,3 +1,21 @@
+# Faxina — tirar a Vercel do código (12/nov/2026, branch `chore/remove-vercel`)
+
+Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Vercel, para o Raylan apagar o projeto e o Blob.
+
+## Plano
+- [ ] Banco `preview` ainda tem fotos no Blob → `fotos:r2:teste` copiar/conferir/trocar-urls (antes de apagar o script)
+- [ ] `lib/storage.ts`: só R2. Fora da Cloudflare (`next dev`) o envio responde "só funciona no preview/produção"
+- [ ] `scripts/r2.ts` (novo): grava/apaga no R2 pelo wrangler; bucket e URL pública lidos do `wrangler.jsonc` (uma fonte)
+- [ ] `demo:loja` (produção/teste) e `demo:seed` (teste) gravam no R2 e apagam só o que é nosso
+- [ ] Tirar `@vercel/blob`, `@vercel/analytics` (`app/layout.tsx`), `LEGACY_HOST` (domains, middleware, wrangler.jsonc)
+- [ ] Tirar `scripts/fotos-para-r2.ts` e `fotos:r2*` (migração concluída; fica no histórico do Git)
+- [ ] `.env.example`, README, comentários e docs sem Vercel
+- [ ] Verificação: `tsc`, lint, build; preview da branch na Cloudflare (upload/troca/exclusão de foto no R2 de preview);
+      `demo:loja:teste` criar → fotos 200 no r2.dev → apagar → objetos removidos
+- [ ] OK do Raylan → merge → produção conferida → Raylan apaga o projeto e o Blob na Vercel
+
+---
+
 # Fase 5 — corte direto para a Cloudflare (12/nov/2026)
 
 Decisão do Raylan: o site ainda não é usado por ninguém → **sem transição gradual nem reserva na Vercel**.

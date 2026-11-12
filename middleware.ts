@@ -7,7 +7,7 @@ const SESSION_COOKIE = "sid" // mesmo nome de lib/auth/session.ts
 const GLOBAL_PREFIXES = ["/pedido/", "/_next/", "/api/", "/auth/"]
 
 /**
- * 1) Domínios: <slug>.rgm.dev.br mostra a loja; painel.rgm.dev.br é o painel; o endereço antigo redireciona.
+ * 1) Domínios: <slug>.rgm.dev.br mostra a loja; painel.rgm.dev.br é o painel; a raiz leva ao painel.
  * 2) Painel: checagem otimista do cookie (a validação de verdade é em requireSession()/requireStore()).
  *
  * É `middleware.ts` (runtime Edge) e não `proxy.ts` (Node) de propósito: na Cloudflare (OpenNext) o proxy em Node
@@ -17,19 +17,6 @@ export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const host = classifyHost(request.headers.get("host"))
   const redirect = (url: string) => withHeaders(NextResponse.redirect(url, 308))
-
-  if (host.kind === "legacy") {
-    // QR codes e links antigos: /loja/<slug>/... → <slug>.rgm.dev.br/... ; /admin → painel
-    const m = pathname.match(/^\/loja\/([a-z0-9-]+)(\/.*)?$/)
-    const store = m && storeOrigin(m[1])
-    if (store) return redirect(`${store}${m[2] ?? ""}${search}`)
-    // raiz antiga abria o cardápio da loja padrão: continua abrindo, no endereço novo
-    const home = pathname === "/" && storeOrigin(process.env.DEFAULT_STORE_SLUG || "mrsmash")
-    if (home) return redirect(`${home}/`)
-    const panel = panelOrigin()
-    if (panel && pathname.startsWith("/admin")) return redirect(`${panel}${pathname}${search}`)
-    // /pedido/<token> continua funcionando aqui (links de acompanhamento já enviados)
-  }
 
   if (host.kind === "root") {
     const panel = panelOrigin()

@@ -27,7 +27,6 @@
   "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos" }],
   "vars": {
     "ROOT_DOMAIN": "rgm.dev.br",
-    "LEGACY_HOST": "mr-smash-street.vercel.app",
     "SITE_URL": "https://painel.rgm.dev.br",
     "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
     "MP_TEST_MODE": "false",
@@ -43,9 +42,8 @@
       // Bucket separado: um teste nunca apaga foto de loja real
       "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos-preview" }],
       "vars": {
-        // Vazios de propósito: lojas pelo caminho /loja/<slug> e links com o endereço de acesso, como no preview da Vercel
+        // Vazios de propósito: lojas pelo caminho /loja/<slug> e links com o endereço de acesso (*.workers.dev)
         "ROOT_DOMAIN": "",
-        "LEGACY_HOST": "",
         "SITE_URL": "",
         "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
         "MP_TEST_MODE": "true",

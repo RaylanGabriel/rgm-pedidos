@@ -52,8 +52,8 @@ Em produção com a primeira loja, a **Mr. Smash**.
 | Banco | **PostgreSQL (Neon)** + **Drizzle ORM**, com migrations versionadas em [`drizzle/`](drizzle/) |
 | Validação | Zod (mesmos schemas no navegador e no servidor) |
 | Pagamentos | **Mercado Pago**: OAuth por loja, API de Orders (Pix) e webhooks assinados |
-| Arquivos | Vercel Blob (fotos do cardápio) |
-| Hospedagem | Vercel (`main` = produção, cada branch = preview) |
+| Arquivos | **Cloudflare R2** (fotos do cardápio, em `fotos.rgm.dev.br`) |
+| Hospedagem | **Cloudflare Workers** via OpenNext (`main` = produção, cada branch = preview). Ver [docs/ARQUITETURA-CLOUDFLARE.md](docs/ARQUITETURA-CLOUDFLARE.md) |
 
 ---
 
@@ -78,7 +78,7 @@ Em produção com a primeira loja, a **Mr. Smash**.
 - Pix vencido é cancelado sozinho.
 - Se o Mercado Pago estiver fora do ar, o pedido cai para "Pix direto com a loja", sem perder a venda.
 
-**Sem tarefas agendadas.** O plano gratuito da Vercel não tem cron frequente. Por isso, a manutenção roda de forma preguiçosa ao ler os pedidos: fechar entregas esquecidas e cancelar Pix vencido.
+**Sem tarefas agendadas (por enquanto).** A manutenção roda de forma preguiçosa ao ler os pedidos: fechar entregas esquecidas e cancelar Pix vencido. Um Cron Trigger da Cloudflare está planejado.
 
 **Relatórios agregados em SQL** ([`lib/reports.ts`](lib/reports.ts)), e não somando pedidos em memória. A planilha **.xlsx é gerada sem biblioteca** ([`lib/xlsx.ts`](lib/xlsx.ts)), montando o OpenXML e o zip à mão, com números e datas de verdade.
 
@@ -87,7 +87,7 @@ Em produção com a primeira loja, a **Mr. Smash**.
 - Há limite de tentativas de login.
 - Os papéis por loja são dono e equipe, mais o super admin da plataforma.
 
-**Dois bancos.** A branch `production` do Neon atende o site no ar. A branch `preview` atende os testes e os previews da Vercel. Migrations são aplicadas primeiro no preview e, depois de aprovadas, na produção.
+**Dois bancos.** A branch `production` do Neon atende o site no ar. A branch `preview` atende os testes e o Worker de preview (`rgm-pedidos-preview`). Migrations são aplicadas primeiro no preview e, depois de aprovadas, na produção.
 
 ---
 

@@ -6,7 +6,7 @@ import { db } from "@/db"
 import { loginAttempts } from "@/db/schema"
 
 /*
- * Limite de requisições guardado no banco (funciona mesmo com várias instâncias na Vercel).
+ * Limite de requisições guardado no banco (funciona mesmo com várias instâncias do Worker).
  * Reaproveita a tabela login_attempts como registro genérico de "batidas" por chave.
  */
 
