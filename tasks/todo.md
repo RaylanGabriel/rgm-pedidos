@@ -3,16 +3,25 @@
 Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Vercel, para o Raylan apagar o projeto e o Blob.
 
 ## Plano
-- [ ] Banco `preview` ainda tem fotos no Blob → `fotos:r2:teste` copiar/conferir/trocar-urls (antes de apagar o script)
-- [ ] `lib/storage.ts`: só R2. Fora da Cloudflare (`next dev`) o envio responde "só funciona no preview/produção"
-- [ ] `scripts/r2.ts` (novo): grava/apaga no R2 pelo wrangler; bucket e URL pública lidos do `wrangler.jsonc` (uma fonte)
-- [ ] `demo:loja` (produção/teste) e `demo:seed` (teste) gravam no R2 e apagam só o que é nosso
-- [ ] Tirar `@vercel/blob`, `@vercel/analytics` (`app/layout.tsx`), `LEGACY_HOST` (domains, middleware, wrangler.jsonc)
-- [ ] Tirar `scripts/fotos-para-r2.ts` e `fotos:r2*` (migração concluída; fica no histórico do Git)
-- [ ] `.env.example`, README, comentários e docs sem Vercel
-- [ ] Verificação: `tsc`, lint, build; preview da branch na Cloudflare (upload/troca/exclusão de foto no R2 de preview);
-      `demo:loja:teste` criar → fotos 200 no r2.dev → apagar → objetos removidos
+- [x] Banco `preview` tinha 19 fotos no Blob → copiadas (1 falha de rede, refeita), conferidas e URLs trocadas
+      (backup em `backups/`). Os dois bancos: 0 URLs do Blob
+- [x] `lib/storage.ts`: só R2. Fora da Cloudflare (`next dev`) o envio responde com aviso e não grava
+- [x] `scripts/r2.ts` (novo): grava/apaga no R2 pelo wrangler; bucket e URL pública lidos do `wrangler.jsonc` (uma fonte)
+- [x] `demo:loja` (produção/teste) e `demo:seed` (teste) gravam no R2 e apagam só o que é do bucket
+- [x] Tirados `@vercel/blob`, `@vercel/analytics` (`app/layout.tsx`), `LEGACY_HOST` (domains, middleware, wrangler.jsonc)
+- [x] Tirados `scripts/fotos-para-r2.ts` e `fotos:r2*` (migração concluída; fica no histórico do Git)
+- [x] `.env.example`, README e comentários sem Vercel
+- [x] Verificação (ver revisão)
 - [ ] OK do Raylan → merge → produção conferida → Raylan apaga o projeto e o Blob na Vercel
+
+## Revisão
+- `tsc` ok; `next build` ok. **Lint não roda**: o projeto não tem `eslint.config.*` (já era assim na `main`).
+- `demo:loja:teste`: criou uma demo com capa e 2 ilustrações no R2 de teste (3 × 200 `image/webp`), e o `apagar`
+  removeu os 3 objetos do bucket. O `demo:seed` usa o mesmo código, mas não foi rodado porque trocaria as fotos reais
+  da loja de teste por ilustrações.
+- Preview da branch (`chore-remove-vercel-rgm-pedidos-preview.raylanmiranda1.workers.dev`): item com foto criado pelo
+  painel → foto no R2 (200, cache de 1 ano) e no cardápio público → item apagado → foto 404. Cardápio: 19 fotos do R2,
+  0 do Blob, sem script do Vercel Analytics. Páginas 307/200/307/200.
 
 ---
 
