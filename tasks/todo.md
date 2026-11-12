@@ -12,7 +12,10 @@ Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Ve
 - [x] Tirados `scripts/fotos-para-r2.ts` e `fotos:r2*` (migração concluída; fica no histórico do Git)
 - [x] `.env.example`, README e comentários sem Vercel
 - [x] Verificação (ver revisão)
-- [ ] OK do Raylan → merge → produção conferida → Raylan apaga o projeto e o Blob na Vercel
+- [x] OK do Raylan → merge (`826a8d6`) → build de produção ok → produção conferida: domínios, webhook 401, cardápio
+      com 19 fotos do R2 (todas 200), 0 Blob, sem Vercel Analytics; logs: 17 eventos, 0 problemas
+- [ ] Raylan apaga o projeto e o Blob store na Vercel (e a linha `BLOB_READ_WRITE_TOKEN` do `.env.local`)
+- [ ] Depois: configurar o ESLint numa branch própria (o projeto não tem `eslint.config.*`)
 
 ## Revisão
 - `tsc` ok; `next build` ok. **Lint não roda**: o projeto não tem `eslint.config.*` (já era assim na `main`).
