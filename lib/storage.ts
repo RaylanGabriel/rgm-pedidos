@@ -2,13 +2,15 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 import { getCloudflareContext } from "@opennextjs/cloudflare"
-import { del, put } from "@vercel/blob"
 
 /**
  * Fotos (itens do cardápio, logo, capa).
  * - Na Cloudflare: bucket R2 (binding FOTOS), servido em FOTOS_PUBLIC_URL (ex.: https://fotos.rgm.dev.br).
  * - Na Vercel / `next dev` (sem o binding): Vercel Blob, como antes. Fica até o fim da migração.
  * As chaves são iguais nos dois (`stores/<id>/<pasta>/<uuid>.<ext>`), então copiar Blob → R2 é só trocar a origem da URL.
+ *
+ * O `@vercel/blob` só é carregado quando usado: ele traz o `undici`, que compila WebAssembly ao carregar — o Workers
+ * proíbe isso. Por isso, na Cloudflare, fotos antigas do Blob não são apagadas (o Blob inteiro sai no fim da migração).
  *
  * O navegador já reduz a imagem antes de enviar; aqui validamos de novo pelo conteúdo, não pela extensão.
  */
@@ -69,6 +71,7 @@ export async function uploadImage(file: File, folder: string): Promise<UploadRes
       })
       return { url: `${storage.base}/${key}` }
     }
+    const { put } = await import("@vercel/blob")
     const blob = await put(key, Buffer.from(bytes), {
       access: "public",
       contentType: sig.type,
@@ -87,9 +90,14 @@ export async function deleteImage(url: string | null | undefined) {
   if (!url || !URL.canParse(url)) return
   try {
     const storage = r2()
-    if (storage && url.startsWith(`${storage.base}/`)) {
-      await storage.bucket.delete(decodeURIComponent(url.slice(storage.base.length + 1).split(/[?#]/)[0]))
-    } else if (isVercelBlob(new URL(url)) && process.env.BLOB_READ_WRITE_TOKEN) {
+    if (storage) {
+      if (url.startsWith(`${storage.base}/`)) {
+        await storage.bucket.delete(decodeURIComponent(url.slice(storage.base.length + 1).split(/[?#]/)[0]))
+      }
+      return // foto antiga no Vercel Blob: fica até o Blob ser apagado
+    }
+    if (isVercelBlob(new URL(url)) && process.env.BLOB_READ_WRITE_TOKEN) {
+      const { del } = await import("@vercel/blob")
       await del(url)
     }
   } catch (e) {
