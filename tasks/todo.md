@@ -10,7 +10,9 @@
 - [x] Teste local (`wrangler dev --test-scheduled`, banco preview): rota sem segredo/segredo errado → 404; cron →
       `{"entregasFechadas":1,"pixVencidosCancelados":1,"sessoesVencidasApagadas":1,"tentativasAntigasApagadas":1}`;
       2ª execução → tudo 0. Dados de teste, `.dev.vars` e `.open-next` apagados.
-- [ ] Preview da branch · [ ] OK do Raylan · [ ] merge · [ ] confirmar nos logs da produção que o cron rodou
+- [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [ ] OK do Raylan · [ ] merge · [ ] confirmar nos logs da produção que o cron rodou
+
+
 
 ---
 
