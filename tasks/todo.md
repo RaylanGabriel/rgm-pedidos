@@ -11,8 +11,11 @@ DNS e produção na Cloudflare de uma vez; a Vercel sai depois.
 - [x] Merge `feat/cloudflare-workers` → `main` (OK do Raylan em 12/nov; sem migração de banco; Vercel publicou, painel 200)
 - [x] Segredos do Worker `rgm-pedidos` (7, sem o token do Blob). `DATABASE_URL` veio do `.env.prod-db`: na Vercel ele é
       "sensível" e o `vercel env pull` traz vazio. Banco conferido = produção; vars públicas iguais às da Vercel
-- [ ] Raylan: Workers Builds no `rgm-pedidos` (branch `main`, builds de preview desligados); preview passa a seguir a `main`
-- [ ] Primeiro build de produção ok; teste no `rgm-pedidos.raylanmiranda1.workers.dev`
+- [x] Raylan: Workers Builds no `rgm-pedidos` (branch `main`, builds de preview desligados); preview passa a seguir a `main`
+- [x] Primeiro build de produção ok (`a3b4364`, rotas publicadas); teste só leitura no `rgm-pedidos.raylanmiranda1.workers.dev`:
+      cardápio do banco de produção, checkout, login, `/admin` sem sessão → login, 404s, webhook 401/401, cache do
+      estático, cabeçalhos de segurança; logs: 13 eventos, 0 erros. Domínio real só testável com a zona ativa
+      (zona pendente devolve o `100::` cru, sem proxy)
 - [ ] Raylan: nameservers no registro.br (DNSSEC desligado antes)
 - [ ] Zona ativa → domínio `fotos.rgm.dev.br` no bucket `rgm-pedidos-fotos`; conferir que a rota `*` do Worker não o intercepta
 - [ ] Fotos: `fotos:r2 -- copiar`, `conferir`, `trocar-urls --valer`
