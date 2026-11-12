@@ -188,8 +188,8 @@ sem `DATABASE_URL`.
 
 | Worker | Branch de deploy | Build | Deploy | Branches de preview |
 |---|---|---|---|---|
-| `rgm-pedidos-preview` | `feat/cloudflare-workers` (vira `main` após o merge) | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy --env preview` | ligado: `npx opennextjs-cloudflare upload --env preview` |
-| `rgm-pedidos` (fase 6) | `main` | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy` | **desligado** (uma versão de branch usaria os segredos e o banco de produção) |
+| `rgm-pedidos-preview` | `main` (desde o merge em 12/nov) | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy --env preview` | ligado: `npx opennextjs-cloudflare upload --env preview` |
+| `rgm-pedidos` (conectado em 12/nov; rotas `rgm.dev.br/*` e `*.rgm.dev.br/*`) | `main` | `npx opennextjs-cloudflare build` | `npx opennextjs-cloudflare deploy` | **desligado** (uma versão de branch usaria os segredos e o banco de produção) |
 
 **Fotos (fase 4) — `scripts/fotos-para-r2.ts`:** 12/nov: as 19 fotos do Blob usadas na produção (1 capa + 18 itens; o
 logo é `/logo.png`) foram copiadas para `rgm-pedidos-fotos` com a mesma chave e conferidas por SHA-256. As URLs no banco
