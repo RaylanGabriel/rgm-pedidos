@@ -24,7 +24,9 @@ DNS e produção na Cloudflare de uma vez; a Vercel sai depois.
       mais específica `fotos.rgm.dev.br/*` **sem Worker** (Raylan, no painel). Conferir foto 200 sem passar pelo Worker
 - [ ] Fotos: `fotos:r2 -- copiar`, `conferir`, `trocar-urls --valer`
 - [ ] Testes: raiz, `www`, `painel`, loja, fotos, login, pedido com Pix de teste no preview, webhook do Mercado Pago, "Conectar Mercado Pago"
-- [ ] Raylan: Pix real de R$ 1
+- [x] Raylan: Pix real (R$ 0,70, 12/nov 16:54 UTC): pedido criado na Cloudflare, webhook do Mercado Pago chegou
+      (200) e marcou pago em 47 s; status mudado no painel. Logs: 2 exceções "Network connection lost" em pré-carregamento
+      `_rsc` do painel, cancelado pelo navegador (a mesma página abriu com 200 um segundo depois); não é bug
 - [ ] Faxina: tirar Blob/Analytics/endereço da Vercel do código, `demo:*` para o R2, apagar projeto e Blob na Vercel
 
 ---
