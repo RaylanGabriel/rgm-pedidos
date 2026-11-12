@@ -8,8 +8,9 @@ DNS e produção na Cloudflare de uma vez; a Vercel sai depois.
 - [x] Token só de DNS da zona (`CLOUDFLARE_DNS_TOKEN` em `.env.cloudflare`, expira em 30 dias)
 - [x] DNS: apagados os 6 `A` e o `CNAME _domainconnect` da Vercel; criados `AAAA 100::` com proxy em `@` e `*`; mantidos os 3 `CAA`
 - [x] `wrangler.jsonc`: rotas `rgm.dev.br/*` e `*.rgm.dev.br/*` na produção; preview com `routes: []` (conferido lendo a config)
-- [ ] Merge `feat/cloudflare-workers` → `main` (OK do Raylan em 12/nov; sem migração de banco)
-- [ ] Segredos do Worker `rgm-pedidos` copiados da produção da Vercel (sem o token do Blob), conferindo que o banco é o `production`
+- [x] Merge `feat/cloudflare-workers` → `main` (OK do Raylan em 12/nov; sem migração de banco; Vercel publicou, painel 200)
+- [x] Segredos do Worker `rgm-pedidos` (7, sem o token do Blob). `DATABASE_URL` veio do `.env.prod-db`: na Vercel ele é
+      "sensível" e o `vercel env pull` traz vazio. Banco conferido = produção; vars públicas iguais às da Vercel
 - [ ] Raylan: Workers Builds no `rgm-pedidos` (branch `main`, builds de preview desligados); preview passa a seguir a `main`
 - [ ] Primeiro build de produção ok; teste no `rgm-pedidos.raylanmiranda1.workers.dev`
 - [ ] Raylan: nameservers no registro.br (DNSSEC desligado antes)

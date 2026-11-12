@@ -29,5 +29,7 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
 
 - Caminhos que começam com `/` viram caminho do Windows no Git Bash (`/loja` → `C:/Program Files/Git/loja`).
   Regra: usar `MSYS_NO_PATHCONV=1` em comandos que recebem caminhos de URL (`vercel curl`, `vercel api`).
+  Vale para **qualquer** programa, inclusive `node script.mjs /zones/...` (12/nov/2026: chamadas à API da Cloudflare
+  falharam com 404 por isso). Colocar `export MSYS_NO_PATHCONV=1` no início do comando.
 - **Nunca publicar na Cloudflare um build feito nesta máquina.** O OpenNext copia os valores do `.env.local` para dentro
   do Worker. Deploy só via push (Workers Builds).
