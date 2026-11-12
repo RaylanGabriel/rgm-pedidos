@@ -10,9 +10,14 @@ import { loginAttempts } from "@/db/schema"
  * Reaproveita a tabela login_attempts como registro genérico de "batidas" por chave.
  */
 
+/**
+ * IP do visitante. Na Cloudflare só vale o `cf-connecting-ip`: a própria Cloudflare o define e sobrescreve o que o
+ * visitante mandar. O `x-forwarded-for` NÃO serve: a Cloudflare acrescenta o IP real no fim e mantém o primeiro valor
+ * como veio do visitante, então dava para inventar um IP a cada requisição e escapar dos limites.
+ * Fora da Cloudflare (`next dev`) não há o cabeçalho: todos contam como "unknown", o que só importa localmente.
+ */
 export async function clientIp() {
-  const h = await headers()
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown"
+  return (await headers()).get("cf-connecting-ip")?.trim() || "unknown"
 }
 
 /** Quantas batidas a chave teve dentro da janela. */
