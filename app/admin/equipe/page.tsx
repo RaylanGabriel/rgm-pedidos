@@ -14,8 +14,9 @@ export const metadata = { title: "Equipe" }
 const dateTime = (d: Date) =>
   d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
 
-export default async function EquipePage() {
+export default async function EquipePage({ searchParams }: { searchParams: Promise<{ removido?: string }> }) {
   const { store, user } = await requireOwner()
+  const removed = (await searchParams).removido?.slice(0, 100)
 
   const members = await db
     .select({
@@ -55,6 +56,12 @@ export default async function EquipePage() {
             Cada funcionário entra com o próprio login. Assim o seu fica só com você: faturamento, preços e pagamentos.
           </p>
         </div>
+
+        {removed && (
+          <p role="status" className="rounded-lg border border-green-600/40 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 px-4 py-3 text-sm">
+            {removed} não tem mais acesso a esta loja.
+          </p>
+        )}
 
         <Card className="border-2">
           <CardHeader>

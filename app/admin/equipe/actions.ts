@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import { and, eq, sql } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
@@ -123,6 +124,7 @@ export async function removeStaffAction(_prev: FormState, fd: FormData): Promise
       db.delete(sessions).where(and(eq(sessions.userId, userId), eq(sessions.activeStoreId, ctx.store.id))),
     ])
   }
+  // A linha da pessoa some da lista (e a mensagem do formulário junto): o aviso vai para o topo da página
   revalidatePath("/admin/equipe")
-  return { ok: true, message: `${m.name} não tem mais acesso a esta loja.` }
+  redirect(`/admin/equipe?removido=${encodeURIComponent(m.name)}`)
 }
