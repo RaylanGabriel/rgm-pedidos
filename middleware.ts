@@ -9,8 +9,11 @@ const GLOBAL_PREFIXES = ["/pedido/", "/_next/", "/api/", "/auth/"]
 /**
  * 1) Domínios: <slug>.rgm.dev.br mostra a loja; painel.rgm.dev.br é o painel; o endereço antigo redireciona.
  * 2) Painel: checagem otimista do cookie (a validação de verdade é em requireSession()/requireStore()).
+ *
+ * É `middleware.ts` (runtime Edge) e não `proxy.ts` (Node) de propósito: na Cloudflare (OpenNext) o proxy em Node
+ * ainda é experimental e sem manutenção oficial. Este arquivo só lê host e cookie, então roda no Edge sem problema.
  */
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
   const host = classifyHost(request.headers.get("host"))
   const redirect = (url: string) => withHeaders(NextResponse.redirect(url, 308))

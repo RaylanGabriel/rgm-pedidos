@@ -47,7 +47,7 @@ Em produção com a primeira loja, a **Mr. Smash**.
 
 | Camada | Escolha |
 |---|---|
-| Framework | **Next.js 16** (App Router, Server Components, Server Actions, Route Handlers, `proxy.ts`) |
+| Framework | **Next.js 16** (App Router, Server Components, Server Actions, Route Handlers, `middleware.ts`) |
 | Interface | **React 19**, **Tailwind CSS 4**, shadcn/ui (Radix), lucide-react |
 | Banco | **PostgreSQL (Neon)** + **Drizzle ORM**, com migrations versionadas em [`drizzle/`](drizzle/) |
 | Validação | Zod (mesmos schemas no navegador e no servidor) |

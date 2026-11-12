@@ -25,7 +25,8 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body className={`font-sans antialiased`}>
         {children}
-        <Analytics />
+        {/* Só na Vercel. Na Cloudflare, o Web Analytics é ligado pelo painel dela (sem código). */}
+        {process.env.VERCEL && <Analytics />}
       </body>
     </html>
   )

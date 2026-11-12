@@ -4,7 +4,9 @@ Plano para levar o RGM Pedidos da Vercel para a Cloudflare **antes do primeiro c
 funciona (domínios por loja, Pix, webhook, fotos) e ganhando segurança, tarefas agendadas e custo menor.
 Nada é desligado na Vercel até a Cloudflare estar testada e no ar — dá para voltar atrás em minutos.
 
-> Status: **planejamento** (nov/2026). Nenhuma mudança feita ainda.
+> Status (11/nov/2026): **fase 2 pronta na branch `feat/cloudflare-workers`** — testada localmente no runtime do Workers
+> (cardápio, checkout, painel inteiro, Excel, QR do Pix, descriptografia do token MP, webhook 401, todos os casos de
+> domínio). Falta a fase 1 (conta) e subir em `*.workers.dev` (fase 3). Ver "Decisões tomadas na fase 2" no fim.
 
 ---
 
@@ -150,3 +152,26 @@ flowchart LR
 
 Banco Neon e migrations, app RGM-PEDIDOS do Mercado Pago (URLs de retorno e webhook), domínio `rgm.dev.br`,
 estrutura do código e o fluxo de trabalho (branch → preview → aprovação → `main`).
+
+---
+
+## 10. Decisões tomadas na fase 2 (o que mudou em relação ao plano)
+
+| Assunto | Decisão | Por quê |
+|---|---|---|
+| **Versão do Next** | 16.0.10 → **16.4.6** (branch `fix/next-16-4`, vai antes da migração) | o 16.0 tinha falhas de segurança já corrigidas, e o `@opennextjs/cloudflare` 1.20.16 exige ≥ 16.4.5 |
+| **`proxy.ts` x `middleware.ts`** | **`middleware.ts` (Edge)** | o OpenNext passou a aceitar `proxy.ts` (1.20.3), mas avisa no build: *experimental, sem manutenção oficial*. O Next 16 marca `middleware.ts` como "deprecated" (só aviso; funciona na Vercel e na Cloudflare). Rever quando o suporte ao proxy em Node sair do experimental |
+| **Onde fazer o build de deploy** | **só no Workers Builds** (Linux, repositório limpo). **Nunca** `opennextjs-cloudflare deploy/upload` a partir desta máquina | o build do OpenNext **copia os valores dos `.env*` locais** (`.env.local`) para dentro do Worker (`.open-next/cloudflare/next-env.mjs`). No CI não existe `.env.local` (está no `.gitignore`), então só os segredos do Worker valem. Build local serve só para `npm run cf:preview`, e a pasta `.open-next/` deve ser apagada depois |
+| **Build no Windows** | funciona (com aviso), dá para testar local sem WSL | testado em 11/nov |
+| **Ambientes** | 2 Workers: `rgm-pedidos` (produção) e `rgm-pedidos-preview` (`--env preview`), cada um com seus segredos | os segredos são por Worker; preview de branch no mesmo Worker usaria o banco de produção |
+| **Fotos** | `lib/storage.ts` em modo duplo: com binding `FOTOS` + `FOTOS_PUBLIC_URL` grava no R2, senão Vercel Blob. Mesmas chaves (`stores/<id>/...`) | a Vercel continua funcionando como reserva; copiar Blob → R2 vira só trocar a origem da URL. Na Vercel, apagar uma foto que já está no R2 é ignorado (fica órfã até a limpeza da fase 8) |
+| **Buckets** | `rgm-pedidos-fotos` (produção, `fotos.rgm.dev.br`) e `rgm-pedidos-fotos-preview` (endereço r2.dev) | um teste no preview nunca apaga foto de loja real (hoje, na Vercel, preview e produção usam o mesmo Blob) |
+| **Cache do Next** | **nenhum** (sem R2/D1 de cache) | só `/` e `/_not-found` são estáticos; o resto é dinâmico. `revalidatePath` nas actions continua atualizando a tela. Se entrar ISR, ver https://opennext.js.org/cloudflare/caching |
+| **Analytics** | `<Analytics />` da Vercel só quando `process.env.VERCEL`; na Cloudflare, Web Analytics ligado pelo painel (sem código) | evita requisições 404 para `/_vercel/insights` |
+| **Variáveis públicas** | em `wrangler.jsonc` (`vars`), versionadas. Segredos via `wrangler secret` | `ROOT_DOMAIN`, `SITE_URL` etc. não são segredo; ficam revisáveis no Git |
+
+**Segredos por Worker** (mesmos nomes da Vercel): `DATABASE_URL`, `MP_CLIENT_ID`, `MP_CLIENT_SECRET`, `MP_WEBHOOK_SECRET`,
+`MP_TOKEN_KEY`, `MP_TEST_ACCESS_TOKEN`, `MP_PROD_ACCESS_TOKEN` (só produção) e, até o fim da fase 4,
+`BLOB_READ_WRITE_TOKEN` (para apagar fotos antigas do Blob).
+
+**Comandos:** `npm run cf:preview` (build + Worker local com o env `preview`, em http://localhost:8787).

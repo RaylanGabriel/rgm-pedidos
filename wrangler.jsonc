@@ -1,0 +1,47 @@
+// Cloudflare Workers (Next.js via @opennextjs/cloudflare). Plano: docs/ARQUITETURA-CLOUDFLARE.md
+//
+// Dois Workers, cada um com seus segredos (`wrangler secret put ... [--env preview]`):
+// - rgm-pedidos          → produção (banco Neon `production`, Pix real)
+// - rgm-pedidos-preview  → testes/branches (banco Neon `preview`, Pix de teste)
+//
+// Aqui ficam só valores públicos. Segredos (DATABASE_URL, MP_CLIENT_SECRET, MP_TOKEN_KEY, ...) nunca entram neste arquivo.
+// Atenção: "vars", "services" e "r2_buckets" NÃO são herdados pelo env "preview" — mantenha os dois blocos alinhados.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rgm-pedidos",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // Endereços próprios só depois da troca de DNS (fase 5); até lá, só *.workers.dev
+  "workers_dev": true,
+  "preview_urls": true,
+
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos" }],
+  "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos" }],
+  "vars": {
+    "ROOT_DOMAIN": "rgm.dev.br",
+    "LEGACY_HOST": "mr-smash-street.vercel.app",
+    "SITE_URL": "https://painel.rgm.dev.br",
+    "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
+    "MP_TEST_MODE": "false",
+    "FOTOS_PUBLIC_URL": "https://fotos.rgm.dev.br",
+  },
+
+  "env": {
+    "preview": {
+      "name": "rgm-pedidos-preview",
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos-preview" }],
+      // Bucket separado: um teste nunca apaga foto de loja real
+      "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos-preview" }],
+      "vars": {
+        // Sem ROOT_DOMAIN: lojas pelo caminho /loja/<slug>, como no preview da Vercel
+        "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
+        "MP_TEST_MODE": "true",
+        // Endereço público r2.dev do bucket de preview (preencher na fase 3)
+        "FOTOS_PUBLIC_URL": "",
+      },
+    },
+  },
+}

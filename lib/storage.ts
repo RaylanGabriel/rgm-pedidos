@@ -1,13 +1,20 @@
 import "server-only"
 
 import { randomUUID } from "node:crypto"
+import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { del, put } from "@vercel/blob"
 
 /**
- * Fotos (itens do cardápio, logo) no Vercel Blob.
+ * Fotos (itens do cardápio, logo, capa).
+ * - Na Cloudflare: bucket R2 (binding FOTOS), servido em FOTOS_PUBLIC_URL (ex.: https://fotos.rgm.dev.br).
+ * - Na Vercel / `next dev` (sem o binding): Vercel Blob, como antes. Fica até o fim da migração.
+ * As chaves são iguais nos dois (`stores/<id>/<pasta>/<uuid>.<ext>`), então copiar Blob → R2 é só trocar a origem da URL.
+ *
  * O navegador já reduz a imagem antes de enviar; aqui validamos de novo pelo conteúdo, não pela extensão.
  */
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+
+const CACHE_SECONDS = 60 * 60 * 24 * 365 // nome é único: pode guardar em cache por 1 ano
 
 const SIGNATURES: { type: string; ext: string; test: (b: Uint8Array) => boolean }[] = [
   { type: "image/jpeg", ext: "jpg", test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
@@ -18,6 +25,26 @@ const SIGNATURES: { type: string; ext: string; test: (b: Uint8Array) => boolean 
     test: (b) => String.fromCharCode(...b.slice(0, 4)) === "RIFF" && String.fromCharCode(...b.slice(8, 12)) === "WEBP",
   },
 ]
+
+/** O pedaço da API do R2 que usamos (evita depender dos tipos gerados do Workers). */
+type PhotoBucket = {
+  put(key: string, value: Uint8Array, options: { httpMetadata: { contentType: string; cacheControl: string } }): Promise<unknown>
+  delete(key: string): Promise<void>
+}
+
+/** Bucket R2 + endereço público, se estivermos rodando na Cloudflare com tudo configurado. */
+function r2(): { bucket: PhotoBucket; base: string } | null {
+  const base = (process.env.FOTOS_PUBLIC_URL ?? "").trim().replace(/\/+$/, "")
+  if (!base) return null
+  try {
+    const bucket = (getCloudflareContext().env as unknown as { FOTOS?: PhotoBucket }).FOTOS
+    return bucket ? { bucket, base } : null
+  } catch {
+    return null // fora do Workers (Vercel, next dev)
+  }
+}
+
+const isVercelBlob = (url: URL) => url.hostname.endsWith(".public.blob.vercel-storage.com")
 
 export type UploadResult = { url: string } | { error: string }
 
@@ -33,12 +60,20 @@ export async function uploadImage(file: File, folder: string): Promise<UploadRes
   const sig = SIGNATURES.find((s) => s.test(bytes))
   if (!sig) return { error: "Formato não suportado. Use JPG, PNG ou WebP." }
 
+  const key = `${folder}/${randomUUID()}.${sig.ext}`
   try {
-    const blob = await put(`${folder}/${randomUUID()}.${sig.ext}`, Buffer.from(bytes), {
+    const storage = r2()
+    if (storage) {
+      await storage.bucket.put(key, bytes, {
+        httpMetadata: { contentType: sig.type, cacheControl: `public, max-age=${CACHE_SECONDS}, immutable` },
+      })
+      return { url: `${storage.base}/${key}` }
+    }
+    const blob = await put(key, Buffer.from(bytes), {
       access: "public",
       contentType: sig.type,
       addRandomSuffix: false,
-      cacheControlMaxAge: 60 * 60 * 24 * 365, // nome é único: pode guardar em cache por 1 ano
+      cacheControlMaxAge: CACHE_SECONDS,
     })
     return { url: blob.url }
   } catch (e) {
@@ -49,9 +84,14 @@ export async function uploadImage(file: File, folder: string): Promise<UploadRes
 
 /** Apaga a foto antiga, se for nossa (URLs externas ou /arquivo.png do site são ignoradas). */
 export async function deleteImage(url: string | null | undefined) {
-  if (!url || !URL.canParse(url) || !new URL(url).hostname.endsWith(".public.blob.vercel-storage.com")) return
+  if (!url || !URL.canParse(url)) return
   try {
-    await del(url)
+    const storage = r2()
+    if (storage && url.startsWith(`${storage.base}/`)) {
+      await storage.bucket.delete(decodeURIComponent(url.slice(storage.base.length + 1).split(/[?#]/)[0]))
+    } else if (isVercelBlob(new URL(url)) && process.env.BLOB_READ_WRITE_TOKEN) {
+      await del(url)
+    }
   } catch (e) {
     console.error("Falha ao apagar imagem", e) // não impede a operação principal
   }
