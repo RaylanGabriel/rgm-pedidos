@@ -14,7 +14,8 @@ Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Ve
 - [x] Verificação (ver revisão)
 - [x] OK do Raylan → merge (`826a8d6`) → build de produção ok → produção conferida: domínios, webhook 401, cardápio
       com 19 fotos do R2 (todas 200), 0 Blob, sem Vercel Analytics; logs: 17 eventos, 0 problemas
-- [ ] Raylan apaga o projeto e o Blob store na Vercel (e a linha `BLOB_READ_WRITE_TOKEN` do `.env.local`)
+- [x] Raylan apagou na Vercel o Blob store (`cardapio-fotos`, 19 blobs), o projeto e o domínio `rgm.dev.br`, além da
+      pasta `.vercel`. Linha `BLOB_READ_WRITE_TOKEN` tirada do `.env.local`. Foto antiga do Blob → 404; site e 19 fotos ok
 - [ ] Depois: configurar o ESLint numa branch própria (o projeto não tem `eslint.config.*`)
 
 ## Revisão
