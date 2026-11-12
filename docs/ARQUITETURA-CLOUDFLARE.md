@@ -4,9 +4,11 @@ Plano para levar o RGM Pedidos da Vercel para a Cloudflare **antes do primeiro c
 funciona (domínios por loja, Pix, webhook, fotos) e ganhando segurança, tarefas agendadas e custo menor.
 Nada é desligado na Vercel até a Cloudflare estar testada e no ar — dá para voltar atrás em minutos.
 
-> Status (11/nov/2026): **fase 2 pronta na branch `feat/cloudflare-workers`** — testada localmente no runtime do Workers
-> (cardápio, checkout, painel inteiro, Excel, QR do Pix, descriptografia do token MP, webhook 401, todos os casos de
-> domínio). Falta a fase 1 (conta) e subir em `*.workers.dev` (fase 3). Ver "Decisões tomadas na fase 2" no fim.
+> Status (11/nov/2026): **fases 1 e 2 prontas; fase 3 em teste.** Branch `feat/cloudflare-workers` no ar em
+> https://rgm-pedidos-preview.raylanmiranda1.workers.dev (banco `preview`, Pix de teste), publicada pelo Workers Builds.
+> Testado lá: cardápio, checkout, painel inteiro, Excel, token MP, webhook 401, cache dos estáticos e upload/exclusão
+> de foto no R2. Domínios testados no runtime local. Worker: 2,6 MB comprimido, início em 15 ms.
+> Ver "Decisões tomadas na fase 2" no fim.
 
 ---
 
@@ -138,7 +140,7 @@ flowchart LR
 - [ ] `mrsmash.rgm.dev.br` → cardápio; `/finalizar` → checkout; pedido → `/pedido/<token>`
 - [ ] `painel.rgm.dev.br` → login; cozinha atualiza; balcão com QR do Pix
 - [ ] `rgm.dev.br`, `www`, subdomínio reservado, subdomínio inexistente (404), `mr-smash-street.vercel.app` (redireciona)
-- [ ] Upload de foto/logo/capa (R2) e exclusão da antiga
+- [x] Upload de foto de item (R2) e exclusão — testado no preview em 11/nov; falta logo/capa
 - [ ] Pix: gerar QR, webhook com assinatura válida (200) e inválida (401), pagamento entra na cozinha
 - [ ] Conectar Mercado Pago (OAuth) volta para `painel.rgm.dev.br/admin/mercado-pago/retorno`
 - [ ] Entrega por km (Nominatim/ViaCEP), horário automático, aviso no WhatsApp
@@ -171,8 +173,13 @@ estrutura do código e o fluxo de trabalho (branch → preview → aprovação �
 | **Variáveis públicas** | em `wrangler.jsonc` (`vars`), versionadas. Segredos via `wrangler secret` | `ROOT_DOMAIN`, `SITE_URL` etc. não são segredo; ficam revisáveis no Git |
 
 **Segredos por Worker** (mesmos nomes da Vercel): `DATABASE_URL`, `MP_CLIENT_ID`, `MP_CLIENT_SECRET`, `MP_WEBHOOK_SECRET`,
-`MP_TOKEN_KEY`, `MP_TEST_ACCESS_TOKEN`, `MP_PROD_ACCESS_TOKEN` (só produção) e, até o fim da fase 4,
+`MP_TOKEN_KEY`, `MP_TEST_ACCESS_TOKEN`; só na produção: `MP_PROD_ACCESS_TOKEN` e, até o fim da fase 4,
 `BLOB_READ_WRITE_TOKEN` (para apagar fotos antigas do Blob).
+O preview **não** tem `BLOB_READ_WRITE_TOKEN` de propósito: o banco `preview` é cópia da produção e aponta para fotos do
+mesmo Blob — com o token, trocar a foto de um item num teste apagaria a foto real da loja.
+
+**Build no CI:** o banco é conectado no primeiro uso (`db/index.ts`), não na importação — o build da Cloudflare roda
+sem `DATABASE_URL`.
 
 **Comandos:** `npm run cf:preview` (build + Worker local com o env `preview`, em http://localhost:8787).
 
