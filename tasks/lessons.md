@@ -18,6 +18,13 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   **Nunca rodar comandos com `--debug`/verbose de CLIs autenticadas (vercel, wrangler, neonctl) mostrando a saída.**
   Se precisar diagnosticar, filtrar por lista do que é seguro mostrar (ex.: só `Target URL`), nunca por lista do que esconder.
 
+## Migração de plataforma
+
+- **Cabeçalhos "confiáveis" mudam de uma hospedagem para outra.** (12/nov/2026: `x-forwarded-for` era seguro na Vercel,
+  que reescreve o cabeçalho, mas na Cloudflare o 1º valor vem do visitante → limites por IP burláveis. Achado só
+  depois do corte, revisando a política de privacidade.) Regra: ao trocar de plataforma, listar tudo que lê cabeçalhos
+  de rede (IP, host, protocolo, país) e testar com um valor forjado. Na Cloudflare: IP = `cf-connecting-ip`.
+
 ## Windows / PowerShell
 
 - **`| Select-Object -First N` encerra o comando depois de N linhas** — num script longo (cópia de fotos), ele para no
