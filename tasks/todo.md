@@ -4,7 +4,7 @@
 2. [x] Login da equipe: `/admin/equipe` (testado pelo Raylan; merge 12/nov)
 3. [x] Termos de uso + política de privacidade (LGPD) (OK do Raylan; merge 12/nov)
 4. [x] Cron da Cloudflare (Pix vencido, entregas esquecidas, limpeza) (OK do Raylan; merge 12/nov)
-5. [ ] Turnstile no checkout e no login + regras de rate limit na borda
+5. [~] Turnstile no checkout e no login + regras de rate limit na borda (código na produção, desligado até as chaves)
 6. [ ] E-mail `contato@`/`suporte@rgm.dev.br` (Email Routing)
 7. [ ] Web Analytics da Cloudflare
 8. [ ] Alerta quando o Worker der erro
@@ -86,7 +86,7 @@
   **Não ligar o Bot Fight Mode**: no plano Free ele não tem exceção e pode barrar o webhook do Mercado Pago.
 - [x] Preview (navegador): login espera o token e gera outro a cada tentativa; script bloqueado → botão travado e envio
       forçado sem token recusado pelo servidor; checkout completo (dinheiro) → pedido criado. Dados de teste apagados.
-- [ ] OK · [ ] merge · [ ] chaves de produção · [ ] regra de rate limit
+- [x] OK · [x] merge (12/nov) · [ ] chaves de produção · [ ] regra de rate limit
 
 
 
