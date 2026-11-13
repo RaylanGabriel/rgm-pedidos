@@ -25,6 +25,11 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   depois do corte, revisando a política de privacidade.) Regra: ao trocar de plataforma, listar tudo que lê cabeçalhos
   de rede (IP, host, protocolo, país) e testar com um valor forjado. Na Cloudflare: IP = `cf-connecting-ip`.
 
+- **Validar um segredo e enviá-lo no mesmo comando encadeado: a validação precisa PARAR o envio.** (13/nov/2026: o
+  script mostrou `presente=false` para TURNSTILE_SECRET_KEY, mas saiu com código 0 e o `&&` seguiu → um valor VAZIO foi
+  enviado ao Worker de produção. Sem efeito porque a chave pública ainda estava vazia.) Regra: o script de validação sai
+  com `process.exit(1)` quando falta algo, e o envio também recusa valor vazio.
+
 ## Windows / PowerShell
 
 - **`| Select-Object -First N` encerra o comando depois de N linhas** — num script longo (cópia de fotos), ele para no
