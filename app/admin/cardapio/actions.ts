@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { and, asc, count, eq, inArray, isNull, max, not } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { categories, ingredients, menuItemCategories, menuItems } from "@/db/schema"
+import { categories, ingredients, menuItemCategories, menuItemIngredients, menuItems } from "@/db/schema"
 import { isOwner, requireStore } from "@/lib/auth/session"
 import { formText, optional, priceSchema, zodErrorState, type FormState } from "@/lib/form-state"
 import { deleteImage, fileFrom, uploadImage } from "@/lib/storage"
@@ -130,6 +130,7 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
         }),
       ),
     ])
+    await saveRecipe(store.id, itemId, fd)
   } catch (e) {
     if (imageUrl) await deleteImage(imageUrl) // não deixa foto órfã
     throw e
@@ -138,6 +139,52 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
 
   refresh(store.slug)
   return { ok: true, message: id ? "Item atualizado." : "Item adicionado." }
+}
+
+/**
+ * Ficha técnica do lanche (o item já foi conferido como desta loja). Campos do formulário:
+ * - `recipe`: ids dos ingredientes, na ordem dos botões "sem ___"; `fixed`: os que o cliente não pode tirar.
+ * - `newIngredients`: "pão, cebola…" — cria os que não existem (como ingrediente base, sem preço) e põe na ficha.
+ * Só aceita ingredientes desta loja. A ficha é pequena: apaga e grava de novo.
+ */
+async function saveRecipe(storeId: string, itemId: string, fd: FormData) {
+  // Formulário sem a seção da ficha (ex.: página antiga aberta no navegador): não mexe na ficha
+  if (!fd.has("recipeForm")) return
+  const fixed = new Set(fd.getAll("fixed").map(String))
+  const ids = [...new Set(fd.getAll("recipe").map(String))].filter((v) => uuid.safeParse(v).success).slice(0, 40)
+  const typed = [
+    ...new Map(
+      formText(fd, "newIngredients")
+        .split(/[,;\n]+/)
+        .map((n) => n.trim().replace(/\s+/g, " ").slice(0, 60))
+        .filter((n) => n.length >= 2)
+        .map((n) => [n.toLowerCase(), n]),
+    ).values(),
+  ].slice(0, 30)
+
+  const existing = await db
+    .select({ id: ingredients.id, name: ingredients.name })
+    .from(ingredients)
+    .where(eq(ingredients.storeId, storeId))
+  const byName = new Map(existing.map((i) => [i.name.toLowerCase(), i.id]))
+  const mine = new Set(existing.map((i) => i.id))
+
+  const toCreate = typed.filter((n) => !byName.has(n.toLowerCase()))
+  if (toCreate.length) {
+    const created = await db
+      .insert(ingredients)
+      .values(toCreate.map((name) => ({ storeId, name: name[0].toUpperCase() + name.slice(1), price: "0", groupName: "Base", isExtra: false })))
+      .returning({ id: ingredients.id, name: ingredients.name })
+    for (const c of created) byName.set(c.name.toLowerCase(), c.id)
+  }
+  const wanted = [...new Set([...ids.filter((i) => mine.has(i)), ...typed.map((n) => byName.get(n.toLowerCase())!)])]
+
+  await runBatch([
+    db.delete(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, itemId)),
+    ...wanted.map((ingredientId, sortOrder) =>
+      db.insert(menuItemIngredients).values({ menuItemId: itemId, ingredientId, removable: !fixed.has(ingredientId), sortOrder }),
+    ),
+  ])
 }
 
 /** Esgotado/disponível — liberado também para funcionários. */
@@ -276,28 +323,32 @@ export async function moveCategoryAction(id: string, direction: "up" | "down") {
   refresh(ctx.store.slug)
 }
 
-// ---------- Adicionais ----------
+// ---------- Ingredientes (ficha técnica e adicionais) ----------
 const ingredientSchema = z.object({
   name: z.string().min(2, "Nome muito curto").max(60, "Nome muito longo"),
   price: priceSchema,
   groupName: z.string().min(2, "Grupo muito curto").max(40, "Grupo muito longo"),
+  isExtra: z.boolean(),
   active: z.boolean(),
 })
 
 export async function saveIngredientAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const ctx = await isOwner()
   if (!ctx) return NO_PERMISSION
+  const isExtra = fd.get("isExtra") === "on"
   const parsed = ingredientSchema.safeParse({
     name: formText(fd, "name"),
-    price: formText(fd, "price"),
-    groupName: formText(fd, "groupName") || "Adicionais",
+    // Só o adicional tem preço; ingrediente só da ficha fica com 0
+    price: isExtra ? formText(fd, "price") : "0",
+    groupName: formText(fd, "groupName") || (isExtra ? "Adicionais" : "Base"),
+    isExtra,
     active: fd.get("active") === "on",
   })
   if (!parsed.success) return zodErrorState(parsed.error)
 
   const id = formText(fd, "id")
   if (id) {
-    if (!uuid.safeParse(id).success) return { error: "Adicional inválido." }
+    if (!uuid.safeParse(id).success) return { error: "Ingrediente inválido." }
     await db
       .update(ingredients)
       .set(parsed.data)
@@ -306,7 +357,7 @@ export async function saveIngredientAction(_prev: FormState, fd: FormData): Prom
     await db.insert(ingredients).values({ ...parsed.data, storeId: ctx.store.id })
   }
   refresh(ctx.store.slug)
-  return { ok: true, message: id ? "Adicional atualizado." : "Adicional criado." }
+  return { ok: true, message: id ? "Ingrediente atualizado." : "Ingrediente criado." }
 }
 
 export async function toggleIngredientAction(id: string) {

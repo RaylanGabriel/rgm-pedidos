@@ -1,6 +1,7 @@
 "use client"
 
 import { useContext, useState } from "react"
+import { Lock, LockOpen, Plus, X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
@@ -13,6 +14,11 @@ const selectClass =
 
 const priceText = (v?: string | number) => (v === undefined ? "" : Number(v).toFixed(2).replace(".", ","))
 
+export interface RecipeEntry {
+  ingredientId: string
+  removable: boolean
+}
+
 export interface ItemFormData {
   id: string
   name: string
@@ -22,23 +28,41 @@ export interface ItemFormData {
   active: boolean
   imageUrl: string | null
   alsoIn: string[]
+  recipe: RecipeEntry[]
 }
 
 /** Criar (sem `item`) ou editar um lanche. */
 export function ItemForm({
   item,
   categories,
+  ingredients,
   defaultCategoryId,
 }: {
   item?: ItemFormData
   categories: { id: string; name: string }[]
+  /** Todos os ingredientes da loja (para montar a ficha técnica) */
+  ingredients: { id: string; name: string }[]
   defaultCategoryId?: string | null
 }) {
   const close = useContext(CloseContext)
   const initialCategory = item ? (item.categoryId ?? "") : (defaultCategoryId ?? "")
   const [primary, setPrimary] = useState(initialCategory)
+  const [resetKey, setResetKey] = useState(0) // novo item salvo: zera a ficha também
+  const descId = `desc-${item?.id ?? "novo"}`
   return (
-    <ActionForm action={saveItemAction} resetOnSuccess={!item} onSuccess={item ? close : () => setPrimary(initialCategory)} className="space-y-4">
+    <ActionForm
+      action={saveItemAction}
+      resetOnSuccess={!item}
+      onSuccess={
+        item
+          ? close
+          : () => {
+              setPrimary(initialCategory)
+              setResetKey((k) => k + 1)
+            }
+      }
+      className="space-y-4"
+    >
       {(s) => (
         <>
           {item && <input type="hidden" name="id" value={item.id} />}
@@ -55,11 +79,11 @@ export function ItemForm({
             />
           </div>
           <div>
-            <Label htmlFor={`desc-${item?.id ?? "novo"}`} className="mb-1.5">
+            <Label htmlFor={descId} className="mb-1.5">
               Descrição
             </Label>
             <Textarea
-              id={`desc-${item?.id ?? "novo"}`}
+              id={descId}
               name="description"
               rows={2}
               maxLength={300}
@@ -113,10 +137,136 @@ export function ItemForm({
               </div>
             </fieldset>
           )}
+          {/* key: renasce ao salvar (novo item) ou quando a ficha salva muda (ingredientes recém-criados viram chips) */}
+          <RecipePicker
+            key={`${resetKey}:${(item?.recipe ?? []).map((r) => `${r.ingredientId}${r.removable ? "" : "!"}`).join(",")}:${ingredients.length}`}
+            ingredients={ingredients}
+            initial={item?.recipe ?? []}
+            descriptionId={descId}
+          />
           <SubmitButton>{item ? "Salvar alterações" : "Adicionar item"}</SubmitButton>
         </>
       )}
     </ActionForm>
+  )
+}
+
+/** "Pão brioche, smash 90g e cebola." → ["Pão brioche", "smash 90g", "cebola"] (sugestão; o dono revisa antes de salvar) */
+const splitIngredients = (text: string) =>
+  text
+    .split(/[,;\n]+|\s+e\s+/i)
+    .map((s) => s.trim().replace(/[.!]+$/, ""))
+    .filter((s) => s.length >= 2 && s.length <= 60)
+
+/**
+ * Ficha técnica do lanche: quais ingredientes ele leva e quais o cliente pode tirar ("sem cebola").
+ * Manda `recipe` (ids, na ordem), `fixed` (não pode tirar) e `newIngredients` (texto) para saveItemAction.
+ */
+function RecipePicker({ ingredients, initial, descriptionId }: { ingredients: { id: string; name: string }[]; initial: RecipeEntry[]; descriptionId: string }) {
+  const [recipe, setRecipe] = useState<RecipeEntry[]>(initial)
+  const [typed, setTyped] = useState("")
+  const name = new Map(ingredients.map((i) => [i.id, i.name]))
+  const chosen = new Set(recipe.map((r) => r.ingredientId))
+  const others = ingredients.filter((i) => !chosen.has(i.id))
+
+  const add = (id: string) => setRecipe((r) => [...r, { ingredientId: id, removable: true }])
+  const drop = (id: string) => setRecipe((r) => r.filter((x) => x.ingredientId !== id))
+  const toggleFixed = (id: string) => setRecipe((r) => r.map((x) => (x.ingredientId === id ? { ...x, removable: !x.removable } : x)))
+  const fromDescription = () => {
+    const desc = (document.getElementById(descriptionId) as HTMLTextAreaElement | null)?.value ?? ""
+    const known = new Set(recipe.map((r) => (name.get(r.ingredientId) ?? "").toLowerCase()))
+    const parts = splitIngredients(desc).filter((p) => !known.has(p.toLowerCase()))
+    // Os que já existem no cadastro entram direto; os novos vão para o campo de texto (criados ao salvar)
+    const byName = new Map(ingredients.map((i) => [i.name.toLowerCase(), i.id]))
+    const existing = parts.map((p) => byName.get(p.toLowerCase())).filter((id): id is string => !!id && !chosen.has(id))
+    const fresh = parts.filter((p) => !byName.has(p.toLowerCase()))
+    setRecipe((r) => [...r, ...[...new Set(existing)].map((id) => ({ ingredientId: id, removable: true }))])
+    if (fresh.length) setTyped((t) => [t, fresh.join(", ")].filter(Boolean).join(", "))
+  }
+
+  return (
+    <fieldset className="rounded-lg border p-3">
+      <input type="hidden" name="recipeForm" value="1" />
+      {recipe.map((r) => (
+        <span key={r.ingredientId}>
+          <input type="hidden" name="recipe" value={r.ingredientId} />
+          {!r.removable && <input type="hidden" name="fixed" value={r.ingredientId} />}
+        </span>
+      ))}
+      <legend className="px-1 text-sm font-medium">Ingredientes deste lanche</legend>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Viram os botões “sem cebola” para o cliente. Toque no cadeado no que não dá para tirar (ex.: pão, carne).
+      </p>
+
+      {recipe.length > 0 ? (
+        <ul className="mb-3 flex flex-wrap gap-2" aria-label="Ingredientes escolhidos">
+          {recipe.map((r) => (
+            <li key={r.ingredientId} className="flex items-center rounded-full border-2 border-primary bg-primary/10 text-sm">
+              <span className="pl-3 font-medium">{name.get(r.ingredientId) ?? "?"}</span>
+              <button
+                type="button"
+                onClick={() => toggleFixed(r.ingredientId)}
+                aria-pressed={!r.removable}
+                title={r.removable ? "O cliente pode tirar. Toque para travar." : "Fixo: o cliente não pode tirar. Toque para liberar."}
+                className="ml-1 inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {r.removable ? <LockOpen className="h-3.5 w-3.5" aria-hidden /> : <Lock className="h-3.5 w-3.5 text-foreground" aria-hidden />}
+                <span>{r.removable ? "pode tirar" : "fixo"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => drop(r.ingredientId)}
+                aria-label={`Tirar ${name.get(r.ingredientId)} da ficha`}
+                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mb-3 text-sm text-muted-foreground">Nenhum ingrediente ainda: o cliente não vê botões “sem ___” neste lanche.</p>
+      )}
+
+      {others.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">Adicionar da lista</p>
+          <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+            {others.map((i) => (
+              <button
+                key={i.id}
+                type="button"
+                onClick={() => add(i.id)}
+                className="inline-flex h-8 items-center gap-1 rounded-full border border-dashed px-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                {i.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-end gap-2">
+        <Field
+          label="Novos ingredientes"
+          name="newIngredients"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          placeholder="Ex.: pão brioche, cebola roxa, picles"
+          maxLength={600}
+          hint="Separe por vírgula. São criados ao salvar e já entram neste lanche."
+          className="min-w-56 flex-1"
+        />
+        <button
+          type="button"
+          onClick={fromDescription}
+          className="mb-5 inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Copiar da descrição
+        </button>
+      </div>
+    </fieldset>
   )
 }
 
@@ -152,6 +302,7 @@ export interface IngredientFormData {
   name: string
   price: string
   groupName: string
+  isExtra: boolean
   active: boolean
 }
 
@@ -164,31 +315,54 @@ export function IngredientForm({
 }) {
   const close = useContext(CloseContext)
   const listId = `grupos-${ingredient?.id ?? "novo"}`
+  const [isExtra, setIsExtra] = useState(ingredient?.isExtra ?? true)
   return (
-    <ActionForm action={saveIngredientAction} resetOnSuccess={!ingredient} onSuccess={ingredient ? close : undefined} className="space-y-4">
+    <ActionForm
+      action={saveIngredientAction}
+      resetOnSuccess={!ingredient}
+      onSuccess={ingredient ? close : () => setIsExtra(true)}
+      className="space-y-4"
+    >
       {(s) => (
         <>
           {ingredient && <input type="hidden" name="id" value={ingredient.id} />}
-          <div className="grid sm:grid-cols-[1fr_120px_1fr] gap-4">
-            <Field label="Nome" name="name" defaultValue={ingredient?.name} placeholder="Ex.: Bacon" required maxLength={60} error={s.fieldErrors?.name} />
-            <Field
-              label="Preço (R$)"
-              name="price"
-              inputMode="decimal"
-              placeholder="5,00"
-              defaultValue={priceText(ingredient?.price)}
-              required
-              error={s.fieldErrors?.price}
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="isExtra"
+              checked={isExtra}
+              onChange={(e) => setIsExtra(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
             />
+            <span>
+              <span className="font-medium">Vender também como adicional</span>
+              <span className="block text-muted-foreground">
+                Aparece em “Quer turbinar?” com preço. Desmarcado: só compõe os lanches (ex.: pão, cebola).
+              </span>
+            </span>
+          </label>
+          <div className={isExtra ? "grid sm:grid-cols-[1fr_120px_1fr] gap-4" : "grid sm:grid-cols-[1fr_1fr] gap-4"}>
+            <Field label="Nome" name="name" defaultValue={ingredient?.name} placeholder="Ex.: Bacon" required maxLength={60} error={s.fieldErrors?.name} />
+            {isExtra && (
+              <Field
+                label="Preço (R$)"
+                name="price"
+                inputMode="decimal"
+                placeholder="5,00"
+                defaultValue={ingredient?.isExtra ? priceText(ingredient.price) : ""}
+                required
+                error={s.fieldErrors?.price}
+              />
+            )}
             <Field
               label="Grupo"
               name="groupName"
               list={listId}
               defaultValue={ingredient?.groupName ?? ""}
-              placeholder="Ex.: Molhos"
+              placeholder={isExtra ? "Ex.: Molhos" : "Ex.: Base"}
               maxLength={40}
               error={s.fieldErrors?.groupName}
-              hint="Agrupa os adicionais na tela do cliente"
+              hint={isExtra ? "Agrupa os adicionais na tela do cliente" : "Só para organizar esta lista"}
             />
             <datalist id={listId}>
               {groups.map((g) => (
@@ -198,9 +372,9 @@ export function IngredientForm({
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="active" defaultChecked={ingredient?.active ?? true} className="h-4 w-4 accent-[var(--primary)]" />
-            Disponível para os clientes
+            {isExtra ? "Disponível como adicional" : "Ativo"}
           </label>
-          <SubmitButton>{ingredient ? "Salvar alterações" : "Adicionar adicional"}</SubmitButton>
+          <SubmitButton>{ingredient ? "Salvar alterações" : "Adicionar ingrediente"}</SubmitButton>
         </>
       )}
     </ActionForm>

@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, ImageOff, Trash2 } from "lucide-react"
 import { asc, eq } from "drizzle-orm"
 import { db } from "@/db"
-import { categories, ingredients, menuItemCategories, menuItems } from "@/db/schema"
+import { categories, ingredients, menuItemCategories, menuItemIngredients, menuItems } from "@/db/schema"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,16 +25,17 @@ import { CategoryForm, IngredientForm, ItemForm } from "./forms"
 
 export const metadata = { title: "Cardápio" }
 
-const TABS = { itens: "Itens", adicionais: "Adicionais", categorias: "Categorias" } as const
+const TABS = { itens: "Itens", ingredientes: "Ingredientes", categorias: "Categorias" } as const
 type Tab = keyof typeof TABS
 
 export default async function CardapioAdminPage({ searchParams }: { searchParams: Promise<{ aba?: string }> }) {
   const { store, role, user } = await requireStore()
   const canEdit = role === "owner" || user.isSuperadmin
-  const aba = ((await searchParams).aba ?? "itens") as Tab
+  const raw = (await searchParams).aba ?? "itens"
+  const aba = (raw === "adicionais" ? "ingredientes" : raw) as Tab // link antigo da aba "Adicionais"
   const tab: Tab = aba in TABS ? aba : "itens"
 
-  const [cats, items, ings, links] = await Promise.all([
+  const [cats, items, ings, links, recipes] = await Promise.all([
     db.select().from(categories).where(eq(categories.storeId, store.id)).orderBy(asc(categories.sortOrder), asc(categories.name)),
     db.select().from(menuItems).where(eq(menuItems.storeId, store.id)).orderBy(asc(menuItems.sortOrder), asc(menuItems.name)),
     db.select().from(ingredients).where(eq(ingredients.storeId, store.id)).orderBy(asc(ingredients.groupName), asc(ingredients.name)),
@@ -44,8 +45,20 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
       .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
       .where(eq(categories.storeId, store.id))
       .orderBy(asc(menuItemCategories.sortOrder)),
+    db
+      .select({ itemId: menuItemIngredients.menuItemId, ingredientId: menuItemIngredients.ingredientId, removable: menuItemIngredients.removable })
+      .from(menuItemIngredients)
+      .innerJoin(ingredients, eq(ingredients.id, menuItemIngredients.ingredientId))
+      .where(eq(ingredients.storeId, store.id))
+      .orderBy(asc(menuItemIngredients.sortOrder)),
   ])
   const catOptions = cats.map((c) => ({ id: c.id, name: c.name }))
+  const ingOptions = [...ings].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((i) => ({ id: i.id, name: i.name }))
+  const recipeOf = (itemId: string) => recipes.filter((r) => r.itemId === itemId).map((r) => ({ ingredientId: r.ingredientId, removable: r.removable }))
+  const usedIn = (ingId: string) => recipes.filter((r) => r.ingredientId === ingId).length
+  const extras = ings.filter((i) => i.isExtra)
+  const baseOnly = ings.filter((i) => !i.isExtra)
+  const groups = [...new Set(ings.map((i) => i.groupName))]
   const catName = new Map(cats.map((c) => [c.id, c.name]))
   const alsoIn = (itemId: string) => links.filter((l) => l.itemId === itemId).map((l) => l.categoryId)
   /** Itens que aparecem na categoria no cardápio (principal + "também em"), só os visíveis */
@@ -97,7 +110,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
               <Card>
                 <CardContent className="pt-6">
                   <Collapsible summary="+ Adicionar item" defaultOpen={items.length === 0}>
-                    <ItemForm categories={catOptions} defaultCategoryId={cats[0]?.id} />
+                    <ItemForm categories={catOptions} ingredients={ingOptions} defaultCategoryId={cats[0]?.id} />
                   </Collapsible>
                 </CardContent>
               </Card>
@@ -170,8 +183,10 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                                   active: item.active,
                                   imageUrl: item.imageUrl,
                                   alsoIn: alsoIn(item.id),
+                                  recipe: recipeOf(item.id),
                                 }}
                                 categories={catOptions}
+                                ingredients={ingOptions}
                               />
                               <ActionButton
                                 action={deleteItemAction.bind(null, item.id)}
@@ -245,70 +260,91 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
           </div>
         )}
 
-        {/* ---------- Adicionais ---------- */}
-        {tab === "adicionais" && (
+        {/* ---------- Ingredientes (ficha técnica + adicionais) ---------- */}
+        {tab === "ingredientes" && (
           <div className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Um cadastro só: cada ingrediente pode compor os lanches (botões “sem cebola”) e, se você quiser, ser vendido como
+              adicional. Para montar a ficha de um lanche, use “Editar” na aba Itens.
+            </p>
             {canEdit ? (
               <Card>
                 <CardContent className="pt-6">
-                  <Collapsible summary="+ Adicionar adicional" defaultOpen={ings.length === 0}>
-                    <IngredientForm groups={[...new Set(ings.map((i) => i.groupName))]} />
+                  <Collapsible summary="+ Adicionar ingrediente" defaultOpen={ings.length === 0}>
+                    <IngredientForm groups={groups} />
                   </Collapsible>
                 </CardContent>
               </Card>
             ) : (
-              <p className="text-sm text-muted-foreground">Só o dono da loja pode alterar os adicionais.</p>
+              <p className="text-sm text-muted-foreground">Só o dono da loja pode alterar os ingredientes.</p>
             )}
 
-            {[...new Set(ings.map((i) => i.groupName))].map((group) => (
-              <Card key={group}>
-                <CardHeader>
-                  <CardTitle>{group}</CardTitle>
-                </CardHeader>
-                <CardContent className="divide-y">
-                  {ings
-                    .filter((i) => i.groupName === group)
-                    .map((ing) => (
-                      <div key={ing.id} className="py-4 first:pt-0 last:pb-0">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="flex-1 min-w-40">
-                            <p className="font-semibold">
-                              {ing.name} {!ing.active && <Badge variant="outline">Indisponível</Badge>}
-                            </p>
-                            <p className="text-sm text-muted-foreground">+{formatBRL(Number(ing.price))}</p>
+            {[
+              ...[...new Set(extras.map((i) => i.groupName))].map((group) => ({
+                title: `Adicionais · ${group}`,
+                list: extras.filter((i) => i.groupName === group),
+              })),
+              { title: "Só na ficha técnica (não vendidos à parte)", list: baseOnly },
+            ]
+              .filter((s) => s.list.length)
+              .map((section) => (
+                <Card key={section.title}>
+                  <CardHeader>
+                    <CardTitle>{section.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="divide-y">
+                    {section.list.map((ing) => {
+                      const n = usedIn(ing.id)
+                      return (
+                        <div key={ing.id} className="py-4 first:pt-0 last:pb-0">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex-1 min-w-40">
+                              <p className="font-semibold">
+                                {ing.name} {!ing.active && <Badge variant="outline">{ing.isExtra ? "Indisponível" : "Inativo"}</Badge>}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {ing.isExtra ? `+${formatBRL(Number(ing.price))}` : "Sem preço"}
+                                {" · "}
+                                {n ? `em ${n} ${n === 1 ? "lanche" : "lanches"}` : "em nenhum lanche"}
+                              </p>
+                            </div>
+                            {canEdit && ing.isExtra && (
+                              <ActionButton action={toggleIngredientAction.bind(null, ing.id)} size="sm" variant={ing.active ? "outline" : "default"}>
+                                {ing.active ? "Desativar" : "Ativar"}
+                              </ActionButton>
+                            )}
                           </div>
                           {canEdit && (
-                            <ActionButton action={toggleIngredientAction.bind(null, ing.id)} size="sm" variant={ing.active ? "outline" : "default"}>
-                              {ing.active ? "Desativar" : "Ativar"}
-                            </ActionButton>
+                            <Collapsible summary="Editar" className="mt-2">
+                              <div className="space-y-4">
+                                <IngredientForm
+                                  ingredient={{ id: ing.id, name: ing.name, price: ing.price, groupName: ing.groupName, isExtra: ing.isExtra, active: ing.active }}
+                                  groups={groups}
+                                />
+                                <ActionButton
+                                  action={deleteIngredientAction.bind(null, ing.id)}
+                                  confirmText={
+                                    n
+                                      ? `Apagar "${ing.name}"? Ele sai da ficha de ${n} ${n === 1 ? "lanche" : "lanches"}. Pedidos antigos não mudam.`
+                                      : `Apagar "${ing.name}"?`
+                                  }
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Apagar ingrediente
+                                </ActionButton>
+                              </div>
+                            </Collapsible>
                           )}
                         </div>
-                        {canEdit && (
-                          <Collapsible summary="Editar" className="mt-2">
-                            <div className="space-y-4">
-                              <IngredientForm
-                                ingredient={{ id: ing.id, name: ing.name, price: ing.price, groupName: ing.groupName, active: ing.active }}
-                                groups={[...new Set(ings.map((i) => i.groupName))]}
-                              />
-                              <ActionButton
-                                action={deleteIngredientAction.bind(null, ing.id)}
-                                confirmText={`Apagar o adicional "${ing.name}"?`}
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Apagar adicional
-                              </ActionButton>
-                            </div>
-                          </Collapsible>
-                        )}
-                      </div>
-                    ))}
-                </CardContent>
-              </Card>
-            ))}
-            {ings.length === 0 && <p className="text-center text-muted-foreground py-8">Nenhum adicional cadastrado.</p>}
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+              ))}
+            {ings.length === 0 && <p className="text-center text-muted-foreground py-8">Nenhum ingrediente cadastrado.</p>}
           </div>
         )}
 
