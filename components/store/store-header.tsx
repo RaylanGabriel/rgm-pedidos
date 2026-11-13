@@ -167,7 +167,10 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "base" | "name
   )
 }
 
-/** Rodapé: nome + endereço (abre o mapa) à esquerda, redes sociais à direita. Some se a loja não tiver nenhum dos dois. */
+/**
+ * Rodapé. Computador: 3 colunas alinhadas pelo topo (loja + endereço · horário · contato). Celular: tudo
+ * centralizado, sem os títulos das colunas. Sem endereço, horário nem redes: só a linha legal.
+ */
 export function StoreFooter({
   store,
 }: {
@@ -176,7 +179,7 @@ export function StoreFooter({
   const map = mapsLink(store.address)
   const legal = (
     <p className="container mx-auto max-w-6xl px-4 pb-6 text-center text-xs text-muted-foreground sm:text-left">
-      Pedidos online por RGM Pedidos ·{" "}
+      Pedidos online por <span className="font-semibold text-foreground">RGM Pedidos</span> ·{" "}
       <Link href="/termos" className="underline underline-offset-2 hover:text-foreground">
         Termos de uso
       </Link>{" "}
@@ -190,8 +193,8 @@ export function StoreFooter({
     return <footer className="mt-16 border-t bg-card pt-6">{legal}</footer>
   return (
     <footer className="mt-16 border-t bg-card">
-      <div className="container mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
-        <div className="min-w-0 space-y-1">
+      <div className="container mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:items-start sm:justify-between sm:gap-10 sm:text-left">
+        <div className="min-w-0 space-y-1 sm:max-w-sm">
           <p className="font-bold">{store.name}</p>
           {map && (
             <a
@@ -205,18 +208,27 @@ export function StoreFooter({
               <span className="sr-only"> (abre o mapa)</span>
             </a>
           )}
-          {store.weekHours && (
-            <dl className="pt-1 text-sm text-muted-foreground">
+        </div>
+        {store.weekHours && (
+          <div>
+            <p className="mb-1 hidden font-bold sm:block">Horário</p>
+            {/* Grade de 2 colunas: os horários começam todos na mesma linha vertical */}
+            <dl className="inline-grid grid-cols-[auto_auto] gap-x-2 text-sm text-muted-foreground">
               {store.weekHours.map(([days, time]) => (
-                <div key={days} className="flex justify-center gap-2 sm:justify-start">
-                  <dt>{days}:</dt>
-                  <dd className="font-medium tabular-nums text-foreground/80">{time}</dd>
+                <div key={days} className="contents">
+                  <dt className="text-right sm:text-left">{days}:</dt>
+                  <dd className="text-left font-medium tabular-nums text-foreground/80">{time}</dd>
                 </div>
               ))}
             </dl>
-          )}
-        </div>
-        <SocialLinks store={store} compact className="justify-center" />
+          </div>
+        )}
+        {socialLinks(store).length > 0 && (
+          <div>
+            <p className="mb-2 hidden font-bold sm:block">Fale com a gente</p>
+            <SocialLinks store={store} compact className="justify-center sm:justify-start" />
+          </div>
+        )}
       </div>
       {legal}
     </footer>
