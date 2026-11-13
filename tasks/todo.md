@@ -74,7 +74,7 @@ A descrição do combo ("Smash Clássico + batata frita média + refrigerante la
   quando há mais itens (‹ desabilitada no início); até 10 sugestões (antes 4/6).
 - [x] Preview `09aa3d7`: carrinho lateral, finalizar e sacola do celular com 9 cards, todos com 174 px; a seta rola
   (0 → 240 px) e habilita a ‹; no celular as setas ficam escondidas (rola com o dedo).
-- [ ] OK do Raylan · [ ] merge (sem migração) · [ ] conferir produção
+- [x] OK do Raylan · [x] merge `b92f8cc` (junto com o 10c) · [x] produção conferida
 
 ## 10c. Carrinho por lanche: editar, "+" vira outro lanche, foto (Raylan, 13/nov; mesma branch)
 "Quando clico em + ele só adiciona com as mesmas informações. O ideal é aparecer o lanche de novo embaixo com um
@@ -91,7 +91,10 @@ lápis para voltar na tela de tirar/adicionar ingredientes. Foto do lanche no ca
   Tomate muda só a 1ª (R$ 22,90) e reabre marcada; água: "+" soma (1 linha, 2 un., sem Editar); finalizar com
   Editar; no celular a janela abre por cima da sacola. "Editar" virou link embaixo do nome (os 3 botões não cabiam
   no carrinho lateral de 360 px).
-- [ ] OK do Raylan · [ ] merge (sem migração, junto com o 10b) · [ ] conferir produção
+- [x] Balcão no preview: "+" → 2 linhas, editar a 2ª "sem Bacon crocante", pedido criado; banco gravou 1 completo + 1
+  sem bacon; cozinha mostrou. Pedido de teste apagado.
+- [x] OK do Raylan · [x] merge `b92f8cc` · [x] produção (mrsmash.rgm.dev.br, só navegador, sem pedido): foto, "+" → 2
+  linhas, Editar/Salvar, água soma, finalizar com Editar, celular ok.
 
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
 "Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
