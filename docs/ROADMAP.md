@@ -13,7 +13,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia · 📚 es
 - Pedido criado pela função `create_order()` no banco: preço sempre calculado no servidor.
 - Acompanhamento público por token, painel da cozinha, relatórios, editor de cardápio, configurações + QR code.
 - Impressão do pedido em bobina 58 mm (trazida da versão do v0).
-- Deploy: Vercel (`main` = produção, branches = preview). Variáveis antigas do Supabase removidas; `SITE_URL` cadastrada.
+- Deploy: Cloudflare Workers pelo Workers Builds (`main` = produção, branches = preview). Até nov/2026 era a Vercel.
 
 ## ✅ 1. Lembrar os dados do cliente no aparelho
 **Objetivo:** quem já pediu não digita tudo de novo. Sem login.
@@ -33,7 +33,7 @@ Legenda: ✅ feito · 🔨 em andamento · ⏳ próximo · 💭 ideia · 📚 es
 **Extras pedidos durante o item 2 ✅**
 - **Motivo da suspensão** em texto livre (ex.: "contrato encerrado", "falta de pagamento"), mostrado ao dono e à equipe
   (`stores.suspended_reason`, `suspended_at`).
-- **Fotos** de lanches, bebidas etc. e **logo** por upload (Vercel Blob, store `cardapio-fotos`): imagem reduzida no
+- **Fotos** de lanches, bebidas etc. e **logo** por upload (hoje no Cloudflare R2, em `fotos.rgm.dev.br`; até nov/2026 no Vercel Blob): imagem reduzida no
   navegador (WebP), conferida no servidor (tipo real do arquivo, até 2 MB), foto antiga apagada ao trocar.
 
 ## ✅ 3. Taxa de entrega por localização
@@ -96,7 +96,7 @@ Crítica feita com o plugin de design + skill Revenue-Centric Design (`.claude/s
   `lib/order-shared.ts`) — corrigiu a cozinha e o cliente mostrando etapas diferentes.
 - Cliente confirma **"Recebi meu pedido"** na tela de acompanhamento (`orders.customer_confirmed_at`).
 - Se ninguém confirmar, **fecha sozinho 1h após a saída** (`out_for_delivery_at`, `auto_delivered`,
-  `autoCompleteDeliveries`, roda ao ler pedidos — o plano grátis da Vercel não tem tarefa agendada frequente).
+  `autoCompleteDeliveries`, roda ao ler pedidos e, desde nov/2026, também no cron a cada 5 min).
 
 ## ✅ 4b. Relatórios (fora do plano original)
 Revisão de bugs, lógica e design com o plugin de design + skill de gráficos (dataviz).
@@ -119,20 +119,20 @@ Revisão de bugs, lógica e design com o plugin de design + skill de gráficos (
   (só conta pedidos a partir de nov/2026).
 - **Pouca saída**: itens abaixo de 30% da média do cardápio, com dica (promoção, combo, tirar do cardápio).
 
-## 🔨 4c. Domínio da plataforma — rgm.dev.br (fazer ANTES do Mercado Pago)
+## ✅ 4c. Domínio da plataforma — rgm.dev.br (fazer ANTES do Mercado Pago)
 **Problema:** hoje o endereço é `mr-smash-street.vercel.app/loja/<slug>` — o nome "Mr. Smash" não faz sentido para
 as outras lojas, mesmo com o nome delas depois da `/`.
 
 **Por que antes do Mercado Pago:** o app do Mercado Pago guarda a **URL de retorno do login (OAuth)** e a **URL do
 webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tudo e reconectar as contas.
 
-**Proposta (em camadas):**
+**Proposta (em camadas; escrita quando o site ainda estava na Vercel):**
 1. **Domínio neutro da plataforma** (comprar um `.com.br` no registro.br, ~R$ 40/ano), com nome de produto e não de loja.
    O painel fica em `app.<dominio>` (ou `<dominio>/admin`).
 2. **Subdomínio por loja:** `mrsmash.<dominio>`, `dogaodoze.<dominio>` — domínio curinga `*.<dominio>` na Vercel
    (grátis) + `proxy.ts` lendo o host e mostrando a loja certa. `/loja/<slug>` continua funcionando.
-3. **Domínio próprio da loja (opcional, plano pago):** `www.lanchonetedoze.com.br` apontando para a plataforma,
-   cadastrado pela API de domínios da Vercel. Tabela `store_domains`.
+3. **Domínio próprio da loja (opcional, plano pago):** `www.lanchonetedoze.com.br` apontando para a plataforma —
+   hoje seria pelo **Cloudflare for SaaS** (custom hostnames, com certificado automático). Tabela `store_domains`.
 
 **Cuidados:**
 - **QR codes já impressos** apontam para o endereço atual: manter `mr-smash-street.vercel.app` redirecionando (301)
@@ -148,8 +148,9 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
 - `<projeto>.rgm.dev.br` → outros projetos
 - **Subdomínios reservados** (nenhuma loja pode usar como slug): `www`, `painel`, `app`, `admin`, `api`, `mail`,
   `blog`, `docs`, `status` + os nomes dos outros projetos (lista em código, fácil de aumentar).
-- DNS do domínio na Vercel (servidores `ns1/ns2.vercel-dns.com` no registro.br) — exigido para o curinga `*.rgm.dev.br`
-  ter HTTPS automático; registros dos outros sites continuam podendo apontar para qualquer lugar.
+- DNS do domínio na **Cloudflare** desde 12/nov/2026 (`cody`/`margot.ns.cloudflare.com` no registro.br; antes era a
+  Vercel). Curinga `*.rgm.dev.br` com HTTPS automático. Subdomínio que não for das lojas (fotos, outros projetos)
+  precisa de rota própria sem Worker — ver `docs/ARQUITETURA-CLOUDFLARE.md`.
 - Escolha justificada: o cliente chega pelo QR code da mesa/carrinho, então o nome do domínio pesa pouco; projetos de
   risco (ex.: rifa) ficam **fora** deste domínio para não dividir reputação.
 
@@ -198,9 +199,9 @@ Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
 - Em produção, conexão feita em modo de teste não gera Pix: o painel pede para reconectar.
 
 **Falta:**
-- **"Conectar Mercado Pago" (OAuth) de outras contas** dava "O aplicativo não está pronto para se conectar". O painel do
-  Mercado Pago só considera o app pronto depois do 1º pagamento real (etapa 4, até 24 h). Testar de novo com a conta
-  real de outra pessoa; se continuar, abrir chamado no suporte do Mercado Pago Developers.
+- **"Conectar Mercado Pago" (OAuth) de outras contas** dá "O aplicativo não está pronto para se conectar" — testado de
+  novo em 12/nov com a conta real de outra pessoa, depois de pagamentos reais. Causa provável: `allow_flow` vazio na
+  aplicação (`GET /applications/<id>`). **Chamado aberto no suporte do MP Developers** (pedindo também o Platform ID).
 - ✅ Nota de qualidade: a cobrança agora envia `items` (lanche com adicionais no preço + "Taxa de entrega"; o Mercado Pago
   recusa se a soma não bater, então sem itens nesse caso), `statement_descriptor` (nome da loja sem acento, até 22) e
   nome/sobrenome do comprador. Falta: Device ID (script de segurança do MP, útil para cartão) e Platform ID (comercial do MP).
@@ -221,13 +222,24 @@ conseguir explicar sozinho numa entrevista:
 - **OAuth:** como o dono conecta a conta sem passar a senha, o `state` anti-CSRF, access token × refresh token.
 - **Criptografia dos tokens:** AES-256-GCM, IV, tag de autenticação, por que a chave fica fora do banco.
 - **Segurança geral:** preço calculado no servidor (`create_order()`), sessão com hash, rate limit, `store_id` em tudo.
-- **Banco e deploy:** migrations, branches `production`/`preview` do Neon, preview da Vercel.
+- **Banco e deploy:** migrations, branches `production`/`preview` do Neon, Workers de produção e de preview na Cloudflare.
 - Formato sugerido: uma conversa por tema + perguntas de entrevista para treinar.
 
-## ⏳ 8. Migrar para a Cloudflare (antes do 1º cliente real)
+## ✅ 8. Migrar para a Cloudflare (feito em 12/nov/2026, antes do 1º cliente real)
 O plano grátis da Vercel proíbe uso comercial (site que processa pedidos/pagamentos). Decisão: Cloudflare Workers Paid
-(US$ 5/mês) — mais segurança (WAF, Turnstile, rate limit), cron, R2 e aprendizado. Arquitetura completa e plano em
-fases em [`docs/ARQUITETURA-CLOUDFLARE.md`](ARQUITETURA-CLOUDFLARE.md).
+(US$ 5/mês) — mais segurança (WAF, Turnstile, rate limit), cron, R2 e aprendizado. Corte direto (sem reserva na
+Vercel), fotos no R2, Vercel e Blob apagados. Tudo em [`docs/ARQUITETURA-CLOUDFLARE.md`](ARQUITETURA-CLOUDFLARE.md).
+
+## ✅ 8b. Pronto para o 1º cliente (12–13/nov/2026; checklist em `tasks/todo.md`)
+- **Login da equipe** (item 7 abaixo).
+- **Termos de uso e política de privacidade** (`/termos`, `/privacidade`, LGPD): links no rodapé, no checkout e no login.
+- **Cron** a cada 5 min: entregas esquecidas, Pix vencido (consulta o Mercado Pago antes de cancelar), limpeza.
+- **Segurança:** Turnstile no login; regra de rate limit da Cloudflare em `/admin/login` e `/finalizar`; IP real pelo
+  `cf-connecting-ip` (o `x-forwarded-for` era forjável na Cloudflare).
+- **E-mail** `contato@`, `suporte@`, `raylan@rgm.dev.br` → Gmail (Email Routing). **Web Analytics** sem cookies.
+- **Alerta de erros por e-mail** (`alertas@rgm.dev.br`) + **UptimeRobot** (painel e loja, a cada 5 min).
+- **Backup diário** do banco no R2 (03:00, 30 dias): `npm run backup -- conferir|restaurar`.
+- **ESLint** com as regras do Next 16 (`npm run lint`).
 
 ## ✅ 7. Equipe: o dono cria o login dos funcionários (nov/2026, antes do 1º cliente)
 **Por que importa:** sem isso o dono deixa o próprio login aberto no tablet da cozinha (qualquer um vê faturamento,
@@ -279,17 +291,18 @@ a ordem é 9a → 9b.
 ---
 
 ## Pendências do Mr. Smash (dados, não código)
-- Cadastrar endereço e WhatsApp da loja em Configurações (aparecem no topo e no acompanhamento).
+- ✅ Endereço e WhatsApp cadastrados (13/nov).
+- Item de teste a R$ 0,70 mantido de propósito por enquanto (teste do Pix real).
 - Categorias de teste ("Teste 1/2/3", "Teste") podem ser apagadas quando quiser.
 
 ## Notas técnicas
 - Repositório: **github.com/RaylanGabriel/rgm-pedidos** (antes `v0-mr-smash-street-website`; o GitHub redireciona o nome antigo).
 - **Dois bancos (branches do Neon, projeto "rgm-pedidos", antes "Hamburguerias")**:
-  - `production` → só o site no ar (variável `DATABASE_URL` de Production na Vercel; local em `.env.prod-db`).
-  - `preview` → previews da Vercel e testes locais (`.env.local`). É uma cópia da produção: testes não sujam o site no ar.
+  - `production` → só o site no ar (segredo `DATABASE_URL` do Worker `rgm-pedidos`; local em `.env.prod-db`).
+  - `preview` → Worker `rgm-pedidos-preview` e testes locais (`.env.local`). É uma cópia da produção: testes não sujam o site no ar.
 - **Fluxo de migration:** `npm run db:migrate` (aplica no preview) → testar → aprovado → `npm run db:migrate:prod`
   (aplica na produção) **antes** de juntar na `main`.
 - Renovar a cópia com os dados atuais da produção: `npm run db:preview:reset` (apaga o que foi feito no preview).
-- Migrations em `drizzle/` (0003 → 0023): `npm run db:generate -- --name x`.
+- Migrations em `drizzle/` (0003 → 0024): `npm run db:generate -- --name x`.
 - Erros do banco chegam embrulhados pelo Drizzle: ler `err.cause.message`.
 - Datas no fuso de São Paulo (`lib/dates.ts`).
