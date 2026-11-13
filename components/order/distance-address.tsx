@@ -45,8 +45,11 @@ export function useDistanceQuote(active: boolean, v: AddressFields, quoteFn: (pa
   const parts = partsFromFields(v)
   const key = active && ready(v) ? JSON.stringify({ ...parts, complement: null, cep: null }) : ""
   const [state, setState] = useState<{ key: string; quote: QuoteView | null }>({ key: "", quote: null })
+  // Função mais recente sem refazer a consulta a cada renderização (atualizada fora da renderização)
   const fnRef = useRef(quoteFn)
-  fnRef.current = quoteFn
+  useEffect(() => {
+    fnRef.current = quoteFn
+  })
 
   useEffect(() => {
     if (!key) return
