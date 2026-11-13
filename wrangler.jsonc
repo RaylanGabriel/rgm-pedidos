@@ -39,7 +39,7 @@
     "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
     "MP_TEST_MODE": "false",
     "FOTOS_PUBLIC_URL": "https://fotos.rgm.dev.br",
-    // Turnstile (anti-robô no checkout e no login): widget "RGM Pedidos" (rgm.dev.br, modo Gerenciado). Chave pública;
+    // Turnstile (anti-robô no login do painel; tirado do checkout em 13/nov): widget "RGM Pedidos" (rgm.dev.br, modo Gerenciado). Chave pública;
     // o segredo TURNSTILE_SECRET_KEY fica no Worker. Vazio = desligado.
     "TURNSTILE_SITE_KEY": "0x4AAAAAAF--m8IBn58aOCqr",
   },

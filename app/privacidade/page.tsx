@@ -89,7 +89,8 @@ export default function PrivacidadePage() {
           </li>
           <li>
             <strong>Cloudflare</strong> (hospedagem do site e das fotos) e <strong>Neon</strong> (banco de dados, com
-            servidores em São Paulo), que guardam os dados em nosso nome, com medidas de segurança.
+            servidores em São Paulo), que guardam os dados em nosso nome, com medidas de segurança. No login do painel, o
+            Turnstile da Cloudflare confere características do navegador para barrar robôs, sem cookies de rastreamento.
           </li>
           <li>
             <strong>WhatsApp e Google Maps</strong>, só se você tocar nos botões que abrem esses aplicativos.

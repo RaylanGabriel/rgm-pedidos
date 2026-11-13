@@ -4,9 +4,10 @@
 2. [x] Login da equipe: `/admin/equipe` (testado pelo Raylan; merge 12/nov)
 3. [x] Termos de uso + política de privacidade (LGPD) (OK do Raylan; merge 12/nov)
 4. [x] Cron da Cloudflare (Pix vencido, entregas esquecidas, limpeza) (OK do Raylan; merge 12/nov)
-5. [~] Turnstile no checkout e no login + regras de rate limit na borda (código na produção, desligado até as chaves)
-6. [ ] E-mail `contato@`/`suporte@rgm.dev.br` (Email Routing)
-7. [ ] Web Analytics da Cloudflare
+5. [x] Turnstile + regra de rate limit na borda. Testado pelo Raylan (computador e celular); **só no login** a pedido dele
+   (no checkout atrasava o cliente; lá ficam o limite por IP e a regra da borda em `/finalizar`)
+6. [x] E-mail `contato@`/`suporte@`/`raylan@rgm.dev.br` → Gmail (Email Routing; MX/SPF/DKIM ok; Raylan recebeu o teste)
+7. [x] Web Analytics da Cloudflare (automático, sem cookies; script presente nas páginas)
 8. [ ] Alerta quando o Worker der erro
 9. [~] Backup do banco → cópia diária no R2 (decisão do Raylan; plano pago do Neon fica para depois)
 10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
