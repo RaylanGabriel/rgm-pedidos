@@ -9,7 +9,7 @@
 6. [x] E-mail `contato@`/`suporte@`/`raylan@rgm.dev.br` → Gmail (Email Routing; MX/SPF/DKIM ok; Raylan recebeu o teste)
 7. [x] Web Analytics da Cloudflare (automático, sem cookies; script presente nas páginas)
 8. [~] Alerta de erros por e-mail (branch `feat/alertas`, testado localmente) + monitor externo UptimeRobot (Raylan)
-9. [~] Backup do banco → cópia diária no R2 (decisão do Raylan; plano pago do Neon fica para depois)
+9. [x] Backup do banco → cópia diária no R2, 1º de produção conferido (plano pago do Neon fica para depois)
 10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
 11. [ ] ESLint
 12. [ ] Atualizar `docs/ROADMAP.md` (Vercel → Cloudflare)
@@ -100,7 +100,8 @@
 - `npm run backup[:teste] -- conferir|restaurar`: simula por padrão; produção exige `--valer --sim-producao`; uma transação.
 - [x] Preview: backup gerado (13 tabelas, 126 linhas, 10 KB); conferir bate; restaurado por cima do banco de teste →
       **13/13 tabelas idênticas** (hash de todas as linhas antes × depois); site de teste ok.
-- [x] OK · [x] merge (13/nov) · [ ] conferir o 1º backup de produção (`npm run backup -- conferir`) depois das 06:00 UTC
+- [x] OK · [x] merge (13/nov) · [x] 1º backup de produção conferido: `2026-11-13.json.gz` gerado às 06:01 UTC,
+      13 tabelas com as mesmas contagens do banco
 
 ## 8. Alerta de erros por e-mail (branch `feat/alertas`)
 - Plano aprovado pelo Raylan (13/nov), com o monitor externo (UptimeRobot) para o site fora do ar.
