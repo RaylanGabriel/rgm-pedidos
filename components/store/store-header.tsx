@@ -3,6 +3,7 @@ import Link from "next/link"
 import { Bike, Clock, Facebook, Instagram, MapPin, ShoppingBag, Store as StoreIcon } from "lucide-react"
 import { facebookLink, instagramLink, mapsLink, whatsappLink } from "@/lib/links"
 import type { PublicStore } from "@/lib/orders"
+import { AccountLink } from "@/components/store/account-link"
 import { deliveryAvailable, formatBRL, formatKm, type DeliveryConfig } from "@/lib/order-shared"
 
 /** Resumo da entrega para o topo da loja (o cliente sabe o custo antes de escolher). */
@@ -89,7 +90,10 @@ export function StoreHero({ store, delivery }: { store: PublicStore; delivery: D
   ]
 
   return (
-    <header>
+    <header className="relative">
+      <div className="absolute right-4 top-3 z-10">
+        <AccountLink base={store.base} overlay />
+      </div>
       {store.coverUrl ? (
         <div className="relative h-36 overflow-hidden bg-muted sm:h-56">
           <Image src={store.coverUrl} alt="" fill priority sizes="100vw" className="object-cover" />
@@ -165,14 +169,17 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "base" | "name
           </span>
           <span className="truncate font-bold">{store.name}</span>
         </Link>
-        <span
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
-            store.isOpen ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-muted text-muted-foreground"
-          }`}
-        >
-          <span className={`h-2 w-2 rounded-full ${store.isOpen ? "bg-green-600" : "bg-muted-foreground"}`} aria-hidden />
-          {store.isOpen ? "Aberto" : "Fechado"}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+              store.isOpen ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${store.isOpen ? "bg-green-600" : "bg-muted-foreground"}`} aria-hidden />
+            {store.isOpen ? "Aberto" : "Fechado"}
+          </span>
+          <AccountLink base={store.base} />
+        </div>
       </div>
     </header>
   )

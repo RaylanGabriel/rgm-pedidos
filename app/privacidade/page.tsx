@@ -47,6 +47,11 @@ export default function PrivacidadePage() {
         </List>
         <p>Não pedimos CPF, e-mail nem cadastro para fazer um pedido.</p>
         <p>
+          <strong>De quem cria uma conta (opcional):</strong> e-mail, nome, WhatsApp, os endereços que você salvar e, se
+          entrar com o Google, o identificador da sua conta Google (não recebemos sua senha). Os pedidos feitos com a conta
+          ficam ligados a ela para você ver o histórico em qualquer aparelho.
+        </p>
+        <p>
           <strong>De quem usa o painel:</strong> nome, e-mail, senha (guardada só em forma de <em>hash</em>, que nem nós
           conseguimos ler), a data dos logins e o IP de tentativas de login erradas (apagado em até 24 horas).
         </p>
@@ -60,6 +65,7 @@ export default function PrivacidadePage() {
           <li>calcular a taxa de entrega pela distância, quando a loja cobra assim;</li>
           <li>permitir que a loja fale com você pelo WhatsApp sobre o pedido;</li>
           <li>gerar os relatórios da própria loja (vendas, itens mais pedidos, clientes que mais compram);</li>
+          <li>com conta: preencher seus dados sozinho, guardar seus endereços e mostrar seus pedidos e o “Pedir de novo”;</li>
           <li>segurança: impedir abusos, fraudes e acessos indevidos.</li>
         </List>
         <p>
@@ -93,6 +99,10 @@ export default function PrivacidadePage() {
             Turnstile da Cloudflare confere características do navegador para barrar robôs, sem cookies de rastreamento.
           </li>
           <li>
+            <strong>Google:</strong> se você escolher “Continuar com Google”, o Google nos informa seu nome, e-mail e um
+            identificador da conta. <strong>Resend:</strong> envia o código de acesso para o seu e-mail.
+          </li>
+          <li>
             <strong>WhatsApp e Google Maps</strong>, só se você tocar nos botões que abrem esses aplicativos.
           </li>
         </List>
@@ -106,9 +116,13 @@ export default function PrivacidadePage() {
       <Section title="5. O que fica no seu aparelho (cookies e armazenamento local)">
         <List>
           <li>
-            <strong>O cardápio das lojas não usa cookies.</strong> O carrinho fica salvo só no seu navegador. Se você marcar
+            <strong>Sem conta, o cardápio das lojas não usa cookies.</strong> O carrinho fica salvo só no seu navegador. Se você marcar
             “Lembrar meus dados neste aparelho”, o seu nome, WhatsApp e endereço também ficam salvos só ali, para o próximo
             pedido. Para apagar, toque em “Não é você? Apagar dados” na tela do pedido ou limpe os dados do site no navegador.
+          </li>
+          <li>
+            <strong>Se você entrar na sua conta</strong>, um cookie de sessão mantém você conectado em todas as lojas da
+            plataforma. Ele dura até 90 dias ou até você sair.
           </li>
           <li>
             <strong>O painel usa um cookie de sessão</strong>, necessário para manter você conectado. Ele dura até 30 dias ou
@@ -131,6 +145,11 @@ export default function PrivacidadePage() {
           <li>
             <strong>Contas do painel:</strong> enquanto estiverem ativas. A conta de um funcionário é apagada quando o dono o
             remove da equipe.
+          </li>
+          <li>
+            <strong>Conta de cliente:</strong> até você apagar em “Minha conta → Apagar conta”, o que apaga na hora seu
+            e-mail, nome, WhatsApp e endereços. Os pedidos já feitos continuam com a loja (como qualquer pedido sem conta),
+            sem ligação com você além do nome e telefone informados no pedido. Códigos de acesso por e-mail valem 10 minutos.
           </li>
           <li>
             <strong>Dados lembrados no seu aparelho:</strong> até você apagar.

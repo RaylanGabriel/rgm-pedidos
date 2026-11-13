@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Loader2, ShieldCheck, UserCheck } from "lucide-react"
+import { ArrowLeft, Loader2, MapPin, ShieldCheck, UserCheck, UserRound } from "lucide-react"
+import { addressLine } from "../conta/account-sections"
+import type { AddressValue } from "../conta/account-forms"
 import { Button } from "@/components/ui/button"
 import { CartSummary, cartTotal } from "@/components/order/cart-summary"
 import { CartSuggestions } from "@/components/order/cart-suggestions"
@@ -11,7 +13,7 @@ import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/componen
 import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, toOrderItem, useCart } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
-import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
+import { addressText, emptyAddressFields, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
 import { placeOrder, quoteDeliveryAction } from "./actions"
 
 export function CheckoutForm({
@@ -19,12 +21,15 @@ export function CheckoutForm({
   menu,
   delivery,
   pixOnline = false,
+  account = null,
 }: {
   store: PublicStore
   menu: MenuView
   delivery: DeliveryConfig
   /** Loja conectou o Mercado Pago: Pix é pago pelo site logo depois de confirmar */
   pixOnline?: boolean
+  /** Cliente logado (conta opcional): nome/WhatsApp e endereços salvos */
+  account?: { email: string; name: string | null; phone: string | null; addresses: AddressValue[] } | null
 }) {
   const cart = useCart(store.slug, menu)
   const router = useRouter()
@@ -36,21 +41,37 @@ export function CheckoutForm({
   const errorRef = useRef<HTMLDivElement>(null)
   const [remember, setRemember] = useState(true)
   const [usingSaved, setUsingSaved] = useState(false)
+  // Conta: endereço salvo escolhido ("new" = digitar outro) e se o novo vai para a conta
+  const [chosenAddress, setChosenAddress] = useState<string>("new")
+  const [saveNewAddress, setSaveNewAddress] = useState(true)
 
-  // Preenche com os dados lembrados neste aparelho
+  const applyAddress = (a: AddressValue) => {
+    const parts = { cep: a.cep ?? "", street: a.street, number: a.number ?? "", district: a.district ?? "", city: a.city ?? "", state: a.state ?? "", complement: a.complement ?? "" }
+    // Taxa por bairro: escolhe sozinho o bairro da loja com o mesmo nome
+    const zone = a.district ? delivery.zones.find((z) => z.name.trim().toLowerCase() === a.district!.trim().toLowerCase()) : undefined
+    setFields((f) => ({ ...f, address: parts, deliveryAddress: addressText(parts), deliveryZoneId: zone?.id ?? f.deliveryZoneId }))
+    setChosenAddress(a.id)
+  }
+
+  // Preenche com os dados lembrados neste aparelho e, com conta, com os dados da conta (que valem em qualquer aparelho)
   useEffect(() => {
     const saved = loadCustomer()
-    if (!saved) return
-    // Dados salvos podem ser de outra loja ou de antes de a lista de bairros mudar
-    const canDeliver = deliveryAvailable(delivery)
-    const zoneOk = delivery.zones.some((z) => z.id === saved.deliveryZoneId)
-    setFields((f) => ({
-      ...f,
-      ...saved,
-      type: saved.type === "delivery" && !canDeliver ? "pickup" : saved.type,
-      deliveryZoneId: zoneOk ? saved.deliveryZoneId : "",
-    }))
-    setUsingSaved(true)
+    if (saved) {
+      // Dados salvos podem ser de outra loja ou de antes de a lista de bairros mudar
+      const canDeliver = deliveryAvailable(delivery)
+      const zoneOk = delivery.zones.some((z) => z.id === saved.deliveryZoneId)
+      setFields((f) => ({
+        ...f,
+        ...saved,
+        type: saved.type === "delivery" && !canDeliver ? "pickup" : saved.type,
+        deliveryZoneId: zoneOk ? saved.deliveryZoneId : "",
+      }))
+      if (!account) setUsingSaved(true)
+    }
+    if (account) {
+      setFields((f) => ({ ...f, customerName: account.name || f.customerName, customerPhone: account.phone || f.customerPhone }))
+      if (account.addresses[0]) applyAddress(account.addresses[0]) // o usado por último vem primeiro
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -84,12 +105,30 @@ export function CheckoutForm({
     setError(null)
     setErrors({})
 
+    // Com conta: o endereço escolhido é marcado como usado; um novo vai para a conta se o cliente deixou marcado
+    const zoneName = delivery.zones.find((z) => z.id === fields.deliveryZoneId)?.name ?? ""
+    const typed = fields.address.street.trim()
+      ? { label: "", ...fields.address }
+      : fields.deliveryAddress.trim()
+        ? { label: "", cep: "", street: fields.deliveryAddress.trim(), number: "", district: zoneName, city: "", state: "", complement: "" }
+        : null
+    const accountInfo =
+      account && isDelivery
+        ? chosenAddress !== "new"
+          ? { addressId: chosenAddress }
+          : { saveAddress: saveNewAddress ? typed : null }
+        : undefined
+
     startTransition(async () => {
-      const result = await placeOrder(store.slug, {
-        ...fields,
-        ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-        items: cart.lines.map(toOrderItem),
-      })
+      const result = await placeOrder(
+        store.slug,
+        {
+          ...fields,
+          ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
+          items: cart.lines.map(toOrderItem),
+        },
+        accountInfo,
+      )
 
       if (!result.ok) {
         setError(result.error)
@@ -97,8 +136,11 @@ export function CheckoutForm({
         return
       }
       placed.current = true
-      if (remember) saveCustomer(fields)
-      else forgetCustomer()
+      // Com conta os dados já ficam na conta; sem conta, no aparelho (se o cliente deixou marcado)
+      if (!account) {
+        if (remember) saveCustomer(fields)
+        else forgetCustomer()
+      }
       saveRecentOrder(store.slug, { token: result.publicToken, number: result.orderNumber, createdAt: new Date().toISOString() })
       router.push(`/pedido/${result.publicToken}`)
       cart.clear()
@@ -126,7 +168,7 @@ export function CheckoutForm({
   const trust = (
     <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
       <ShieldCheck className="h-4 w-4 text-green-700 dark:text-green-400" aria-hidden />
-      Sem cadastro · você acompanha o pedido em tempo real
+      {account ? "Pedido salvo na sua conta" : "Sem cadastro"} · você acompanha o pedido em tempo real
     </p>
   )
 
@@ -156,7 +198,19 @@ export function CheckoutForm({
         </aside>
 
         <div className="space-y-6 lg:order-1">
-          {usingSaved && (
+          {account ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-muted px-4 py-3 text-sm">
+              <span className="flex min-w-0 items-center gap-2">
+                <UserCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                <span className="truncate">
+                  Pedido na sua conta <span className="text-muted-foreground">({account.email})</span>
+                </span>
+              </span>
+              <Link href={`${store.base}/conta`} className="font-medium underline underline-offset-2 hover:text-primary">
+                Minha conta
+              </Link>
+            </div>
+          ) : usingSaved ? (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-muted px-4 py-3 text-sm">
               <span className="flex items-center gap-2">
                 <UserCheck className="h-4 w-4 text-primary" aria-hidden />
@@ -166,24 +220,91 @@ export function CheckoutForm({
                 Não é você? Apagar dados
               </button>
             </div>
+          ) : (
+            <Link
+              href={`${store.base}/conta?volta=${encodeURIComponent(`${store.base}/finalizar`)}`}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-dashed px-4 py-3 text-sm transition hover:border-primary"
+            >
+              <span>
+                <span className="font-semibold">Tem conta? Entre</span>
+                <span className="text-muted-foreground"> para preencher sozinho e salvar seus endereços (opcional).</span>
+              </span>
+              <UserRound className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            </Link>
           )}
 
           <div className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+            {account && isDelivery && account.addresses.length > 0 && (
+              <fieldset className="mb-6">
+                <legend className="mb-2 text-sm font-semibold">Entregar em</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {account.addresses.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => applyAddress(a)}
+                      aria-pressed={chosenAddress === a.id}
+                      disabled={pending}
+                      className={`rounded-xl border-2 p-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        chosenAddress === a.id ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <MapPin className="h-4 w-4 text-primary" aria-hidden />
+                        {a.label || "Endereço"}
+                      </span>
+                      <span className="mt-0.5 block text-muted-foreground">{addressLine(a)}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChosenAddress("new")
+                      setFields((f) => ({ ...f, address: emptyAddressFields, deliveryAddress: "" }))
+                    }}
+                    aria-pressed={chosenAddress === "new"}
+                    disabled={pending}
+                    className={`rounded-xl border-2 border-dashed p-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      chosenAddress === "new" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
+                    }`}
+                  >
+                    + Outro endereço
+                  </button>
+                </div>
+              </fieldset>
+            )}
+
             <OrderFields value={fields} onChange={setFields} errors={errors} disabled={pending} delivery={delivery} total={total} pixOnline={pixOnline} quote={distance.quote} quoteLoading={distance.loading} />
 
-            <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                disabled={pending}
-                className="mt-0.5 h-5 w-5 accent-[var(--primary)]"
-              />
-              <span>
-                <span className="font-medium">Lembrar meus dados neste aparelho</span>
-                <span className="block text-muted-foreground">Na próxima compra o formulário já vem preenchido. Desmarque em celular compartilhado.</span>
-              </span>
-            </label>
+            {account ? (
+              isDelivery &&
+              chosenAddress === "new" && (
+                <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={saveNewAddress}
+                    onChange={(e) => setSaveNewAddress(e.target.checked)}
+                    disabled={pending}
+                    className="mt-0.5 h-5 w-5 accent-[var(--primary)]"
+                  />
+                  <span className="font-medium">Salvar este endereço na minha conta</span>
+                </label>
+              )
+            ) : (
+              <label className="mt-8 flex cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  disabled={pending}
+                  className="mt-0.5 h-5 w-5 accent-[var(--primary)]"
+                />
+                <span>
+                  <span className="font-medium">Lembrar meus dados neste aparelho</span>
+                  <span className="block text-muted-foreground">Na próxima compra o formulário já vem preenchido. Desmarque em celular compartilhado.</span>
+                </span>
+              </label>
+            )}
 
             <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
               Ao confirmar, seus dados vão para a {store.name} preparar e entregar o pedido, e você concorda com os{" "}

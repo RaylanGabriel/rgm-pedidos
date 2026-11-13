@@ -1,12 +1,18 @@
 "use server"
 
+import { z } from "zod"
+import { getCustomer } from "@/lib/auth/customer"
+import { addressSchema, afterOrder } from "@/lib/customer-account"
 import { quoteDistance, quoteError } from "@/lib/geo"
 import { addressPartsSchema, type QuoteView } from "@/lib/order-shared"
 import { createOrder, getStoreBySlug, type CreateOrderResult } from "@/lib/orders"
 import { clientIp, rateLimit } from "@/lib/rate-limit-server"
 
-/** Pedido feito pelo cliente no site público. */
-export async function placeOrder(slug: string, input: unknown): Promise<CreateOrderResult> {
+/**
+ * Pedido feito pelo cliente no site público. Com conta (cookie csid): o pedido fica na conta e o endereço usado
+ * é marcado (ou salvo, se for novo e o cliente pediu).
+ */
+export async function placeOrder(slug: string, input: unknown, account?: { addressId?: string | null; saveAddress?: unknown }): Promise<CreateOrderResult> {
   const store = await getStoreBySlug(slug)
   if (!store) return { ok: false, error: "Loja não encontrada." }
 
@@ -15,7 +21,20 @@ export async function placeOrder(slug: string, input: unknown): Promise<CreateOr
     return { ok: false, error: "Muitos pedidos em sequência. Aguarde alguns minutos e tente de novo." }
   }
 
-  return createOrder(store.id, input, { requireOpen: true, pixOnline: true })
+  const result = await createOrder(store.id, input, { requireOpen: true, pixOnline: true })
+  const me = result.ok ? await getCustomer() : null
+  if (result.ok && me) {
+    const addressId = z.string().uuid().safeParse(account?.addressId)
+    const newAddress = account?.saveAddress ? addressSchema.safeParse(account.saveAddress) : null
+    const fields = input as { customerName?: unknown; customerPhone?: unknown }
+    await afterOrder(me, result.publicToken, {
+      addressId: addressId.success ? addressId.data : null,
+      newAddress: newAddress?.success ? newAddress.data : null,
+      name: typeof fields?.customerName === "string" ? fields.customerName.trim() : undefined,
+      phone: typeof fields?.customerPhone === "string" ? fields.customerPhone : undefined,
+    })
+  }
+  return result
 }
 
 /** Entrega por km: distância e taxa para o endereço digitado (só mostra; o pedido recalcula no servidor). */

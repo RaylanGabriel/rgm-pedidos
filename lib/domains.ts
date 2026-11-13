@@ -35,6 +35,13 @@ export const RESERVED_SUBDOMAINS = new Set([
   "loja",
   "pedido",
   "pedidos",
+  "conta",
+  "entrar",
+  "auth",
+  // envio de e-mail (Resend: send/rsend são CNAME no DNS; um subdomínio de loja aqui nunca abriria)
+  "send",
+  "rsend",
+  "resend",
   // outros projetos em rgm.dev.br: acrescente aqui
 ])
 

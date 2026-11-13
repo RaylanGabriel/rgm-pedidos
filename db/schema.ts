@@ -134,6 +134,75 @@ export const loginAttempts = pgTable(
   (t) => [index("login_attempts_key_created_idx").on(t.key, t.createdAt)],
 )
 
+// ---------- Clientes (conta opcional, vale para todas as lojas) ----------
+/**
+ * Conta do cliente: entra com Google ou com código por e-mail (sem senha). Separada de `users` (equipe):
+ * uma sessão de cliente nunca abre o painel. Pedir sem conta continua possível.
+ */
+export const customers = pgTable(
+  "customers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name"),
+    phone: text("phone"),
+    googleSub: text("google_sub"), // id da conta Google (o "sub" do token), quando entrou com Google
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("customers_email_unique").on(sql`lower(${t.email})`), uniqueIndex("customers_google_sub_unique").on(t.googleSub)],
+)
+
+/** Sessões do cliente (cookie `csid` no domínio das lojas). Aqui fica só o sha256 do token. */
+export const customerSessions = pgTable(
+  "customer_sessions",
+  {
+    id: text("id").primaryKey(), // sha256(token) em hex
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("customer_sessions_customer_idx").on(t.customerId)],
+)
+
+/** Endereços salvos do cliente ("Casa", "Trabalho"…). Sem bairro de entrega da loja: isso é de cada loja. */
+export const customerAddresses = pgTable(
+  "customer_addresses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    customerId: uuid("customer_id")
+      .notNull()
+      .references(() => customers.id, { onDelete: "cascade" }),
+    label: text("label"), // "Casa", "Trabalho"
+    cep: text("cep"),
+    street: text("street").notNull(),
+    number: text("number"),
+    district: text("district"),
+    city: text("city"),
+    state: text("state"),
+    complement: text("complement"),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("customer_addresses_customer_idx").on(t.customerId)],
+)
+
+/** Código de 6 dígitos mandado por e-mail para entrar. Só o sha256; vale 10 min e até 5 tentativas. */
+export const customerLoginCodes = pgTable(
+  "customer_login_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(), // já em minúsculas
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("customer_login_codes_email_idx").on(t.email, t.createdAt)],
+)
+
 // ---------- Cardápio ----------
 export const categories = pgTable(
   "categories",
@@ -319,6 +388,8 @@ export const orders = pgTable(
     publicToken: text("public_token").notNull(), // token aleatório p/ o cliente acompanhar (não adivinhável)
     customerName: text("customer_name").notNull(),
     customerPhone: text("customer_phone"),
+    // Conta do cliente que fez o pedido (opcional). Apagar a conta só desliga: o pedido mantém nome/telefone.
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     type: orderType("type").notNull().default("pickup"),
     deliveryAddress: text("delivery_address"),
     deliveryZoneName: text("delivery_zone_name"), // bairro no momento do pedido (cópia)
@@ -349,6 +420,7 @@ export const orders = pgTable(
     uniqueIndex("orders_public_token_unique").on(t.publicToken),
     index("orders_mp_order_idx").on(t.mpOrderId),
     index("orders_store_status_created_idx").on(t.storeId, t.status, t.createdAt),
+    index("orders_customer_created_idx").on(t.customerId, t.createdAt),
   ],
 )
 

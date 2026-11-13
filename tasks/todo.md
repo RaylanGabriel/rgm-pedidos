@@ -1,3 +1,76 @@
+# 6. Conta do cliente (opcional) — Google + código por e-mail (13/nov/2026, branch `feat/conta-cliente`)
+
+Decisões do Raylan (13/nov): entrar com **Google** ou **código de 6 dígitos por e-mail** (sem senha); **uma conta
+para todas as lojas** (cada loja só vê os pedidos feitos nela); v1 com dados preenchidos sozinhos, vários endereços,
+"Meus pedidos" + "Pedir de novo" e "Apagar minha conta" (LGPD). Pedir sem conta continua igual (nunca obrigatório).
+
+## Achados (mapa do código)
+- Sessão da equipe: cookie `sid` só do `painel.rgm.dev.br` (host-only), token aleatório com sha256 no banco. A do
+  cliente será **separada** (`csid`, tabela própria) e com `Domain=.rgm.dev.br` para valer em todas as lojas.
+- Lojas só em `<slug>.rgm.dev.br` (sem domínio próprio) → um cookie no domínio-pai basta. Preview (workers.dev):
+  cookie só do host (dá para testar no preview da branch).
+- E-mail: o `send_email` atual só entrega para endereços verificados (alertas). Código de login precisa de um
+  serviço de envio: **Cloudflare Email Service** (beta, exige Workers Paid US$ 5/mês, sem chave) ou **Resend**
+  (grátis até 100/dia, chave de API + registros DNS no rgm.dev.br).
+- Google não aceita endereço de retorno coringa (`*.rgm.dev.br`) → retorno único em `https://rgm.dev.br/auth/cliente/
+  google/retorno`, que grava o cookie no domínio-pai e volta para a loja de origem (endereço validado).
+- `orders` não tem ligação com cliente; `create_order` fica igual — o pedido recebe `customer_id` logo depois.
+
+## Modelo (migração 0027)
+- `customers` (email único sem maiúsculas, nome, telefone, `google_sub` único, criado/último acesso)
+- `customer_sessions` (id = sha256 do token, customer_id, expira em 90 dias)
+- `customer_addresses` (apelido "Casa"/"Trabalho", cep, rua, número, bairro, cidade, UF, complemento, último uso)
+- `customer_login_codes` (email, sha256 do código, expira em 10 min, tentativas ≤ 5) + limite por IP/e-mail
+- `orders.customer_id` (set null ao apagar a conta: a loja mantém nome/telefone do pedido, como hoje)
+
+## Telas
+- Loja: "Entrar" no topo (ícone de pessoa) → janela: "Continuar com Google" ou e-mail → código. Logado: "Minha conta".
+- Finalizar: logado → nome/WhatsApp preenchidos, escolher endereço salvo (ou novo, com "salvar na conta"); o pedido
+  fica na conta. Não logado: igual hoje + convite discreto "Entre para salvar seus dados".
+- Minha conta (`/conta` em qualquer loja): dados, endereços (adicionar/editar/apagar), Meus pedidos (todas as lojas,
+  com acompanhamento) + **Pedir de novo** (põe os itens que ainda existem no carrinho daquela loja), Sair, Apagar conta.
+- Privacidade: novos dados (e-mail, id do Google, endereços), cookie `csid`, como apagar. Termos: conta opcional.
+
+## Fases
+1. [x] Banco + sessão do cliente + "Minha conta" (dados, endereços, pedidos, pedir de novo, apagar).
+2. [x] Código por e-mail (código pronto; falta a chave do Resend para enviar de verdade).
+3. [x] Google (código pronto; falta o app no Google Cloud).
+4. [x] Finalizar integrado + política de privacidade. [ ] Teste do login real (código e Google) → OK → migração → merge.
+
+## Revisão (13/nov, preview `1e712e8`, sessão de cliente criada por script)
+- Sem conta: topo mostra "Entrar"; /conta mostra a tela de entrar (sem Resend/Google configurados: aviso).
+- Com conta: salvar nome/WhatsApp e endereço "Casa"; topo mostra o 1º nome; finalizar preenchido ("Pedido na sua
+  conta"), endereço salvo oferecido na entrega; pedido #36 (retirada) **ligado à conta** no banco.
+- Meus pedidos lista o pedido; "Pedir de novo" põe o Smash Bacon no carrinho e limpa o endereço (?pedirDeNovo);
+  Sair volta para "Entrar"; Apagar conta: conta e endereços somem, o pedido fica com a loja sem ligação.
+- Bug achado e corrigido (`e7f993b`): o "Pedir de novo" abria a sacola do celular também no computador (cobria a
+  página). Dados de teste apagados. Nenhuma loja da produção usa os nomes reservados (conta, entrar, auth).
+
+## Ações do Raylan
+- [x] Envio de e-mail: Resend.
+- [x] Resend: conta + domínio rgm.dev.br (sa-east-1) + chaves no `.env.cloudflare`: `RESEND_ADMIN_KEY` (Full access,
+  só para o setup; pode ser apagada) e `RESEND_API_KEY` (Sending access; restringir ao rgm.dev.br após verificar).
+- [x] Google Cloud: cliente OAuth Web com retorno em rgm.dev.br e no preview da branch (conferido no Google: par
+  ID/segredo válido, os 2 retornos aceitos). [ ] Confirmar app "Em produção" (Público).
+
+## Setup feito (13/nov)
+- DNS na Cloudflare (sem proxy): TXT `resend._domainkey`, CNAME `send` → send.forge.rmta.net, CNAME `rsend` →
+  rsend-sae1.forge.rmta.net, TXT `_dmarc` `v=DMARC1; p=none;`. Nomes send/rsend/resend reservados (`db450b3`).
+- Segredos `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`: produção com `wrangler secret bulk`;
+  preview com `wrangler versions secret bulk --env preview` (o `secret bulk` falha no preview porque a última versão
+  é de branch e não está publicada) + novo build da branch (`98dbf61`) para herdar.
+- Domínio verificado no Resend (DKIM + 2 SPF).
+
+## Teste do login real (13/nov, preview `98dbf61`)
+- Código por e-mail com `delivered@resend.dev` (código lido pela API do Resend): e-mail de `acesso@rgm.dev.br`
+  entregue; código certo → Minha conta, cookie `csid` httpOnly/secure/90 dias; código errado → "Código errado. Você
+  tem mais 4 tentativas." e continua fora. Conta de teste apagada.
+- Google: botão aparece; `/auth/cliente/google` → accounts.google.com com o retorno do preview, PKCE S256 e cookie
+  `g_oauth`. [x] Raylan entrou com a conta Google dele (13/nov 17:32): conta criada com `google_sub`, depois saiu
+  (0 sessões abertas).
+
+---
+
 # 9a. Ficha técnica dos lanches + botões "sem ___" (13/nov/2026, branch `feat/ficha-tecnica`)
 
 Decisões do Raylan (13/nov): um cadastro só de ingredientes; o dono marca o que não pode tirar; botões no balcão e
