@@ -40,7 +40,8 @@ todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem
   aparece nos adicionais, botão vira "Sem cebola", carrinho e acompanhamento mostram "SEM cebola"; balcão "sem
   picles"; cozinha com as duas faixas vermelhas; preço não muda. Pedidos, ingredientes e sessão de teste apagados.
 - A loja de teste estava fechada (horário 18h) → o teste abre/restaura a loja (`loja-aberta.ts`). Não era bug.
-- [ ] OK do Raylan · [ ] `db:migrate:prod` · [ ] merge · [ ] conferir produção
+- [x] OK do Raylan (13/nov, depois do ajuste abaixo) · [x] `db:migrate:prod` (tabelas criadas; 12 adicionais
+  intactos; `create_order` nova) · [x] merge `c6bf090` · [ ] conferir produção
 
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
 "Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não

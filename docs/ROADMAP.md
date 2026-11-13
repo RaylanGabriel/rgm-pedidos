@@ -265,17 +265,19 @@ Para a visita comercial: monta em ~30 s a loja **do próprio cliente** (`<loja>.
   cria o login com senha provisória, apaga pedidos de teste, numeração volta ao #1) · `apagar <slug>` (só demos).
 - A pasta `demos/` fica fora do Git (dados de possíveis clientes).
 
-## 💭 9. Ficha técnica dos lanches → "sem cebola" e controle de estoque (ideias do Raylan, 12/nov/2026)
+## 🔨 9. Ficha técnica dos lanches → "sem cebola" e controle de estoque (ideias do Raylan, 12/nov/2026)
 Depois dos itens 1–12 de "deixar pronto para o 1º cliente" (`tasks/todo.md`). As duas ideias usam a mesma base, então
 a ordem é 9a → 9b.
 
-**9a. Ingredientes de cada lanche + botões "sem ___"**
-- Cadastro de ingredientes da loja (pão, carne, queijo, cebola, pimentão…) e, em cada item do cardápio, quais ele leva
-  (a "ficha técnica"; quantidade por lanche já fica registrada para o 9b).
-- **Balcão / Novo pedido:** ao escolher o lanche, aparecem botões só com os ingredientes daquele lanche: "sem cebola",
-  "sem pimentão"… (toque liga/desliga). Vale também no **cardápio online** (opção "Retirar ingredientes").
-- Cozinha, impressão e acompanhamento mostram **SEM cebola** em destaque. Fica guardado no pedido como cópia (mudar a
-  ficha depois não altera pedidos antigos), como já é feito com nome e preço.
+**✅ 9a. Botões "sem ___" por lanche (na produção em 13/nov/2026)**
+- Os botões saem da **descrição** de cada lanche: no painel → Cardápio → Editar, seção "O cliente pode tirar", o dono
+  toca no que pode sair (sugestão automática: ingrediente curto, sem medida). Adicionais não entram. Botão
+  "Preencher pela descrição" faz todos os lanches de uma vez. Aba "Adicionais" virou "Ingredientes".
+- Balcão e cardápio online: "Tirar algum ingrediente?" ao escolher o lanche. Carrinho, cozinha, impressão,
+  acompanhamento, planilha e Pix mostram **SEM cebola**. Guardado no pedido como cópia do nome.
+- O servidor só aceita "sem" que esteja na lista daquele lanche, daquela loja.
+- Para o 9b: hoje a lista guarda só o que se pode tirar; o estoque vai precisar da ficha completa (pão, carne) e da
+  quantidade por lanche.
 
 **9b. Controle de estoque (card no painel, só dono)**
 - Saldo por ingrediente com unidade (un, kg, fatia…), entrada de compras ("chegaram 100 pães"), ajuste/perda.
