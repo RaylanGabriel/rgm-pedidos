@@ -1,3 +1,46 @@
+# Revisão geral (13/nov/2026) — para corrigir
+
+Feita para o documento do projeto (aba "Para corrigir" em https://claude.ai/artifact/BzZZh9YAiqjxEVs5c1LnJc), com dois
+revisores (segurança e bugs). Nenhuma falha crítica; isolamento entre lojas ok; tsc ok; lint 0 erros e 8 avisos.
+"Conferido" = confirmado por mim no código ou no site no ar.
+
+## Alta
+- [ ] 1. Pix PAGO cancelado sozinho quando a loja fica sem token MP (syncPixOrder devolve "pending" sem token →
+  cancelOverduePix cancela). Conferido. Sem token → "não verificável", não cancelar, avisar.
+- [ ] 2. Pedido duplicado: UPDATE do troco depois do create_order no mesmo try (lib/orders.ts) → cliente vê erro e repete;
+  getCustomer em finalizar/actions.ts idem. Conferido. Troco dentro do create_order + chave de idempotência por checkout.
+- [ ] 3. Mudança de etapa da cozinha sem "etapa esperada": tablet atrasado volta pedido cancelado/entregue.
+- [ ] 4. Redirecionamento aberto: safeReturn aceita "/<TAB>/site.com" (lib/auth/google.ts:26, conta/page.tsx). Conferido.
+- [ ] 5. Código por e-mail: attempts lido e gravado (não atômico) + verifyCodeAction sem rate limit.
+
+## Média
+- [ ] 6. Produção em rgm-pedidos.raylanmiranda1.workers.dev (workers_dev/preview_urls true). Conferido (200).
+- [ ] 7. Rate limit não atômico + checkout sem anti-robô → pedidos falsos em dinheiro.
+- [ ] 8. Bloqueio do dono por terceiros (5 erros por e-mail bloqueiam até a senha certa).
+- [ ] 9. Dados pessoais em error_events (params do Drizzle na mensagem de fora; token no path).
+- [ ] 10. Sem CSP/HSTS.
+- [ ] 11. Sem error.tsx; ações sem try/catch derrubam o painel da cozinha.
+- [ ] 12. Pix pendente conta como venda (relatórios, caixa, tempo de espera).
+- [ ] 13. Fechamento de caixa por dia do calendário (lojas que passam da meia-noite).
+- [ ] 14. Manutenção 2× a cada 8 s no quadro da cozinha.
+- [ ] 15. Falha ao salvar lanche apaga a foto nova que continua em uso.
+- [ ] 16. alertedAt marcado antes do envio do e-mail.
+- [ ] 17. Backup não consistente (consulta por tabela) e todo em memória.
+
+## Baixa
+- [ ] 18. Webhook MP sem janela de ts; "deauthorized" apaga sem confirmar.
+- [ ] 19. csid em todos os subdomínios (manter outros projetos fora de rgm.dev.br).
+- [ ] 20. Equipe: adicionar usuário existente sem convite (revela nome).
+- [ ] 21. Abuso de e-mails de código (incomodar/travar login alheio).
+- [ ] 22. reconcile mantém adicionais de categoria sem adicionais.
+- [ ] 23. Cancelar Pix do balcão cujo cancelamento no MP falhou deixa QR pagável.
+- [ ] 24. saveTiersAction: delete + insert sem batch.
+- [ ] 25. Pedidos recentes: localStorage não-array quebra.
+- [ ] 26. Limitador apaga a tabela inteira a cada hit; índices faltando (order_items.menu_item_id etc., relatórios).
+- Reforços: 2FA do super admin, scrypt mais forte, backup criptografado, 8 avisos do lint.
+
+---
+
 # 6. Conta do cliente (opcional) — Google + código por e-mail (13/nov/2026, branch `feat/conta-cliente`)
 
 Decisões do Raylan (13/nov): entrar com **Google** ou **código de 6 dígitos por e-mail** (sem senha); **uma conta
