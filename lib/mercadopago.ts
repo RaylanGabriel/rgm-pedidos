@@ -3,7 +3,8 @@ import "server-only"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { orders, storePaymentAccounts } from "@/db/schema"
+import { orders, storePaymentAccounts, stores } from "@/db/schema"
+import { recordError } from "@/lib/alerts"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
 
 /**
@@ -232,8 +233,10 @@ const isDead = (mp: MpOrder) => ["expired", "canceled", "cancelled", "failed", "
 /**
  * Consulta a cobrança no Mercado Pago e atualiza o pedido (pago → entra na cozinha; vencida → cancela).
  * Usada pelo webhook e pela tela do pedido. Idempotente.
+ * "unverifiable" = a loja está sem conexão válida com o Mercado Pago (desconectou, renovação falhou): não dá para
+ * saber se foi pago — quem chama nunca deve tratar isso como "não pago".
  */
-export async function syncPixOrder(orderId: string): Promise<"paid" | "pending" | "cancelled" | "ignored"> {
+export async function syncPixOrder(orderId: string): Promise<"paid" | "pending" | "cancelled" | "ignored" | "unverifiable"> {
   const [o] = await db
     .select({ id: orders.id, storeId: orders.storeId, mpOrderId: orders.mpOrderId, paymentStatus: orders.paymentStatus, status: orders.status, total: orders.total })
     .from(orders)
@@ -242,7 +245,7 @@ export async function syncPixOrder(orderId: string): Promise<"paid" | "pending" 
   if (!o?.mpOrderId) return "ignored"
   if (o.paymentStatus === "paid") return "paid"
   const token = await storeAccessToken(o.storeId)
-  if (!token) return "pending"
+  if (!token) return "unverifiable"
   const mp = await mpFetch<MpOrder>(token, `/v1/orders/${encodeURIComponent(o.mpOrderId)}`)
   if (mp.external_reference && mp.external_reference !== o.id) return "ignored" // nunca confia em cobrança de outro pedido
   if (isPaid(mp)) {
@@ -291,6 +294,8 @@ export async function dropPixCharge(orderId: string): Promise<"paid" | "ok"> {
  * as lojas). Antes de cancelar, consulta o Mercado Pago: se o aviso (webhook) falhou e ninguém estava com a tela aberta,
  * um Pix PAGO seria cancelado. Se a consulta falhar (rede, Mercado Pago fora do ar), não cancela — tenta de novo na
  * próxima vez. "Cobrança não encontrada" (404) é diferente: não existe, então não pode ser paga → cancela.
+ * Loja sem conexão válida ("unverifiable"): também não cancela — o pedido fica em "Aguardando Pix", onde a equipe
+ * resolve à mão (tela do QR), e o cron avisa por e-mail uma vez por pedido.
  * Devolve quantos foram cancelados.
  */
 export async function cancelOverduePix(storeId?: string) {
@@ -301,12 +306,29 @@ export async function cancelOverduePix(storeId?: string) {
     eq(orders.status, "pending"),
     lt(orders.pixExpiresAt, sql`now() - interval '5 minutes'`),
   )
-  const rows = await db.select({ id: orders.id }).from(orders).where(overdue)
+  const rows = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      slug: stores.slug,
+      // entrou agora na janela de vencido (o cron roda a cada 5 min): o aviso sai uma vez só por pedido
+      justOverdue: sql<boolean>`${orders.pixExpiresAt} >= now() - interval '10 minutes'`,
+    })
+    .from(orders)
+    .innerJoin(stores, eq(stores.id, orders.storeId))
+    .where(overdue)
   const toCancel: string[] = []
-  for (const { id } of rows) {
+  for (const { id, orderNumber, slug, justOverdue } of rows) {
     try {
       const status = await syncPixOrder(id) // pago → entra na cozinha; vencido no MP → já cancela
       if (status === "pending" || status === "ignored") toCancel.push(id)
+      else if (status === "unverifiable" && !storeId && justOverdue) {
+        await recordError(
+          "pix",
+          `loja ${slug}`,
+          `Pix do pedido #${orderNumber} (loja ${slug}) venceu e não dá para conferir: a loja está sem conexão válida com o Mercado Pago. O pedido NÃO foi cancelado e segue em "Aguardando Pix" — confira no app do Mercado Pago da loja e peça para reconectar.`,
+        )
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       if (message.startsWith("MP_API_404:")) toCancel.push(id)

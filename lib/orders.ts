@@ -410,8 +410,9 @@ export async function getOrderByToken(token: string) {
   if (row && row.mpOrderId && row.paymentStatus === "pending" && row.status === "pending") {
     try {
       const result = await syncPixOrder(row.id)
-      if (result !== "pending") row = await find()
-      else if (row.pixExpiresAt && row.pixExpiresAt.getTime() < Date.now() - 5 * 60_000) {
+      // "unverifiable" (loja sem conexão com o Mercado Pago): nada muda e nunca cancela — segue aguardando
+      if (result !== "pending" && result !== "unverifiable") row = await find()
+      else if (result === "pending" && row.pixExpiresAt && row.pixExpiresAt.getTime() < Date.now() - 5 * 60_000) {
         await cancelOverduePix(row.storeId)
         row = await find()
       }
