@@ -45,14 +45,18 @@ todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
 "Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
 adicionar. O ideal é puxar automático dos ingredientes de cada item."
-- [ ] `lib/recipe.ts`: `descriptionParts` ("Blend 120g, queijo, alface e tomate" → partes) + `suggestRemovable`
+- [x] `lib/recipe.ts`: `descriptionParts` ("Blend 120g, queijo, alface e tomate" → partes) + `suggestRemovable`
   (sem número/medida e até 3 palavras) — usado no painel e no servidor.
-- [ ] Editar lanche: a lista de todos os ingredientes, o cadeado e o campo "Novos ingredientes" saem. Ficam chips
+- [x] Editar lanche: a lista de todos os ingredientes, o cadeado e o campo "Novos ingredientes" saem. Ficam chips
   com as partes da **descrição** (atualizam ao digitar); toque liga/desliga "o cliente pode tirar". Padrão: sugestão
   ligada só em categoria com adicionais. Manda os nomes ligados (`removable`).
-- [ ] Servidor: nomes → ingrediente **base** (`is_extra=false`) de mesmo nome ou cria; nunca liga um adicional.
-- [ ] Botão "Preencher pela descrição" para os lanches ainda sem botões (categorias com adicionais).
-- [ ] Sem migração nova (a ficha guarda só os removíveis; `removable` fica true). Teste E2E refeito no preview.
+- [x] Servidor: nomes → ingrediente **base** (`is_extra=false`) de mesmo nome ou cria; nunca liga um adicional.
+- [x] Botão "Preencher pela descrição" para os lanches ainda sem botões (categorias com adicionais).
+- [x] Sem migração nova (a ficha guarda só os removíveis; `removable` fica true).
+- [x] Teste no preview (`0b82bb0`): aviso "6 lanches ainda não têm"; Smash Salada sugere Alface, Tomate, Picles,
+  Cebola roxa, Molho ranch (carne 120g apagada); digitar ", pimenta" cria o chip na hora; desligar o molho → salvo e
+  reaberto igual; Guaraná: nada ligado; "Preencher" preenche os outros 5 e o aviso some; cliente vê só os da descrição;
+  no banco, nenhum adicional virou botão "sem". Dados e sessão de teste apagados (Raylan testa do zero).
 
 ---
 
