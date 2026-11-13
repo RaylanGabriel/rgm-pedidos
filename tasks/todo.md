@@ -75,6 +75,17 @@
 - Caminho: Raylan confere o app no painel do MP (pendências, Configurações avançadas, permissões); se continuar vazio,
   chamado no suporte do MP Developers com esses dados (Raylan salvou as configurações avançadas de novo: continuou vazio → chamado aberto, pedindo também o Platform ID). PKCE só se o MP exigir (aí implementamos o `code_verifier`).
 
+## 5. Turnstile + limite na borda (branch `feat/turnstile`)
+- `lib/turnstile.ts`: confere o token no servidor (siteverify, com o IP real e a ação "pedido"/"login"). Recusa token
+  ausente/inválido/de outra ação; se a verificação em si falhar (rede/Cloudflare fora), deixa passar — o site não pode
+  parar de vender, e os limites por IP continuam. Sem `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`: desligado.
+- `components/turnstile.tsx`: widget invisível (`interaction-only`, pt-br), só aparece se a Cloudflare desconfiar.
+  Checkout e login esperam o token ("Verificando segurança…") e geram outro a cada tentativa (o token vale uma vez).
+- Preview: chaves de TESTE oficiais (sempre passam). Produção: desligado até o Raylan criar o widget no painel.
+- Borda (Raylan, no painel): 1 regra de rate limit (plano Free) para POST em `/admin/login` e `/finalizar`.
+  **Não ligar o Bot Fight Mode**: no plano Free ele não tem exceção e pode barrar o webhook do Mercado Pago.
+- [ ] Preview · [ ] OK · [ ] merge · [ ] chaves de produção · [ ] regra de rate limit
+
 
 
 ---

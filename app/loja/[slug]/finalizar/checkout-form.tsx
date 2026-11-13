@@ -12,6 +12,7 @@ import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, useCart } 
 import type { MenuView, PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
+import { Turnstile } from "@/components/turnstile"
 import { placeOrder, quoteDeliveryAction } from "./actions"
 
 export function CheckoutForm({
@@ -19,13 +20,18 @@ export function CheckoutForm({
   menu,
   delivery,
   pixOnline = false,
+  turnstileSiteKey = null,
 }: {
   store: PublicStore
   menu: MenuView
   delivery: DeliveryConfig
   /** Loja conectou o Mercado Pago: Pix é pago pelo site logo depois de confirmar */
   pixOnline?: boolean
+  /** Anti-robô ligado (Turnstile): o botão espera o token, e cada envio usa um token novo */
+  turnstileSiteKey?: string | null
 }) {
+  const [captcha, setCaptcha] = useState<{ token: string | null; key: number }>({ token: null, key: 0 })
+  const newCaptcha = () => setCaptcha((c) => ({ token: null, key: c.key + 1 }))
   const cart = useCart(store.slug, menu)
   const router = useRouter()
   const [fields, setFields] = useState<OrderFieldsValue>(emptyOrderFields)
@@ -85,19 +91,24 @@ export function CheckoutForm({
     setErrors({})
 
     startTransition(async () => {
-      const result = await placeOrder(store.slug, {
-        ...fields,
-        ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-        items: cart.lines.map((l) => ({
-          menuItemId: l.menuItemId,
-          quantity: l.quantity,
-          extras: l.extras.map((x) => ({ ingredientId: x.ingredientId, quantity: x.quantity })),
-        })),
-      })
+      const result = await placeOrder(
+        store.slug,
+        {
+          ...fields,
+          ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
+          items: cart.lines.map((l) => ({
+            menuItemId: l.menuItemId,
+            quantity: l.quantity,
+            extras: l.extras.map((x) => ({ ingredientId: x.ingredientId, quantity: x.quantity })),
+          })),
+        },
+        captcha.token,
+      )
 
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
+        if (turnstileSiteKey) newCaptcha() // o token já foi gasto nesta tentativa
         return
       }
       placed.current = true
@@ -118,6 +129,11 @@ export function CheckoutForm({
     </>
   ) : !store.isOpen ? (
     "Loja fechada no momento"
+  ) : turnstileSiteKey && !captcha.token ? (
+    <>
+      <Loader2 className="h-5 w-5 animate-spin" />
+      Verificando segurança…
+    </>
   ) : isDelivery && fee === null ? (
     byDistance ? (distance.loading ? "Calculando a entrega…" : distance.quote ? "Confira o endereço de entrega" : "Informe o endereço de entrega") : "Escolha o bairro"
   ) : (
@@ -125,7 +141,7 @@ export function CheckoutForm({
       {pixOnline && fields.paymentMethod === "pix" ? "Confirmar e pagar com Pix" : "Confirmar pedido"} · {formatBRL(total)}
     </>
   )
-  const canSubmit = store.isOpen && !pending && !(isDelivery && fee === null) && !belowMin
+  const canSubmit = store.isOpen && !pending && !(isDelivery && fee === null) && !belowMin && (!turnstileSiteKey || !!captcha.token)
 
   const trust = (
     <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
@@ -188,6 +204,17 @@ export function CheckoutForm({
                 <span className="block text-muted-foreground">Na próxima compra o formulário já vem preenchido. Desmarque em celular compartilhado.</span>
               </span>
             </label>
+
+            {turnstileSiteKey && (
+              <div className="mt-6">
+                <Turnstile
+                  key={captcha.key}
+                  siteKey={turnstileSiteKey}
+                  action="pedido"
+                  onToken={(token) => setCaptcha((c) => ({ ...c, token }))}
+                />
+              </div>
+            )}
 
             <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
               Ao confirmar, seus dados vão para a {store.name} preparar e entregar o pedido, e você concorda com os{" "}

@@ -7,6 +7,7 @@ import { loginAttempts, storeMembers, users } from "@/db/schema"
 import { getDummyHash, verifyPassword } from "@/lib/auth/password"
 import { createSession } from "@/lib/auth/session"
 import { clientIp, hits, recordHits } from "@/lib/rate-limit-server"
+import { TURNSTILE_ERROR, verifyTurnstile } from "@/lib/turnstile"
 import { loginSchema } from "@/lib/validations"
 
 export type LoginState = {
@@ -30,6 +31,9 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   }
 
   const { email, password } = parsed.data
+  // Anti-robô (Turnstile): o widget grava o token no campo oculto cf-turnstile-response do formulário
+  if (!(await verifyTurnstile(formData.get("cf-turnstile-response"), "login"))) return { error: TURNSTILE_ERROR, email }
+
   const emailKey = `email:${email}`
   const ipKey = `ip:${await clientIp()}`
 
