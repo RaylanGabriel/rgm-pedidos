@@ -79,14 +79,19 @@ A descrição do combo ("Smash Clássico + batata frita média + refrigerante la
 ## 10c. Carrinho por lanche: editar, "+" vira outro lanche, foto (Raylan, 13/nov; mesma branch)
 "Quando clico em + ele só adiciona com as mesmas informações. O ideal é aparecer o lanche de novo embaixo com um
 lápis para voltar na tela de tirar/adicionar ingredientes. Foto do lanche no carrinho (como o iFood)."
-- [ ] `ItemSheet` aceita uma linha inicial (adicionais, "sem", quantidade) e o texto do botão ("Salvar").
-- [ ] `LineEditSheet` (exportado): abre o lanche de uma linha do carrinho já preenchido; salvar troca a linha.
-- [ ] `CartSummary` com `menu`: foto do lanche; botão ✏️ Editar; em lanche que tem o que escolher ("sem" ou
-  adicionais), o **+** cria outra linha logo abaixo (cópia, 1 un.) em vez de somar; bebida etc. continua somando.
-- [ ] `useCart`: `replace(i, linha)` e `insertAfter(i, linha)`. Usar no cardápio (lateral + sacola), no finalizar e
+- [x] `ItemSheet` aceita uma linha inicial (adicionais, "sem", quantidade) e o texto do botão ("Salvar").
+- [x] `LineEditSheet` (exportado): abre o lanche de uma linha do carrinho já preenchido; salvar troca a linha.
+- [x] `CartSummary` com `menu`: foto do lanche; link ✏️ Editar embaixo do lanche; em lanche que tem o que escolher
+  ("sem" ou adicionais), o **+** cria outra linha logo abaixo (cópia, 1 un.); bebida etc. continua somando.
+- [x] `useCart`: `replace(i, linha)` e `insertAfter(i, linha)`. Usado no cardápio (lateral + sacola), no finalizar e
   no balcão (Novo pedido).
-- [ ] Sem banco (o pedido já guarda "sem" e adicionais por linha). Observação por lanche fica para depois (precisa
+- [x] Sem banco (o pedido já guarda "sem" e adicionais por linha). Observação por lanche fica para depois (precisa
   de coluna nova).
+- [x] Preview `7807ef9`: foto no carrinho; "+" no Smash Bacon → 2 linhas; Editar abre "Salvar · R$ 21,90", escolher
+  Tomate muda só a 1ª (R$ 22,90) e reabre marcada; água: "+" soma (1 linha, 2 un., sem Editar); finalizar com
+  Editar; no celular a janela abre por cima da sacola. "Editar" virou link embaixo do nome (os 3 botões não cabiam
+  no carrinho lateral de 360 px).
+- [ ] OK do Raylan · [ ] merge (sem migração, junto com o 10b) · [ ] conferir produção
 
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
 "Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
