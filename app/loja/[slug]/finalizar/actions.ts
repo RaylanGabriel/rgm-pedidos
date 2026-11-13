@@ -5,7 +5,7 @@ import { getCustomer } from "@/lib/auth/customer"
 import { addressSchema, afterOrder } from "@/lib/customer-account"
 import { quoteDistance, quoteError } from "@/lib/geo"
 import { addressPartsSchema, type QuoteView } from "@/lib/order-shared"
-import { createOrder, getStoreBySlug, type CreateOrderResult } from "@/lib/orders"
+import { createOrder, existingAttempt, getStoreBySlug, type CreateOrderResult } from "@/lib/orders"
 import { clientIp, rateLimit } from "@/lib/rate-limit-server"
 
 /**
@@ -16,13 +16,19 @@ export async function placeOrder(slug: string, input: unknown, account?: { addre
   const store = await getStoreBySlug(slug)
   if (!store) return { ok: false, error: "Loja não encontrada." }
 
+  // Repetição de uma tentativa que já criou o pedido (resposta perdida): devolve o pedido antes de qualquer
+  // recusa (limite de pedidos, loja fechando) — senão o cliente ouviria "não deu" e duplicaria na próxima
+  const again = await existingAttempt(store.id, input)
+  if (again) return again
+
   // Anti-spam: até 10 pedidos a cada 10 minutos por IP em cada loja
   if (!(await rateLimit(`order:${store.id}:${await clientIp()}`, 10, 10 * 60 * 1000))) {
     return { ok: false, error: "Muitos pedidos em sequência. Aguarde alguns minutos e tente de novo." }
   }
 
   const result = await createOrder(store.id, input, { requireOpen: true, pixOnline: true })
-  const me = result.ok ? await getCustomer() : null
+  // O pedido já existe: falhar aqui (conta do cliente) nunca pode virar erro para quem pediu — ele repetiria o pedido
+  const me = result.ok ? await getCustomer().catch(() => null) : null
   if (result.ok && me) {
     const addressId = z.string().uuid().safeParse(account?.addressId)
     const newAddress = account?.saveAddress ? addressSchema.safeParse(account.saveAddress) : null

@@ -319,6 +319,8 @@ export const orderInputSchema = z
       .pipe(z.number().max(10_000, "Valor de troco muito alto").nullable()),
     notes: optionalText(500, "Observações muito longas"),
     items: cartInputSchema,
+    // Uma por tentativa de "Confirmar pedido" (newAttemptKey): repetir a mesma devolve o pedido já criado
+    idempotencyKey: z.string().uuid().nullable().optional().transform((v) => v ?? null),
   })
   .refine((o) => o.type !== "delivery" || !!o.deliveryAddress, {
     message: "Informe o endereço de entrega",
@@ -326,3 +328,9 @@ export const orderInputSchema = z
   })
 
 export type OrderInput = z.input<typeof orderInputSchema>
+
+/** Chave de uma tentativa de pedido (nova a cada pedido concluído; a mesma ao repetir depois de um erro). */
+export const newAttemptKey = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16))

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,7 @@ import { quoteDeliveryAction } from "@/app/loja/[slug]/finalizar/actions"
 import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
 import { toOrderItem, type CartLine } from "@/lib/cart"
 import type { MenuView } from "@/lib/orders"
-import { previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
+import { newAttemptKey, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 
 /** Pedido lançado no balcão pelo painel. Carrinho só em memória (não usa o do site). */
 export function NewOrderForm({
@@ -39,21 +39,40 @@ export function NewOrderForm({
   const byDistance = fields.type === "delivery" && delivery.pricing === "distance"
   const distance = useDistanceQuote(byDistance, fields.address, (parts) => quoteDeliveryAction(slug, parts))
   const fee = fields.type === "delivery" ? (byDistance ? distance.fee : previewDeliveryFee(delivery, fields.deliveryZoneId)) : undefined
+  // Chave desta tentativa (ver checkout): repetir depois de uma falha de rede não lança o pedido duas vezes
+  // `sent` = o pedido como foi enviado na 1ª vez: se mudou antes de repetir, avisa em vez de esconder a mudança
+  const attempt = useRef<{ key: string; sent: string } | null>(null)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (pending) return
     setError(null)
     setErrors({})
+    const body = {
+      ...fields,
+      ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
+      items: lines.map(toOrderItem),
+    }
+    const sent = JSON.stringify(body)
+    attempt.current ??= { key: newAttemptKey(), sent }
+    const idempotencyKey = attempt.current.key
+    const changed = attempt.current.sent !== sent
     startTransition(async () => {
-      const result = await createCounterOrderAction({
-        ...fields,
-        ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-        items: lines.map(toOrderItem),
-      }, showPixQr && pixQr)
+      let result: Awaited<ReturnType<typeof createCounterOrderAction>>
+      try {
+        result = await createCounterOrderAction({ ...body, idempotencyKey }, showPixQr && pixQr)
+      } catch {
+        setError("Sem resposta do servidor (conexão?). Toque em lançar de novo: se o pedido já tiver entrado, ele não será repetido.")
+        return
+      }
+      attempt.current = null
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
+        return
+      }
+      if (result.duplicate && changed) {
+        setError(`O pedido #${result.orderNumber} já tinha entrado no quadro, sem a última alteração. Confira no quadro; se precisar, lance de novo (vira outro pedido).`)
         return
       }
       router.push(result.pixQr ? `/admin/pedidos/pix/${result.publicToken}` : "/admin/pedidos")

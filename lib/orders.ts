@@ -3,14 +3,19 @@ import "server-only"
 import { randomBytes } from "node:crypto"
 import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
+import { z } from "zod"
 import { db } from "@/db"
 import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
 import { distanceTiers, quoteDistance, quoteError } from "@/lib/geo"
 import { openStateLabel, parseHours, storeOpenState, weekSummary } from "@/lib/hours"
 import { categories, deliveryZones, ingredients, menuItemCategories, menuItemIngredients, menuItems, orders, stores } from "@/db/schema"
 import {
+  ACTIVE_STATUSES,
   addressLine,
+  nextStatus,
+  prevStatus,
   removalsText,
+  type OrderType,
   formatBRL,
   formatKm,
   type StoreLocation,
@@ -186,8 +191,25 @@ export const getDeliveryConfig = cache(async (store: StoreRow): Promise<Delivery
 
 // ---------- Criar pedido ----------
 export type CreateOrderResult =
-  | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean }
+  /** duplicate = esta tentativa (mesma chave) já tinha criado o pedido: devolve o existente, nada novo foi criado */
+  | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean; duplicate?: boolean }
   | { ok: false; error: string; fieldErrors?: Record<string, string | undefined> }
+
+/**
+ * Esta tentativa (chave do navegador) já criou um pedido? Roda ANTES de qualquer outra checagem (limite de pedidos,
+ * localização do endereço, loja aberta): se a primeira resposta se perdeu, a repetição tem que achar o pedido
+ * mesmo que agora uma dessas checagens recusasse — senão o cliente ouve "não deu" e a tentativa seguinte duplica.
+ */
+export async function existingAttempt(storeId: string, rawInput: unknown): Promise<CreateOrderResult | null> {
+  const key = z.string().uuid().safeParse((rawInput as { idempotencyKey?: unknown } | null)?.idempotencyKey)
+  if (!key.success) return null
+  const [row] = await db
+    .select({ orderNumber: orders.orderNumber, publicToken: orders.publicToken, pixCode: orders.pixCode })
+    .from(orders)
+    .where(and(eq(orders.storeId, storeId), eq(orders.idempotencyKey, key.data)))
+    .limit(1)
+  return row ? { ok: true, orderNumber: row.orderNumber, publicToken: row.publicToken, pixQr: !!row.pixCode, duplicate: true } : null
+}
 
 const DB_ERRORS: Record<string, string> = {
   STORE_NOT_FOUND: "Loja não encontrada.",
@@ -207,6 +229,8 @@ export async function createOrder(
   rawInput: unknown,
   opts: { requireOpen: boolean; pixOnline: boolean },
 ): Promise<CreateOrderResult> {
+  const again = await existingAttempt(storeId, rawInput)
+  if (again) return again
   const parsed = orderInputSchema.safeParse(rawInput)
   if (!parsed.success) {
     const f = parsed.error.flatten().fieldErrors
@@ -243,60 +267,67 @@ export async function createOrder(
     if (st && !storeOpenState(st).open) return { ok: false, error: DB_ERRORS.STORE_CLOSED }
   }
 
+  // Tudo que muda o pedido (itens, taxa, troco) acontece numa única chamada ao banco. Com a chave da tentativa,
+  // repetir (resposta perdida, toque duplo) devolve o pedido já criado em vez de criar outro.
+  let result: { orderNumber: number; publicToken: string; duplicate: boolean }
   try {
-    const res = await db.execute<{ result: { orderNumber: number; publicToken: string } }>(sql`
+    const res = await db.execute<{ result: { orderNumber: number; publicToken: string; duplicate: boolean } }>(sql`
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
         ${deliveryAddress}, ${o.paymentMethod}::payment_method, ${o.notes},
         ${JSON.stringify(o.items)}::jsonb, ${token}, false,
-        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid, ${distanceKm}::numeric
+        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid, ${distanceKm}::numeric,
+        ${o.paymentMethod === "cash" ? o.changeFor : null}::numeric, ${o.idempotencyKey}::uuid
       ) as result`)
-    const result = res.rows[0].result
-    // Troco: só em dinheiro e só se a nota cobre o total calculado pelo banco
-    if (o.paymentMethod === "cash" && o.changeFor) {
-      await db
-        .update(orders)
-        .set({ changeFor: o.changeFor.toFixed(2) })
-        .where(and(eq(orders.publicToken, token), eq(orders.storeId, storeId), sql`${orders.total} < ${o.changeFor}`))
-    }
-    // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago.
-    // Se falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
-    const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, token) : false
-    return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr }
+    result = res.rows[0].result
   } catch (err) {
-    // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
-    // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
-    const dbError = err instanceof Error && err.cause instanceof Error ? err.cause : err
-    const msg = dbError instanceof Error ? dbError.message : ""
-    const code = Object.keys(DB_ERRORS).find((c) => msg.includes(c))
-    if (code) return { ok: false, error: DB_ERRORS[code] }
-    if (msg.includes("ZONE_INVALID")) {
-      const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
-      return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
-    }
-    const range = msg.match(/OUT_OF_RANGE:([\d.]+)/)
-    if (range) return { ok: false, error: `Esse endereço fica fora da área de entrega (até ${formatKm(Number(range[1]))}). Escolha retirada.` }
-    if (msg.includes("DISTANCE_REQUIRED")) return { ok: false, error: "Informe o endereço de entrega completo." }
-    const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
-    if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
-    const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
-    if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
-    console.error("Erro ao criar pedido:", err)
-    return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." }
+    return orderError(err)
   }
+  // Daqui em diante o pedido EXISTE: nada pode virar "não foi possível criar" (o cliente repetiria e duplicaria).
+  // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago. Se falhar, o pedido segue
+  // como "Pix direto com a loja" (não perde a venda). Numa repetição, devolve o QR que já existe (ou gera, se faltou).
+  const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, result.publicToken) : false
+  return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr, ...(result.duplicate ? { duplicate: true } : {}) }
+}
+
+/** Erro do create_order → mensagem para o cliente (o pedido NÃO foi criado). */
+function orderError(err: unknown): CreateOrderResult {
+  // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
+  // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
+  const dbError = err instanceof Error && err.cause instanceof Error ? err.cause : err
+  const msg = dbError instanceof Error ? dbError.message : ""
+  const code = Object.keys(DB_ERRORS).find((c) => msg.includes(c))
+  if (code) return { ok: false, error: DB_ERRORS[code] }
+  if (msg.includes("ZONE_INVALID")) {
+    const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
+    return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
+  }
+  const range = msg.match(/OUT_OF_RANGE:([\d.]+)/)
+  if (range) return { ok: false, error: `Esse endereço fica fora da área de entrega (até ${formatKm(Number(range[1]))}). Escolha retirada.` }
+  if (msg.includes("DISTANCE_REQUIRED")) return { ok: false, error: "Informe o endereço de entrega completo." }
+  const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
+  if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
+  const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
+  if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
+  // Só a mensagem do banco: o erro de fora traz os dados do cliente (nome, telefone, endereço)
+  console.error("Erro ao criar pedido:", msg || (err instanceof Error ? err.name : "desconhecido"))
+  return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." }
 }
 
 /** Gera a cobrança Pix no Mercado Pago e guarda no pedido. true = QR gerado. */
 async function attachPixCharge(storeId: string, publicToken: string): Promise<boolean> {
   try {
-    const mpToken = await storeAccessToken(storeId)
-    if (!mpToken) return false
     const row = await db.query.orders.findFirst({
       where: and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)),
-      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true },
+      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true, paymentMethod: true, pixCode: true, status: true, paymentStatus: true },
       with: { ...withItems, store: { columns: { name: true } } },
     })
-    if (!row) return false
+    if (!row || row.paymentMethod !== "pix") return false
+    if (row.pixCode) return true // repetição da mesma tentativa: o QR já existe
+    // Repetição tardia de um pedido que já seguiu sem QR (cozinha, cancelado): nunca gera cobrança nova
+    if (row.status !== "pending" || row.paymentStatus !== "pending") return false
+    const mpToken = await storeAccessToken(storeId)
+    if (!mpToken) return false
     // Itens com os adicionais somados no preço unitário (o Mercado Pago confere: soma dos itens = total)
     const items = row.items.map((i) => ({
       title: i.nameSnapshot,
@@ -410,8 +441,9 @@ export async function getOrderByToken(token: string) {
   if (row && row.mpOrderId && row.paymentStatus === "pending" && row.status === "pending") {
     try {
       const result = await syncPixOrder(row.id)
-      if (result !== "pending") row = await find()
-      else if (row.pixExpiresAt && row.pixExpiresAt.getTime() < Date.now() - 5 * 60_000) {
+      // "unverifiable" (loja sem conexão com o Mercado Pago): nada muda e nunca cancela — segue aguardando
+      if (result !== "pending" && result !== "unverifiable") row = await find()
+      else if (result === "pending" && row.pixExpiresAt && row.pixExpiresAt.getTime() < Date.now() - 5 * 60_000) {
         await cancelOverduePix(row.storeId)
         row = await find()
       }
@@ -482,8 +514,22 @@ export async function confirmDeliveryByToken(token: string) {
   return !!row
 }
 
-/** Muda o status de um pedido — sempre restrito à loja informada. */
-export async function setOrderStatus(storeId: string, orderId: string, status: OrderStatus) {
+const ORDER_TYPES: OrderType[] = ["pickup", "delivery", "dine_in"]
+
+/** Mudança que a cozinha pode fazer a partir de `from`: próxima etapa, anterior ou cancelar (nunca sair do fim). */
+function allowedMove(type: OrderType, from: OrderStatus, to: OrderStatus) {
+  if (!ACTIVE_STATUSES.includes(from)) return false // entregue ou cancelado não voltam
+  return to === "cancelled" || to === nextStatus(from, type) || to === prevStatus(from, type)
+}
+
+/**
+ * Muda o status de um pedido — sempre restrito à loja informada.
+ * `from` = a etapa que a tela mostrava: se o pedido já mudou (outro tablet, cliente confirmou, fechou sozinho), nada
+ * acontece e devolve "stale" — uma tela atrasada nunca ressuscita pedido cancelado ou entregue.
+ */
+export async function setOrderStatus(storeId: string, orderId: string, from: OrderStatus, status: OrderStatus): Promise<"ok" | "stale" | "invalid"> {
+  const types = ORDER_TYPES.filter((t) => allowedMove(t, from, status))
+  if (!types.length) return "invalid"
   const done = status === "delivered" || status === "cancelled"
   const updated = await db
     .update(orders)
@@ -500,10 +546,11 @@ export async function setOrderStatus(storeId: string, orderId: string, status: O
       and(
         eq(orders.id, orderId),
         eq(orders.storeId, storeId),
-        // "saiu para entrega" só existe para pedidos de entrega
-        status === "out_for_delivery" ? eq(orders.type, "delivery") : undefined,
+        eq(orders.status, from),
+        // a mudança precisa valer para o tipo do pedido ("saiu para entrega" só existe em entrega)
+        inArray(orders.type, types),
       ),
     )
     .returning({ id: orders.id })
-  return updated.length > 0
+  return updated.length > 0 ? "ok" : "stale"
 }

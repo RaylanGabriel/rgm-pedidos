@@ -414,10 +414,14 @@ export const orders = pgTable(
     readyAt: timestamp("ready_at", { withTimezone: true }), // quando a cozinha marcou "pronto" (tempo de preparo)
     outForDeliveryAt: timestamp("out_for_delivery_at", { withTimezone: true }), // quando saiu para entrega
     autoDelivered: boolean("auto_delivered").notNull().default(false), // fechado sozinho 1h depois de sair
+    // Chave de cada tentativa de "Confirmar pedido" (gerada no navegador): repetir a mesma tentativa — resposta perdida,
+    // toque duplo — devolve o pedido já criado em vez de criar outro. Nunca aparece em tela nem em link.
+    idempotencyKey: uuid("idempotency_key"),
   },
   (t) => [
     uniqueIndex("orders_store_number_unique").on(t.storeId, t.orderNumber),
     uniqueIndex("orders_public_token_unique").on(t.publicToken),
+    uniqueIndex("orders_store_idempotency_unique").on(t.storeId, t.idempotencyKey),
     index("orders_mp_order_idx").on(t.mpOrderId),
     index("orders_store_status_created_idx").on(t.storeId, t.status, t.createdAt),
     index("orders_customer_created_idx").on(t.customerId, t.createdAt),
