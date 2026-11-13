@@ -1,3 +1,37 @@
+# Correção dos 3 bugs de prioridade alta (13/nov/2026, branch `fix/bugs-revisao`)
+
+Um commit por bug + ajustes de uma revisão independente → preview testado → [ ] OK do Raylan → [ ] 0028 em prod → [ ] merge
+→ [ ] produção conferida → [ ] depois: migração que apaga a create_order antiga (12 parâmetros).
+
+## Bug 1 — Pix pago cancelado sozinho (`091f808`)
+- [x] `syncPixOrder` sem token da loja devolve `"unverifiable"`; `cancelOverduePix` não cancela: o pedido fica em
+  "Aguardando Pix" (a equipe resolve na tela do QR). Aviso por e-mail uma vez por pedido (marcado em error_events);
+  só olha Pix vencidos há menos de 2 dias.
+- [x] Teste (banco preview): loja sem conta → continua pendente + 1 aviso (cron 2× = 1 aviso); loja com conta e cobrança
+  inexistente → cancelado como antes.
+
+## Bug 2 — Pedido duplicado (`3889bbe` + migração 0028)
+- [x] `orders.idempotency_key` + índice único (loja, chave); `create_order` nova (14 parâmetros, convive com a antiga):
+  trava a loja, devolve o pedido da mesma chave, grava o troco na mesma transação.
+- [x] A repetição procura a chave antes de qualquer checagem (limite, endereço, loja aberta). Depois de criado, nada vira erro.
+- [x] Checkout e balcão: chave por tentativa; sem resposta → aviso e a mesma chave; mudou o pedido antes de repetir →
+  aviso "pedido #N já tinha sido recebido" com link (o carrinho fica para um novo pedido).
+- [x] Teste (banco): mesma chave 2× e 3× em paralelo = 1 pedido; troco; sem chave; repetição recusável; função antiga ok.
+- [x] Teste (navegador, preview): resposta cortada de propósito depois de o servidor gravar → aviso → repetir abre o
+  MESMO pedido (1 só no banco); mudou o nome e repetiu → aviso com link, 1 pedido.
+
+## Bug 3 — Tablet atrasado ressuscita pedido (`5fc1439`)
+- [x] Ação recebe a etapa de origem; só muda se o pedido ainda está nela e a mudança é permitida. Tablet com a tela antiga
+  (antes do deploy) continua funcionando até recarregar.
+- [x] Teste (banco): 16 casos (atrasado, cancelado, entregue, pular etapa, retirada × entrega). Navegador: tablet A cancela,
+  tablet B atrasado toca "Começar preparo" → aviso "já tinha mudado", pedido continua cancelado.
+
+## Achado no teste (não é destas mudanças)
+- [ ] Erro de hidratação do React #418 (texto diferente servidor × navegador) apareceu 1 vez em 3 rodadas; suspeita: horário
+  relativo ("há X min") virando o minuto. Investigar depois.
+
+---
+
 # Revisão geral (13/nov/2026) — para corrigir
 
 Feita para o documento do projeto (aba "Para corrigir" em https://claude.ai/artifact/BzZZh9YAiqjxEVs5c1LnJc), com dois
