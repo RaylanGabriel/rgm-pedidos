@@ -194,16 +194,20 @@ function RemovablePicker({
         <input key={p} type="hidden" name="removable" value={p} />
       ))}
       <legend className="px-1 text-sm font-medium">O cliente pode tirar</legend>
-      {included.map((i) => (
-        <p key={i.id} className="mb-3 rounded-md bg-muted px-3 py-2 text-sm">
-          <span className="font-medium">Do {i.name}</span>
-          {i.removable.length ? (
-            <>: {i.removable.join(", ")} <span className="text-xs text-muted-foreground">(automático: muda junto com o lanche)</span></>
-          ) : (
-            <span className="text-muted-foreground">: ainda sem botões “sem ___” — escolha no próprio lanche.</span>
-          )}
+      {included
+        .filter((i) => i.removable.length)
+        .map((i) => (
+          <p key={i.id} className="mb-3 rounded-md bg-muted px-3 py-2 text-sm">
+            <span className="font-medium">Do {i.name}:</span> {i.removable.join(", ")}{" "}
+            <span className="text-xs text-muted-foreground">(automático: muda junto com o lanche)</span>
+          </p>
+        ))}
+      {included.some((i) => !i.removable.length) && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Também inclui {included.filter((i) => !i.removable.length).map((i) => i.name).join(", ")} (sem botões “sem ___”; dá para
+          escolher no próprio item).
         </p>
-      ))}
+      )}
       {parts.length ? (
         <>
           <p className="mb-3 text-xs text-muted-foreground">
