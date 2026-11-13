@@ -135,8 +135,14 @@ export function KitchenBoard({
     setError(null)
     startTransition(async () => {
       moveOptimistic({ id: order.id, status })
-      const res = await updateOrderStatusAction(order.id, status)
-      if (!res.ok) setError(`Não foi possível atualizar o pedido #${order.orderNumber}. Tente de novo.`)
+      try {
+        // manda a etapa que esta tela mostra: se outro aparelho já mudou o pedido, o servidor não mexe
+        const res = await updateOrderStatusAction(order.id, order.status, status)
+        if (res.stale) setError(`O pedido #${order.orderNumber} já tinha mudado em outro aparelho. A tela foi atualizada; confira antes de tocar de novo.`)
+        else if (!res.ok) setError(`Não foi possível atualizar o pedido #${order.orderNumber}. Tente de novo.`)
+      } catch {
+        setError(`Sem conexão para atualizar o pedido #${order.orderNumber}. Confira a internet e tente de novo.`)
+      }
       router.refresh()
     })
   }

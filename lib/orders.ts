@@ -9,8 +9,12 @@ import { distanceTiers, quoteDistance, quoteError } from "@/lib/geo"
 import { openStateLabel, parseHours, storeOpenState, weekSummary } from "@/lib/hours"
 import { categories, deliveryZones, ingredients, menuItemCategories, menuItemIngredients, menuItems, orders, stores } from "@/db/schema"
 import {
+  ACTIVE_STATUSES,
   addressLine,
+  nextStatus,
+  prevStatus,
   removalsText,
+  type OrderType,
   formatBRL,
   formatKm,
   type StoreLocation,
@@ -488,8 +492,22 @@ export async function confirmDeliveryByToken(token: string) {
   return !!row
 }
 
-/** Muda o status de um pedido — sempre restrito à loja informada. */
-export async function setOrderStatus(storeId: string, orderId: string, status: OrderStatus) {
+const ORDER_TYPES: OrderType[] = ["pickup", "delivery", "dine_in"]
+
+/** Mudança que a cozinha pode fazer a partir de `from`: próxima etapa, anterior ou cancelar (nunca sair do fim). */
+function allowedMove(type: OrderType, from: OrderStatus, to: OrderStatus) {
+  if (!ACTIVE_STATUSES.includes(from)) return false // entregue ou cancelado não voltam
+  return to === "cancelled" || to === nextStatus(from, type) || to === prevStatus(from, type)
+}
+
+/**
+ * Muda o status de um pedido — sempre restrito à loja informada.
+ * `from` = a etapa que a tela mostrava: se o pedido já mudou (outro tablet, cliente confirmou, fechou sozinho), nada
+ * acontece e devolve "stale" — uma tela atrasada nunca ressuscita pedido cancelado ou entregue.
+ */
+export async function setOrderStatus(storeId: string, orderId: string, from: OrderStatus, status: OrderStatus): Promise<"ok" | "stale" | "invalid"> {
+  const types = ORDER_TYPES.filter((t) => allowedMove(t, from, status))
+  if (!types.length) return "invalid"
   const done = status === "delivered" || status === "cancelled"
   const updated = await db
     .update(orders)
@@ -506,10 +524,11 @@ export async function setOrderStatus(storeId: string, orderId: string, status: O
       and(
         eq(orders.id, orderId),
         eq(orders.storeId, storeId),
-        // "saiu para entrega" só existe para pedidos de entrega
-        status === "out_for_delivery" ? eq(orders.type, "delivery") : undefined,
+        eq(orders.status, from),
+        // a mudança precisa valer para o tipo do pedido ("saiu para entrega" só existe em entrega)
+        inArray(orders.type, types),
       ),
     )
     .returning({ id: orders.id })
-  return updated.length > 0
+  return updated.length > 0 ? "ok" : "stale"
 }

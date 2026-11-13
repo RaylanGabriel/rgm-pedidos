@@ -12,15 +12,19 @@ import { createOrder, setOrderStatus, type CreateOrderResult } from "@/lib/order
 
 const statusSchema = z.enum(["pending", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"])
 
-/** Muda o status de um pedido da loja ativa. */
-export async function updateOrderStatusAction(orderId: string, status: string) {
+/**
+ * Muda o status de um pedido da loja ativa. `from` = a etapa que a tela mostrava; se o pedido já mudou em outro
+ * aparelho, nada muda e volta `stale` (a tela se atualiza).
+ */
+export async function updateOrderStatusAction(orderId: string, from: string, status: string) {
   const { store } = await requireStore()
+  const parsedFrom = statusSchema.safeParse(from)
   const parsed = statusSchema.safeParse(status)
-  if (!parsed.success || !z.string().uuid().safeParse(orderId).success) return { ok: false as const }
+  if (!parsedFrom.success || !parsed.success || !z.string().uuid().safeParse(orderId).success) return { ok: false as const, stale: false }
 
-  const ok = await setOrderStatus(store.id, orderId, parsed.data)
+  const result = await setOrderStatus(store.id, orderId, parsedFrom.data, parsed.data)
   revalidatePath("/admin/pedidos")
-  return { ok }
+  return { ok: result === "ok", stale: result === "stale" }
 }
 
 /**
