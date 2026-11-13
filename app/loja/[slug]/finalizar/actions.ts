@@ -5,7 +5,7 @@ import { getCustomer } from "@/lib/auth/customer"
 import { addressSchema, afterOrder } from "@/lib/customer-account"
 import { quoteDistance, quoteError } from "@/lib/geo"
 import { addressPartsSchema, type QuoteView } from "@/lib/order-shared"
-import { createOrder, getStoreBySlug, type CreateOrderResult } from "@/lib/orders"
+import { createOrder, existingAttempt, getStoreBySlug, type CreateOrderResult } from "@/lib/orders"
 import { clientIp, rateLimit } from "@/lib/rate-limit-server"
 
 /**
@@ -15,6 +15,11 @@ import { clientIp, rateLimit } from "@/lib/rate-limit-server"
 export async function placeOrder(slug: string, input: unknown, account?: { addressId?: string | null; saveAddress?: unknown }): Promise<CreateOrderResult> {
   const store = await getStoreBySlug(slug)
   if (!store) return { ok: false, error: "Loja não encontrada." }
+
+  // Repetição de uma tentativa que já criou o pedido (resposta perdida): devolve o pedido antes de qualquer
+  // recusa (limite de pedidos, loja fechando) — senão o cliente ouviria "não deu" e duplicaria na próxima
+  const again = await existingAttempt(store.id, input)
+  if (again) return again
 
   // Anti-spam: até 10 pedidos a cada 10 minutos por IP em cada loja
   if (!(await rateLimit(`order:${store.id}:${await clientIp()}`, 10, 10 * 60 * 1000))) {

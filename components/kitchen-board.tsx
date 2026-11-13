@@ -138,10 +138,11 @@ export function KitchenBoard({
       try {
         // manda a etapa que esta tela mostra: se outro aparelho já mudou o pedido, o servidor não mexe
         const res = await updateOrderStatusAction(order.id, order.status, status)
-        if (res.stale) setError(`O pedido #${order.orderNumber} já tinha mudado em outro aparelho. A tela foi atualizada; confira antes de tocar de novo.`)
-        else if (!res.ok) setError(`Não foi possível atualizar o pedido #${order.orderNumber}. Tente de novo.`)
+        if (res.stale) setError(`O pedido #${order.orderNumber} já tinha mudado (em outro aparelho ou pelo cliente). A tela foi atualizada; confira antes de tocar de novo.`)
+        else if (!res.ok) setError(`Essa mudança não vale para o pedido #${order.orderNumber}. A tela foi atualizada.`)
       } catch {
-        setError(`Sem conexão para atualizar o pedido #${order.orderNumber}. Confira a internet e tente de novo.`)
+        // Sem internet, ou o painel foi atualizado no servidor: recarregar resolve os dois
+        setError(`Não deu para falar com o servidor (pedido #${order.orderNumber}). Confira a internet e recarregue a página.`)
       }
       router.refresh()
     })
@@ -559,7 +560,7 @@ function AwaitingPix({ orders, now }: { orders: OrderWithItemsView[]; now: numbe
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-xs opacity-80">Entram em Novos sozinhos quando o pagamento cair. Se vencer, são cancelados.</p>
+          <p className="mt-2 text-xs opacity-80">Entram em Novos sozinhos quando o pagamento cair. Se vencer sem pagar, são cancelados (sem conexão com o Mercado Pago, ficam aqui para conferir).</p>
         </div>
       )}
     </div>

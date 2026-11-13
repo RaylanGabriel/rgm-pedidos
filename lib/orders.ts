@@ -3,6 +3,7 @@ import "server-only"
 import { randomBytes } from "node:crypto"
 import { cache } from "react"
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
+import { z } from "zod"
 import { db } from "@/db"
 import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
 import { distanceTiers, quoteDistance, quoteError } from "@/lib/geo"
@@ -190,8 +191,25 @@ export const getDeliveryConfig = cache(async (store: StoreRow): Promise<Delivery
 
 // ---------- Criar pedido ----------
 export type CreateOrderResult =
-  | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean }
+  /** duplicate = esta tentativa (mesma chave) já tinha criado o pedido: devolve o existente, nada novo foi criado */
+  | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean; duplicate?: boolean }
   | { ok: false; error: string; fieldErrors?: Record<string, string | undefined> }
+
+/**
+ * Esta tentativa (chave do navegador) já criou um pedido? Roda ANTES de qualquer outra checagem (limite de pedidos,
+ * localização do endereço, loja aberta): se a primeira resposta se perdeu, a repetição tem que achar o pedido
+ * mesmo que agora uma dessas checagens recusasse — senão o cliente ouve "não deu" e a tentativa seguinte duplica.
+ */
+export async function existingAttempt(storeId: string, rawInput: unknown): Promise<CreateOrderResult | null> {
+  const key = z.string().uuid().safeParse((rawInput as { idempotencyKey?: unknown } | null)?.idempotencyKey)
+  if (!key.success) return null
+  const [row] = await db
+    .select({ orderNumber: orders.orderNumber, publicToken: orders.publicToken, pixCode: orders.pixCode })
+    .from(orders)
+    .where(and(eq(orders.storeId, storeId), eq(orders.idempotencyKey, key.data)))
+    .limit(1)
+  return row ? { ok: true, orderNumber: row.orderNumber, publicToken: row.publicToken, pixQr: !!row.pixCode, duplicate: true } : null
+}
 
 const DB_ERRORS: Record<string, string> = {
   STORE_NOT_FOUND: "Loja não encontrada.",
@@ -211,6 +229,8 @@ export async function createOrder(
   rawInput: unknown,
   opts: { requireOpen: boolean; pixOnline: boolean },
 ): Promise<CreateOrderResult> {
+  const again = await existingAttempt(storeId, rawInput)
+  if (again) return again
   const parsed = orderInputSchema.safeParse(rawInput)
   if (!parsed.success) {
     const f = parsed.error.flatten().fieldErrors
@@ -267,7 +287,7 @@ export async function createOrder(
   // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago. Se falhar, o pedido segue
   // como "Pix direto com a loja" (não perde a venda). Numa repetição, devolve o QR que já existe (ou gera, se faltou).
   const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, result.publicToken) : false
-  return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr }
+  return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr, ...(result.duplicate ? { duplicate: true } : {}) }
 }
 
 /** Erro do create_order → mensagem para o cliente (o pedido NÃO foi criado). */
@@ -299,11 +319,13 @@ async function attachPixCharge(storeId: string, publicToken: string): Promise<bo
   try {
     const row = await db.query.orders.findFirst({
       where: and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)),
-      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true, paymentMethod: true, pixCode: true },
+      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true, paymentMethod: true, pixCode: true, status: true, paymentStatus: true },
       with: { ...withItems, store: { columns: { name: true } } },
     })
     if (!row || row.paymentMethod !== "pix") return false
     if (row.pixCode) return true // repetição da mesma tentativa: o QR já existe
+    // Repetição tardia de um pedido que já seguiu sem QR (cozinha, cancelado): nunca gera cobrança nova
+    if (row.status !== "pending" || row.paymentStatus !== "pending") return false
     const mpToken = await storeAccessToken(storeId)
     if (!mpToken) return false
     // Itens com os adicionais somados no preço unitário (o Mercado Pago confere: soma dos itens = total)

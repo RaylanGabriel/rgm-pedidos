@@ -40,32 +40,39 @@ export function NewOrderForm({
   const distance = useDistanceQuote(byDistance, fields.address, (parts) => quoteDeliveryAction(slug, parts))
   const fee = fields.type === "delivery" ? (byDistance ? distance.fee : previewDeliveryFee(delivery, fields.deliveryZoneId)) : undefined
   // Chave desta tentativa (ver checkout): repetir depois de uma falha de rede não lança o pedido duas vezes
-  const attemptKey = useRef<string | null>(null)
+  // `sent` = o pedido como foi enviado na 1ª vez: se mudou antes de repetir, avisa em vez de esconder a mudança
+  const attempt = useRef<{ key: string; sent: string } | null>(null)
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (pending) return
     setError(null)
     setErrors({})
-    attemptKey.current ??= newAttemptKey()
-    const idempotencyKey = attemptKey.current
+    const body = {
+      ...fields,
+      ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
+      items: lines.map(toOrderItem),
+    }
+    const sent = JSON.stringify(body)
+    attempt.current ??= { key: newAttemptKey(), sent }
+    const idempotencyKey = attempt.current.key
+    const changed = attempt.current.sent !== sent
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof createCounterOrderAction>>
       try {
-        result = await createCounterOrderAction({
-          ...fields,
-          ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-          items: lines.map(toOrderItem),
-          idempotencyKey,
-        }, showPixQr && pixQr)
+        result = await createCounterOrderAction({ ...body, idempotencyKey }, showPixQr && pixQr)
       } catch {
         setError("Sem resposta do servidor (conexão?). Toque em lançar de novo: se o pedido já tiver entrado, ele não será repetido.")
         return
       }
-      attemptKey.current = null
+      attempt.current = null
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
+        return
+      }
+      if (result.duplicate && changed) {
+        setError(`O pedido #${result.orderNumber} já tinha entrado no quadro, sem a última alteração. Confira no quadro; se precisar, lance de novo (vira outro pedido).`)
         return
       }
       router.push(result.pixQr ? `/admin/pedidos/pix/${result.publicToken}` : "/admin/pedidos")

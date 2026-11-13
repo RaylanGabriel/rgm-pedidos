@@ -1,9 +1,9 @@
 import "server-only"
 
 import { createHmac, timingSafeEqual } from "node:crypto"
-import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm"
+import { and, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { orders, storePaymentAccounts, stores } from "@/db/schema"
+import { errorEvents, orders, storePaymentAccounts, stores } from "@/db/schema"
 import { recordError } from "@/lib/alerts"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
 
@@ -295,7 +295,8 @@ export async function dropPixCharge(orderId: string): Promise<"paid" | "ok"> {
  * um Pix PAGO seria cancelado. Se a consulta falhar (rede, Mercado Pago fora do ar), não cancela — tenta de novo na
  * próxima vez. "Cobrança não encontrada" (404) é diferente: não existe, então não pode ser paga → cancela.
  * Loja sem conexão válida ("unverifiable"): também não cancela — o pedido fica em "Aguardando Pix", onde a equipe
- * resolve à mão (tela do QR), e o cron avisa por e-mail uma vez por pedido.
+ * resolve à mão (tela do QR), e o cron avisa por e-mail uma vez por pedido. Só olha Pix vencidos há menos de 2 dias:
+ * um não verificável não fica sendo consultado para sempre (o Mercado Pago responde muito antes disso).
  * Devolve quantos foram cancelados.
  */
 export async function cancelOverduePix(storeId?: string) {
@@ -305,27 +306,25 @@ export async function cancelOverduePix(storeId?: string) {
     isNotNull(orders.mpOrderId),
     eq(orders.status, "pending"),
     lt(orders.pixExpiresAt, sql`now() - interval '5 minutes'`),
+    gt(orders.pixExpiresAt, sql`now() - interval '2 days'`),
   )
   const rows = await db
-    .select({
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      slug: stores.slug,
-      // entrou agora na janela de vencido (o cron roda a cada 5 min): o aviso sai uma vez só por pedido
-      justOverdue: sql<boolean>`${orders.pixExpiresAt} >= now() - interval '10 minutes'`,
-    })
+    .select({ id: orders.id, orderNumber: orders.orderNumber, slug: stores.slug })
     .from(orders)
     .innerJoin(stores, eq(stores.id, orders.storeId))
     .where(overdue)
   const toCancel: string[] = []
-  for (const { id, orderNumber, slug, justOverdue } of rows) {
+  for (const { id, orderNumber, slug } of rows) {
     try {
       const status = await syncPixOrder(id) // pago → entra na cozinha; vencido no MP → já cancela
       if (status === "pending" || status === "ignored") toCancel.push(id)
-      else if (status === "unverifiable" && !storeId && justOverdue) {
-        await recordError(
+      else if (status === "unverifiable" && !storeId) {
+        // Um aviso por pedido: o próprio registro do erro marca que já avisamos (independe do ritmo do cron)
+        const path = `pix-sem-conexao/${id}`
+        const [seen] = await db.select({ id: errorEvents.id }).from(errorEvents).where(and(eq(errorEvents.source, "pix"), eq(errorEvents.path, path))).limit(1)
+        if (!seen) await recordError(
           "pix",
-          `loja ${slug}`,
+          path,
           `Pix do pedido #${orderNumber} (loja ${slug}) venceu e não dá para conferir: a loja está sem conexão válida com o Mercado Pago. O pedido NÃO foi cancelado e segue em "Aguardando Pix" — confira no app do Mercado Pago da loja e peça para reconectar.`,
         )
       }

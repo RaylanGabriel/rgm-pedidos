@@ -41,7 +41,9 @@ export function CheckoutForm({
   const errorRef = useRef<HTMLDivElement>(null)
   // Chave desta tentativa: se a resposta se perder (rede caiu) e o cliente tocar de novo, o servidor devolve o mesmo
   // pedido em vez de criar outro. Só é trocada quando o servidor RESPONDE (pedido feito, ou recusado sem criar nada).
-  const attemptKey = useRef<string | null>(null)
+  // `sent` = o pedido como foi enviado na 1ª vez: se o cliente mudou algo antes de repetir, avisamos em vez de esconder.
+  const attempt = useRef<{ key: string; sent: string } | null>(null)
+  const [received, setReceived] = useState<{ number: number; token: string } | null>(null)
   const [remember, setRemember] = useState(true)
   const [usingSaved, setUsingSaved] = useState(false)
   // Conta: endereço salvo escolhido ("new" = digitar outro) e se o novo vai para a conta
@@ -122,31 +124,36 @@ export function CheckoutForm({
           : { saveAddress: saveNewAddress ? typed : null }
         : undefined
 
-    attemptKey.current ??= newAttemptKey()
-    const idempotencyKey = attemptKey.current
+    const body = {
+      ...fields,
+      ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
+      items: cart.lines.map(toOrderItem),
+    }
+    const sent = JSON.stringify(body)
+    attempt.current ??= { key: newAttemptKey(), sent }
+    const idempotencyKey = attempt.current.key
+    const changed = attempt.current.sent !== sent
+    setReceived(null)
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof placeOrder>>
       try {
-        result = await placeOrder(
-          store.slug,
-          {
-            ...fields,
-            ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-            items: cart.lines.map(toOrderItem),
-            idempotencyKey,
-          },
-          accountInfo,
-        )
+        result = await placeOrder(store.slug, { ...body, idempotencyKey }, accountInfo)
       } catch {
         // Sem resposta: o pedido pode ter sido criado. Mantém a chave — tocar de novo não duplica.
         setError("Não conseguimos confirmar o envio (conexão instável?). Toque em confirmar de novo: se o pedido já tiver chegado, ele não será repetido.")
         return
       }
-      attemptKey.current = null
+      attempt.current = null
 
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
+        return
+      }
+      if (result.duplicate && changed) {
+        // A 1ª tentativa (antes da mudança) já tinha virado pedido: mostra qual, e o carrinho fica para um novo pedido
+        saveRecentOrder(store.slug, { token: result.publicToken, number: result.orderNumber, createdAt: new Date().toISOString() })
+        setReceived({ number: result.orderNumber, token: result.publicToken })
         return
       }
       placed.current = true
@@ -343,6 +350,15 @@ export function CheckoutForm({
           {error && (
             <div ref={errorRef} role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
               <p className="text-sm font-medium text-destructive">{error}</p>
+            </div>
+          )}
+          {received && (
+            <div role="status" className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
+              <p className="font-semibold">Seu pedido #{received.number} já tinha sido recebido — sem a última alteração.</p>
+              <p className="mt-1 text-muted-foreground">Confira o pedido. Se quiser também o que mudou, confirme de novo: vira um pedido separado.</p>
+              <Link href={`/pedido/${received.token}`} className="mt-2 inline-block font-semibold text-primary underline-offset-4 hover:underline">
+                Ver o pedido #{received.number}
+              </Link>
             </div>
           )}
         </div>
