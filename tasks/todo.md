@@ -60,9 +60,10 @@ A descrição do combo ("Smash Clássico + batata frita média + refrigerante la
 - [x] Junto (pedido do Raylan, roadmap 10a): cabeçalho "Área Administrativa" com a mesma largura do status e dos
   cartões (`max-w-6xl mx-auto`), "Minha conta" e "Sair" no mesmo estilo, quebra no celular. Preview `51bb7bf`:
   bordas iguais às do status (1600 px: 224–1376; 390 px: 16–374), fotos conferidas.
-- [x] Junto (Raylan): rodapé da loja no computador em 3 colunas alinhadas pelo topo (loja + endereço · Horário ·
-  Fale com a gente), horários numa coluna só (grade), "RGM Pedidos" em negrito. Celular igual (centralizado, sem
-  títulos). Preview `9b10540`: fotos 1900 px e 468 px conferidas.
+- [x] Junto (Raylan): rodapé da loja. Ordem nome → ícones das redes (44 px) → endereço + "Ver no mapa →" →
+  horário (grade, horários alinhados); computador nas 2 colunas da página (loja embaixo do cardápio, Horário embaixo
+  do carrinho); "RGM Pedidos" em negrito. Degradê com a cor da loja testado e descartado pelo Raylan (fundo neutro).
+  Fotos 1900/900/468 px conferidas.
 - Workers Builds não recebeu os pushes `e3666be`…`7bcf2a8` (incidente da Cloudflare: "Workers API availability");
   um commit vazio depois disparou o build.
 - [ ] OK do Raylan · [ ] `db:migrate:prod` (0026) · [ ] merge · [ ] conferir produção

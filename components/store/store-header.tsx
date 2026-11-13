@@ -201,9 +201,8 @@ export function StoreFooter({
       </Link>
     </p>
   )
-  // Degradê suave da cor da loja: claro em cima, um toque da cor embaixo (texto continua escuro; não compete com
-  // os botões vermelhos de "Adicionar" e funciona com qualquer cor que o dono escolher)
-  const footerClass = "mt-16 border-t bg-linear-to-b from-card to-primary/15"
+  // Fundo neutro (um degradê com a cor da loja foi testado em 13/nov e o Raylan preferiu sem)
+  const footerClass = "mt-16 border-t bg-card"
   if (!map && !store.weekHours && socialLinks(store).length === 0) return <footer className={`${footerClass} pt-6`}>{legal}</footer>
   return (
     <footer className={footerClass}>
