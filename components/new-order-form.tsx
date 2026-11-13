@@ -77,6 +77,9 @@ export function NewOrderForm({
               lines={lines}
               onQuantity={(i, q) => setLines((p) => p.map((l, j) => (j === i ? { ...l, quantity: Math.min(20, Math.max(1, q)) } : l)))}
               onRemove={(i) => setLines((p) => p.filter((_, j) => j !== i))}
+              menu={menu}
+              onReplace={(i, l) => setLines((p) => p.map((x, j) => (j === i ? l : x)))}
+              onInsertAfter={(i, l) => setLines((p) => [...p.slice(0, i + 1), l, ...p.slice(i + 1)])}
               deliveryFee={lines.length ? fee : undefined}
               feePendingLabel={byDistance ? (distance.loading ? "calculando…" : "informe o endereço") : undefined}
             />

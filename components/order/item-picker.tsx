@@ -49,8 +49,7 @@ export function ItemPicker({
     return orphans.length ? [...named, { id: "outros", name: named.length ? "Outros" : "Cardápio", items: orphans }] : named
   }, [menu])
 
-  // Os adicionais seguem a categoria PRINCIPAL do item (a mesma regra do banco)
-  const extrasFor = (item: MenuItemView) => menu.categories.find((c) => c.id === item.categoryId)?.extrasEnabled ?? true
+  const extrasFor = (item: MenuItemView) => extrasEnabledFor(menu, item)
 
   return (
     <div className="min-w-0">
@@ -246,15 +245,44 @@ function MenuItemCard({ item, disabled, onOpen }: { item: MenuItemView; disabled
   )
 }
 
+/** O lanche tem o que escolher (botões "sem" ou adicionais)? No carrinho, o "+" dele vira outro lanche. */
+export function isCustomizable(menu: MenuView, menuItemId: string) {
+  const item = menu.items.find((i) => i.id === menuItemId)
+  return !!item && (item.removable.length > 0 || (extrasEnabledFor(menu, item) && menu.ingredients.length > 0))
+}
+
+// Os adicionais seguem a categoria PRINCIPAL do item (a mesma regra do banco)
+const extrasEnabledFor = (menu: MenuView, item: MenuItemView) => menu.categories.find((c) => c.id === item.categoryId)?.extrasEnabled ?? true
+
+/** Editar uma linha do carrinho: abre o lanche já com as escolhas dela; "Salvar" devolve a linha nova. */
+export function LineEditSheet({ menu, line, onClose, onSave }: { menu: MenuView; line: CartLine | null; onClose: () => void; onSave: (line: CartLine) => void }) {
+  const item = line ? (menu.items.find((i) => i.id === line.menuItemId) ?? null) : null
+  return (
+    <ItemSheet
+      item={item}
+      ingredients={item && extrasEnabledFor(menu, item) ? menu.ingredients : []}
+      initial={line ?? undefined}
+      submitLabel="Salvar"
+      onClose={onClose}
+      onAdd={onSave}
+    />
+  )
+}
+
 // ---------- Janela do item ----------
 function ItemSheet({
   item,
   ingredients,
+  initial,
+  submitLabel = "Adicionar",
   onClose,
   onAdd,
 }: {
   item: MenuItemView | null
   ingredients: MenuView["ingredients"]
+  /** Editando uma linha do carrinho: começa com as escolhas dela */
+  initial?: CartLine
+  submitLabel?: string
   onClose: () => void
   onAdd: (line: CartLine) => void
 }) {
@@ -263,15 +291,15 @@ function ItemSheet({
   const [qty, setQty] = useState(1)
   const [shown, setShown] = useState<MenuItemView | null>(item)
 
-  // Guarda o último item para a animação de fechar não piscar vazia; zera escolhas ao abrir outro
+  // Guarda o último item para a animação de fechar não piscar vazia; ao abrir, começa do zero ou da linha editada
   useEffect(() => {
     if (item) {
       setShown(item)
-      setExtras([])
-      setRemovals([])
-      setQty(1)
+      setExtras(initial?.extras ?? [])
+      setRemovals(initial?.removals ?? [])
+      setQty(initial?.quantity ?? 1)
     }
-  }, [item])
+  }, [item, initial])
 
   const toggleRemoval = (ing: { id: string; name: string }) =>
     setRemovals((prev) =>
@@ -311,7 +339,7 @@ function ItemSheet({
             className="h-12 flex-1 rounded-full text-base font-semibold"
             onClick={() => onAdd({ menuItemId: shown.id, name: shown.name, unitPrice: shown.price, quantity: qty, extras, removals })}
           >
-            Adicionar · {formatBRL(each * qty)}
+            {submitLabel} · {formatBRL(each * qty)}
           </Button>
         </div>
       }

@@ -114,6 +114,10 @@ export function useCart(slug: string, menu: MenuLike) {
     remove: (index: number) => update((p) => p.filter((_, i) => i !== index)),
     setQuantity: (index: number, quantity: number) =>
       update((p) => p.map((l, i) => (i === index ? { ...l, quantity: Math.min(20, Math.max(1, quantity)) } : l))),
+    /** Troca uma linha (lanche editado no carrinho) */
+    replace: (index: number, line: CartLine) => update((p) => p.map((l, i) => (i === index ? line : l))),
+    /** Põe uma linha logo depois de outra ("+" num lanche com escolhas: outro lanche para personalizar) */
+    insertAfter: (index: number, line: CartLine) => update((p) => [...p.slice(0, index + 1), line, ...p.slice(index + 1)]),
     clear: () => update(() => []),
   }
 }

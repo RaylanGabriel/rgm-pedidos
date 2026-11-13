@@ -145,7 +145,7 @@ export function CheckoutForm({
         {/* Resumo (no celular vem primeiro; no computador fica fixo à direita) */}
         <aside className="space-y-5 rounded-3xl border bg-card p-5 shadow-sm lg:sticky lg:top-20 lg:order-2" aria-label="Resumo do pedido">
           <h2 className="text-lg font-bold">Seu pedido</h2>
-          <CartSummary lines={cart.lines} onQuantity={cart.setQuantity} onRemove={cart.remove} deliveryFee={fee} feePendingLabel={byDistance ? (distance.loading ? "calculando…" : "informe o endereço") : undefined} />
+          <CartSummary lines={cart.lines} menu={menu} onQuantity={cart.setQuantity} onRemove={cart.remove} onReplace={cart.replace} onInsertAfter={cart.insertAfter} deliveryFee={fee} feePendingLabel={byDistance ? (distance.loading ? "calculando…" : "informe o endereço") : undefined} />
           <CartSuggestions menu={menu} lines={cart.lines} onAdd={cart.add} />
           <div className="hidden space-y-3 lg:block">
             <Button type="submit" size="lg" className="h-12 w-full rounded-full text-base font-semibold" disabled={!canSubmit}>

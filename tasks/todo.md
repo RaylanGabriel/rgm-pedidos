@@ -76,6 +76,18 @@ A descrição do combo ("Smash Clássico + batata frita média + refrigerante la
   (0 → 240 px) e habilita a ‹; no celular as setas ficam escondidas (rola com o dedo).
 - [ ] OK do Raylan · [ ] merge (sem migração) · [ ] conferir produção
 
+## 10c. Carrinho por lanche: editar, "+" vira outro lanche, foto (Raylan, 13/nov; mesma branch)
+"Quando clico em + ele só adiciona com as mesmas informações. O ideal é aparecer o lanche de novo embaixo com um
+lápis para voltar na tela de tirar/adicionar ingredientes. Foto do lanche no carrinho (como o iFood)."
+- [ ] `ItemSheet` aceita uma linha inicial (adicionais, "sem", quantidade) e o texto do botão ("Salvar").
+- [ ] `LineEditSheet` (exportado): abre o lanche de uma linha do carrinho já preenchido; salvar troca a linha.
+- [ ] `CartSummary` com `menu`: foto do lanche; botão ✏️ Editar; em lanche que tem o que escolher ("sem" ou
+  adicionais), o **+** cria outra linha logo abaixo (cópia, 1 un.) em vez de somar; bebida etc. continua somando.
+- [ ] `useCart`: `replace(i, linha)` e `insertAfter(i, linha)`. Usar no cardápio (lateral + sacola), no finalizar e
+  no balcão (Novo pedido).
+- [ ] Sem banco (o pedido já guarda "sem" e adicionais por linha). Observação por lanche fica para depois (precisa
+  de coluna nova).
+
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
 "Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
 adicionar. O ideal é puxar automático dos ingredientes de cada item."
