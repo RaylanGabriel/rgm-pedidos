@@ -57,6 +57,11 @@ A descrição do combo ("Smash Clássico + batata frita média + refrigerante la
   de outro lanche recusados; lanche sozinho continua; lanche não herda do outro.
 - [x] Navegador (preview `0a2e9e9`): editor do combo mostra o herdado; cliente vê no Combo Clássico os 4 botões do
   Smash Clássico; pedido "sem tomate" aceito; acompanhamento e cozinha mostram SEM tomate. Dados apagados.
+- [x] Junto (pedido do Raylan, roadmap 10a): cabeçalho "Área Administrativa" com a mesma largura do status e dos
+  cartões (`max-w-6xl mx-auto`), "Minha conta" e "Sair" no mesmo estilo, quebra no celular. Preview `51bb7bf`:
+  bordas iguais às do status (1600 px: 224–1376; 390 px: 16–374), fotos conferidas.
+- Workers Builds não recebeu os pushes `e3666be`…`7bcf2a8` (incidente da Cloudflare: "Workers API availability");
+  um commit vazio depois disparou o build.
 - [ ] OK do Raylan · [ ] `db:migrate:prod` (0026) · [ ] merge · [ ] conferir produção
 
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais

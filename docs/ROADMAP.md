@@ -287,8 +287,8 @@ a ordem é 9a → 9b.
 - Relatório: consumo por período e o que comprar.
 
 ## 💭 10. Ajustes e ideias do Raylan (13/nov/2026)
-**10a. Cabeçalho do painel desalinhado** (computador e celular): "Área Administrativa", "Minha conta" e "Sair" não
-ficam na mesma linha/altura. Alinhar e conferir nas duas larguras.
+**✅ 10a. Cabeçalho do painel desalinhado** (computador e celular): "Área Administrativa", "Minha conta" e "Sair"
+agora têm a mesma largura do status e dos cartões; os botões no mesmo estilo e, no celular, abaixo do título.
 
 **10b. "Para acompanhar" no carrinho vira carrossel**
 - Hoje os cards têm alturas diferentes (nome em 1 ou 2 linhas muda o tamanho). Todos com a mesma altura (nome em até
