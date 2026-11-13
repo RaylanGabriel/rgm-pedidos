@@ -22,7 +22,8 @@ export async function placeOrder(slug: string, input: unknown, account?: { addre
   }
 
   const result = await createOrder(store.id, input, { requireOpen: true, pixOnline: true })
-  const me = result.ok ? await getCustomer() : null
+  // O pedido já existe: falhar aqui (conta do cliente) nunca pode virar erro para quem pediu — ele repetiria o pedido
+  const me = result.ok ? await getCustomer().catch(() => null) : null
   if (result.ok && me) {
     const addressId = z.string().uuid().safeParse(account?.addressId)
     const newAddress = account?.saveAddress ? addressSchema.safeParse(account.saveAddress) : null

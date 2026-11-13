@@ -243,60 +243,65 @@ export async function createOrder(
     if (st && !storeOpenState(st).open) return { ok: false, error: DB_ERRORS.STORE_CLOSED }
   }
 
+  // Tudo que muda o pedido (itens, taxa, troco) acontece numa única chamada ao banco. Com a chave da tentativa,
+  // repetir (resposta perdida, toque duplo) devolve o pedido já criado em vez de criar outro.
+  let result: { orderNumber: number; publicToken: string; duplicate: boolean }
   try {
-    const res = await db.execute<{ result: { orderNumber: number; publicToken: string } }>(sql`
+    const res = await db.execute<{ result: { orderNumber: number; publicToken: string; duplicate: boolean } }>(sql`
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
         ${deliveryAddress}, ${o.paymentMethod}::payment_method, ${o.notes},
         ${JSON.stringify(o.items)}::jsonb, ${token}, false,
-        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid, ${distanceKm}::numeric
+        ${o.type === "delivery" ? o.deliveryZoneId : null}::uuid, ${distanceKm}::numeric,
+        ${o.paymentMethod === "cash" ? o.changeFor : null}::numeric, ${o.idempotencyKey}::uuid
       ) as result`)
-    const result = res.rows[0].result
-    // Troco: só em dinheiro e só se a nota cobre o total calculado pelo banco
-    if (o.paymentMethod === "cash" && o.changeFor) {
-      await db
-        .update(orders)
-        .set({ changeFor: o.changeFor.toFixed(2) })
-        .where(and(eq(orders.publicToken, token), eq(orders.storeId, storeId), sql`${orders.total} < ${o.changeFor}`))
-    }
-    // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago.
-    // Se falhar, o pedido segue como "Pix direto com a loja" (não perde a venda).
-    const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, token) : false
-    return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr }
+    result = res.rows[0].result
   } catch (err) {
-    // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
-    // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
-    const dbError = err instanceof Error && err.cause instanceof Error ? err.cause : err
-    const msg = dbError instanceof Error ? dbError.message : ""
-    const code = Object.keys(DB_ERRORS).find((c) => msg.includes(c))
-    if (code) return { ok: false, error: DB_ERRORS[code] }
-    if (msg.includes("ZONE_INVALID")) {
-      const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
-      return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
-    }
-    const range = msg.match(/OUT_OF_RANGE:([\d.]+)/)
-    if (range) return { ok: false, error: `Esse endereço fica fora da área de entrega (até ${formatKm(Number(range[1]))}). Escolha retirada.` }
-    if (msg.includes("DISTANCE_REQUIRED")) return { ok: false, error: "Informe o endereço de entrega completo." }
-    const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
-    if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
-    const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
-    if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
-    console.error("Erro ao criar pedido:", err)
-    return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." }
+    return orderError(err)
   }
+  // Daqui em diante o pedido EXISTE: nada pode virar "não foi possível criar" (o cliente repetiria e duplicaria).
+  // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago. Se falhar, o pedido segue
+  // como "Pix direto com a loja" (não perde a venda). Numa repetição, devolve o QR que já existe (ou gera, se faltou).
+  const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, result.publicToken) : false
+  return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr }
+}
+
+/** Erro do create_order → mensagem para o cliente (o pedido NÃO foi criado). */
+function orderError(err: unknown): CreateOrderResult {
+  // O Drizzle embrulha o erro ("Failed query: …" + parâmetros); a mensagem do RAISE EXCEPTION fica em err.cause.
+  // Usa só a mensagem do banco: a de fora contém dados digitados pelo cliente.
+  const dbError = err instanceof Error && err.cause instanceof Error ? err.cause : err
+  const msg = dbError instanceof Error ? dbError.message : ""
+  const code = Object.keys(DB_ERRORS).find((c) => msg.includes(c))
+  if (code) return { ok: false, error: DB_ERRORS[code] }
+  if (msg.includes("ZONE_INVALID")) {
+    const error = "Escolha um bairro atendido pela loja (a lista pode ter mudado)."
+    return { ok: false, error, fieldErrors: { deliveryZoneId: error } }
+  }
+  const range = msg.match(/OUT_OF_RANGE:([\d.]+)/)
+  if (range) return { ok: false, error: `Esse endereço fica fora da área de entrega (até ${formatKm(Number(range[1]))}). Escolha retirada.` }
+  if (msg.includes("DISTANCE_REQUIRED")) return { ok: false, error: "Informe o endereço de entrega completo." }
+  const min = msg.match(/BELOW_MIN_ORDER:([\d.]+)/)
+  if (min) return { ok: false, error: `O pedido mínimo para entrega é ${formatBRL(Number(min[1]))}. Adicione mais itens ou escolha retirada.` }
+  const unavailable = msg.match(/ITEM_UNAVAILABLE:(.+)/)
+  if (unavailable) return { ok: false, error: `"${unavailable[1].trim()}" acabou. Remova do carrinho para continuar.` }
+  // Só a mensagem do banco: o erro de fora traz os dados do cliente (nome, telefone, endereço)
+  console.error("Erro ao criar pedido:", msg || (err instanceof Error ? err.name : "desconhecido"))
+  return { ok: false, error: "Não foi possível criar o pedido. Tente novamente." }
 }
 
 /** Gera a cobrança Pix no Mercado Pago e guarda no pedido. true = QR gerado. */
 async function attachPixCharge(storeId: string, publicToken: string): Promise<boolean> {
   try {
-    const mpToken = await storeAccessToken(storeId)
-    if (!mpToken) return false
     const row = await db.query.orders.findFirst({
       where: and(eq(orders.publicToken, publicToken), eq(orders.storeId, storeId)),
-      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true },
+      columns: { id: true, orderNumber: true, total: true, deliveryFee: true, customerName: true, paymentMethod: true, pixCode: true },
       with: { ...withItems, store: { columns: { name: true } } },
     })
-    if (!row) return false
+    if (!row || row.paymentMethod !== "pix") return false
+    if (row.pixCode) return true // repetição da mesma tentativa: o QR já existe
+    const mpToken = await storeAccessToken(storeId)
+    if (!mpToken) return false
     // Itens com os adicionais somados no preço unitário (o Mercado Pago confere: soma dos itens = total)
     const items = row.items.map((i) => ({
       title: i.nameSnapshot,

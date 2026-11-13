@@ -12,7 +12,7 @@ import { CartSuggestions } from "@/components/order/cart-suggestions"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
 import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, toOrderItem, useCart } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
-import { deliveryAvailable, formatBRL, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
+import { deliveryAvailable, formatBRL, newAttemptKey, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 import { addressText, emptyAddressFields, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
 import { placeOrder, quoteDeliveryAction } from "./actions"
 
@@ -39,6 +39,9 @@ export function CheckoutForm({
   const [pending, startTransition] = useTransition()
   const placed = useRef(false) // pedido enviado: não redirecionar para o cardápio ao esvaziar o carrinho
   const errorRef = useRef<HTMLDivElement>(null)
+  // Chave desta tentativa: se a resposta se perder (rede caiu) e o cliente tocar de novo, o servidor devolve o mesmo
+  // pedido em vez de criar outro. Só é trocada quando o servidor RESPONDE (pedido feito, ou recusado sem criar nada).
+  const attemptKey = useRef<string | null>(null)
   const [remember, setRemember] = useState(true)
   const [usingSaved, setUsingSaved] = useState(false)
   // Conta: endereço salvo escolhido ("new" = digitar outro) e se o novo vai para a conta
@@ -119,16 +122,27 @@ export function CheckoutForm({
           : { saveAddress: saveNewAddress ? typed : null }
         : undefined
 
+    attemptKey.current ??= newAttemptKey()
+    const idempotencyKey = attemptKey.current
     startTransition(async () => {
-      const result = await placeOrder(
-        store.slug,
-        {
-          ...fields,
-          ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-          items: cart.lines.map(toOrderItem),
-        },
-        accountInfo,
-      )
+      let result: Awaited<ReturnType<typeof placeOrder>>
+      try {
+        result = await placeOrder(
+          store.slug,
+          {
+            ...fields,
+            ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
+            items: cart.lines.map(toOrderItem),
+            idempotencyKey,
+          },
+          accountInfo,
+        )
+      } catch {
+        // Sem resposta: o pedido pode ter sido criado. Mantém a chave — tocar de novo não duplica.
+        setError("Não conseguimos confirmar o envio (conexão instável?). Toque em confirmar de novo: se o pedido já tiver chegado, ele não será repetido.")
+        return
+      }
+      attemptKey.current = null
 
       if (!result.ok) {
         setError(result.error)
