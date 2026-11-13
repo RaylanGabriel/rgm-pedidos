@@ -34,7 +34,8 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
       const lines = reconcile(raw, menu)
       if (lines.length) {
         addMany(lines)
-        setCartOpen(true)
+        // celular: abre a sacola; no computador o carrinho já está à vista do lado
+        if (window.matchMedia("(max-width: 1023px)").matches) setCartOpen(true)
       }
       setReorderMsg(
         !lines.length
