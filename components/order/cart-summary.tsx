@@ -3,7 +3,7 @@
 import { Trash2 } from "lucide-react"
 import { QuantityStepper } from "@/components/order/bottom-sheet"
 import type { CartLine } from "@/lib/cart"
-import { formatBRL, lineTotal } from "@/lib/order-shared"
+import { formatBRL, lineTotal, removalsText } from "@/lib/order-shared"
 
 export function cartTotal(lines: CartLine[]) {
   return lines.reduce((s, l) => s + lineTotal(l), 0)
@@ -44,6 +44,9 @@ export function CartSummary({
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     + {line.extras.map((e) => (e.quantity > 1 ? `${e.quantity}x ${e.name}` : e.name)).join(", ")}
                   </p>
+                )}
+                {line.removals.length > 0 && (
+                  <p className="mt-0.5 text-sm font-semibold text-destructive">{removalsText(line.removals.map((r) => r.name))}</p>
                 )}
               </div>
               <span className="shrink-0 font-bold tabular-nums">{formatBRL(lineTotal(line))}</span>

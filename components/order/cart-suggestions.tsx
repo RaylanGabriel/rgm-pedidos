@@ -45,7 +45,7 @@ export function CartSuggestions({
           <li key={item.id} className="w-28 shrink-0">
             <button
               type="button"
-              onClick={() => onAdd({ menuItemId: item.id, name: item.name, unitPrice: item.price, quantity: 1, extras: [] })}
+              onClick={() => onAdd({ menuItemId: item.id, name: item.name, unitPrice: item.price, quantity: 1, extras: [], removals: [] })}
               className="group flex w-full flex-col overflow-hidden rounded-2xl border bg-card text-left transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Adicionar ${item.name}, ${formatBRL(item.price)}`}
             >

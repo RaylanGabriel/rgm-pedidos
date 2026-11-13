@@ -10,7 +10,7 @@ import { mapsLink, whatsappLink } from "@/lib/links"
 import { getOrderByToken } from "@/lib/orders"
 import { storeBase } from "@/lib/site-url"
 import QRCode from "qrcode"
-import { awaitingPix, changeText, formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
+import { awaitingPix, changeText, formatBRL, fullAddress, lineTotal, orderSteps, PAYMENT_LABEL, removalsText, STATUS_LABEL, TYPE_LABEL, type OrderStatus } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
 import { ConfirmDelivery } from "./confirm-delivery"
 import { PixPayment } from "./pix-payment"
@@ -195,6 +195,7 @@ export default async function PedidoPage({ params }: { params: Promise<{ token: 
                         + {item.extras.map((e) => (e.quantity > 1 ? `${e.quantity}x ${e.name}` : e.name)).join(", ")}
                       </p>
                     )}
+                    {item.removals.length > 0 && <p className="text-sm font-semibold text-destructive">{removalsText(item.removals)}</p>}
                   </div>
                   <p className="shrink-0 font-semibold tabular-nums">{formatBRL(lineTotal(item))}</p>
                 </li>

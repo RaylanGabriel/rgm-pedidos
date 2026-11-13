@@ -1,3 +1,65 @@
+# 9a. Ficha técnica dos lanches + botões "sem ___" (13/nov/2026, branch `feat/ficha-tecnica`)
+
+Decisões do Raylan (13/nov): um cadastro só de ingredientes; o dono marca o que não pode tirar; botões no balcão e
+no cardápio online.
+
+Hoje não há ligação lanche ↔ ingredientes: `ingredients` é a lista de adicionais pagos da loja, oferecida inteira a
+todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem cebola…" (gambiarra atual).
+
+## Modelo (migração 0025)
+- `ingredients.is_extra` (padrão true): **um cadastro só de ingredientes**. Adicional = ingrediente vendido à parte
+  (+R$). Base (pão, carne, cebola) = `is_extra=false`, preço 0. Os adicionais de hoje continuam iguais.
+- `menu_item_ingredients(menu_item_id, ingredient_id, removable)`: a ficha de cada lanche. `removable=false` para o
+  que não se tira (pão, carne). Quantidade por lanche fica para o 9b (estoque).
+- `order_item_removals(order_item_id, ingredient_id set null, name_snapshot)`: o "sem X" de cada lanche do pedido,
+  separado dos adicionais (relatórios de adicionais não mudam). Cópia do nome, como já é feito com nome e preço.
+- `create_order` (CREATE OR REPLACE, mesma assinatura): aceita `removals: [ingredientId]` por item; só aceita
+  ingrediente da ficha daquele lanche, desta loja, com `removable`; não mexe no preço.
+
+## Telas
+- **Painel → Cardápio:** aba "Adicionais" vira "Ingredientes" (cada um: vendido como adicional? preço). No editar
+  lanche: "Ingredientes deste lanche" — marcar quais leva e se o cliente pode tirar; campo rápido "pão, carne,
+  cebola…" que cria os que faltam como ingrediente base.
+- **Escolher o lanche (cardápio online e balcão):** seção "Tirar algum ingrediente?" com botões "sem Cebola"
+  (liga/desliga) só com os ingredientes removíveis daquele lanche. Adicionais: só os `is_extra`.
+- **Mostrar "SEM cebola" em destaque:** carrinho, cozinha, impressão, acompanhamento do cliente, planilha (coluna
+  "Sem"), descrição da cobrança Pix. Placeholder das observações deixa de sugerir "sem cebola".
+- Carrinho salvo no aparelho: valida o "sem" contra a ficha atual (ingrediente que saiu da ficha é descartado).
+
+## Testes
+- Preview: cadastrar ficha → pedir online com "sem cebola" → cozinha/impressão/acompanhamento mostram → pedido do
+  balcão idem → tentar mandar "sem pão" (não removível) ou de outro lanche pela API → recusado → relatório de
+  adicionais inalterado → planilha com a coluna.
+
+## Revisão (13/nov)
+- Migração `0025` aplicada no banco preview. `create_order` testada direto no banco (6 casos): "sem" removível aceito e
+  gravado; "sem pão" (fixo) e ingrediente fora da ficha → `REMOVAL_INVALID`; ingrediente base como adicional →
+  `EXTRA_UNAVAILABLE`; adicional de verdade aceito; "sem" repetido grava 1 vez.
+- Navegador no preview da branch: dono criou 3 ingredientes pelo campo rápido e travou o pão; aba Ingredientes (e o
+  link antigo `?aba=adicionais`) mostra "em 1 lanche"; cliente vê só "Cebola"/"Picles" (pão fixo fora), a cebola não
+  aparece nos adicionais, botão vira "Sem cebola", carrinho e acompanhamento mostram "SEM cebola"; balcão "sem
+  picles"; cozinha com as duas faixas vermelhas; preço não muda. Pedidos, ingredientes e sessão de teste apagados.
+- A loja de teste estava fechada (horário 18h) → o teste abre/restaura a loja (`loja-aberta.ts`). Não era bug.
+- [ ] OK do Raylan · [ ] `db:migrate:prod` · [ ] merge · [ ] conferir produção
+
+## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
+"Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
+adicionar. O ideal é puxar automático dos ingredientes de cada item."
+- [x] `lib/recipe.ts`: `descriptionParts` ("Blend 120g, queijo, alface e tomate" → partes) + `suggestRemovable`
+  (sem número/medida e até 3 palavras) — usado no painel e no servidor.
+- [x] Editar lanche: a lista de todos os ingredientes, o cadeado e o campo "Novos ingredientes" saem. Ficam chips
+  com as partes da **descrição** (atualizam ao digitar); toque liga/desliga "o cliente pode tirar". Padrão: sugestão
+  ligada só em categoria com adicionais. Manda os nomes ligados (`removable`).
+- [x] Servidor: nomes → ingrediente **base** (`is_extra=false`) de mesmo nome ou cria; nunca liga um adicional.
+- [x] Botão "Preencher pela descrição" para os lanches ainda sem botões (categorias com adicionais).
+- [x] Sem migração nova (a ficha guarda só os removíveis; `removable` fica true).
+- [x] Teste no preview (`0b82bb0`): aviso "6 lanches ainda não têm"; Smash Salada sugere Alface, Tomate, Picles,
+  Cebola roxa, Molho ranch (carne 120g apagada); digitar ", pimenta" cria o chip na hora; desligar o molho → salvo e
+  reaberto igual; Guaraná: nada ligado; "Preencher" preenche os outros 5 e o aviso some; cliente vê só os da descrição;
+  no banco, nenhum adicional virou botão "sem". Dados e sessão de teste apagados (Raylan testa do zero).
+
+---
+
 # Deixar o site pronto para o 1º cliente (12/nov/2026) — ordem combinada com o Raylan
 
 1. [ ] "Conectar Mercado Pago" com a conta real de outra pessoa → **erro do MP (`allow_flow` vazio); chamado aberto no suporte**

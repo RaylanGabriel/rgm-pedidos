@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { CartSummary, cartTotal } from "@/components/order/cart-summary"
 import { CartSuggestions } from "@/components/order/cart-suggestions"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
-import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, useCart } from "@/lib/cart"
+import { forgetCustomer, loadCustomer, saveCustomer, saveRecentOrder, toOrderItem, useCart } from "@/lib/cart"
 import type { MenuView, PublicStore } from "@/lib/orders"
 import { deliveryAvailable, formatBRL, previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
@@ -88,11 +88,7 @@ export function CheckoutForm({
       const result = await placeOrder(store.slug, {
         ...fields,
         ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-        items: cart.lines.map((l) => ({
-          menuItemId: l.menuItemId,
-          quantity: l.quantity,
-          extras: l.extras.map((x) => ({ ingredientId: x.ingredientId, quantity: x.quantity })),
-        })),
+        items: cart.lines.map(toOrderItem),
       })
 
       if (!result.ok) {

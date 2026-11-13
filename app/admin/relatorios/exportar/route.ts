@@ -107,6 +107,7 @@ export async function GET(req: Request) {
         { header: "Quantidade", type: "int", width: 12 },
         { header: "Preço unitário", type: "brl", width: 15 },
         { header: "Adicionais (por unidade)", width: 32 },
+        { header: "Sem (tirar)", width: 24 },
         { header: "Total da linha", type: "brl", width: 15 },
       ],
       rows: orders.flatMap((o) =>
@@ -118,6 +119,7 @@ export async function GET(req: Request) {
           i.quantity,
           i.unitPrice,
           i.extras.map((e) => `${e.quantity}x ${e.name}`).join(", "),
+          i.removals.join(", "),
           lineTotal(i),
         ]),
       ),

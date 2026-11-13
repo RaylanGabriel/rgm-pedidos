@@ -10,6 +10,15 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   ou commitar arquivos de configuração do Claude (`CLAUDE.md`, `tasks/`) na branch em que se está trabalhando.
   Ao trocar de branch, conferir se `CLAUDE.md` continua na pasta.
 
+## Produto / telas do dono
+
+- **Tirar a configuração do que o dono já escreve, em vez de pedir para ele montar a partir do catálogo inteiro.**
+  (13/nov/2026: a ficha técnica mostrava todos os ingredientes da loja, inclusive os adicionais, para o dono escolher
+  → "achei confuso; não faz sentido tirar um adicional; o ideal é puxar automático dos ingredientes de cada item".)
+  Regra: antes de desenhar uma tela de configuração, perguntar "de onde isso já pode sair sozinho?" (descrição,
+  categoria, histórico) e deixar o dono só confirmar/ajustar. Não misturar conceitos diferentes na mesma lista
+  (adicional pago ≠ ingrediente que se tira).
+
 ## Segredos
 
 - **Nunca "mascarar" segredo com filtro de texto (regex) na saída de um comando.** (11/nov/2026: um filtro falhou com
@@ -31,6 +40,12 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   com `process.exit(1)` quando falta algo, e o envio também recusa valor vazio.
 
 ## Windows / PowerShell
+
+- **`Get-Content`/`Set-Content` do PowerShell 5.1 estragam acentos** (lê como ANSI, grava UTF-8 com BOM): "pão" vira
+  "pÃ£o". (13/nov/2026: um arquivo de teste ficou com o texto quebrado e o botão "Salvar alterações" não era achado.)
+  Regra: editar arquivos com o Edit/Write ou com `node` (`fs.readFileSync(f, "utf8")`), nunca com Get/Set-Content.
+- **Arquivos com CRLF:** trocas de texto com várias linhas por script falham em silêncio (o trecho tem `\r\n`).
+  Normalizar (`.replace(/\r\n/g, "\n")`) antes, ou usar o Edit; e o script deve falhar (`throw`) se não achar o trecho.
 
 - **`| Select-Object -First N` encerra o comando depois de N linhas** — num script longo (cópia de fotos), ele para no
   meio sem erro. (12/nov/2026: a cópia para o R2 parou na 3ª linha.) Regra: para scripts que gravam algo, guardar a

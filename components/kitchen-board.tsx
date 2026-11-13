@@ -34,6 +34,7 @@ import {
   changeText,
   PAYMENT_LABEL,
   prevStatus,
+  removalsText,
   STATUS_LABEL,
   TYPE_LABEL,
   type OrderStatus,
@@ -432,6 +433,12 @@ function OrderCard({
             </p>
             {i.extras.length > 0 && (
               <p className="pl-9 text-sm text-muted-foreground">+ {i.extras.map((x) => (x.quantity > 1 ? `${x.quantity}x ${x.name}` : x.name)).join(", ")}</p>
+            )}
+            {i.removals.length > 0 && (
+              // Destaque forte: é o que a cozinha não pode deixar passar
+              <p className="ml-9 mt-0.5 inline-block rounded-md bg-red-600 px-2 py-0.5 text-sm font-bold uppercase tracking-wide text-white">
+                {removalsText(i.removals)}
+              </p>
             )}
           </li>
         ))}

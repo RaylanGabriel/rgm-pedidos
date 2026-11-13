@@ -14,18 +14,32 @@ export interface CartExtra {
   unitPrice: number
   quantity: number
 }
+/** Ingrediente da ficha que o cliente pediu para tirar ("sem cebola"). Não muda o preço. */
+export interface CartRemoval {
+  ingredientId: string
+  name: string
+}
 export interface CartLine {
   menuItemId: string
   name: string
   unitPrice: number
   quantity: number
   extras: CartExtra[]
+  removals: CartRemoval[]
 }
 
 interface MenuLike {
-  items: { id: string; name: string; price: number; available: boolean }[]
+  items: { id: string; name: string; price: number; available: boolean; removable: { id: string; name: string }[] }[]
   ingredients: { id: string; name: string; price: number }[]
 }
+
+/** Payload de um item para o servidor (checkout e pedido do balcão usam o mesmo formato). */
+export const toOrderItem = (l: CartLine) => ({
+  menuItemId: l.menuItemId,
+  quantity: l.quantity,
+  extras: l.extras.map((x) => ({ ingredientId: x.ingredientId, quantity: x.quantity })),
+  removals: l.removals.map((r) => r.ingredientId),
+})
 
 const cartKey = (slug: string) => `cart:${slug}`
 const ordersKey = (slug: string) => `orders:${slug}`
@@ -46,7 +60,10 @@ function write(key: string, value: unknown) {
   }
 }
 
-/** Mantém só itens/adicionais que ainda existem no cardápio, com nome e preço atuais. */
+/**
+ * Mantém só itens/adicionais que ainda existem no cardápio, com nome e preço atuais.
+ * O "sem ___" só fica se o ingrediente ainda está na ficha do lanche e pode ser tirado.
+ */
 function reconcile(lines: unknown, menu: MenuLike): CartLine[] {
   if (!Array.isArray(lines)) return []
   const items = new Map(menu.items.map((i) => [i.id, i]))
@@ -60,7 +77,12 @@ function reconcile(lines: unknown, menu: MenuLike): CartLine[] {
       const q = Number(e?.quantity)
       return ing && Number.isInteger(q) && q >= 1 ? [{ ingredientId: ing.id, name: ing.name, unitPrice: ing.price, quantity: Math.min(q, 10) }] : []
     })
-    return [{ menuItemId: item.id, name: item.name, unitPrice: item.price, quantity: Math.min(qty, 20), extras }]
+    const canRemove = new Map(item.removable.map((r) => [r.id, r]))
+    const removals = (Array.isArray(l.removals) ? l.removals : []).flatMap((r: Partial<CartRemoval>) => {
+      const ing = r && typeof r.ingredientId === "string" ? canRemove.get(r.ingredientId) : undefined
+      return ing ? [{ ingredientId: ing.id, name: ing.name }] : []
+    })
+    return [{ menuItemId: item.id, name: item.name, unitPrice: item.price, quantity: Math.min(qty, 20), extras, removals }]
   })
 }
 

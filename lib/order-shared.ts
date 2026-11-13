@@ -22,7 +22,12 @@ export interface OrderItemView {
   unitPrice: number
   quantity: number
   extras: OrderExtraView[]
+  /** Ingredientes que o cliente pediu para tirar ("SEM cebola"). Não mexem no preço. */
+  removals: string[]
 }
+
+/** "SEM cebola, pimentão" (ou null). Um texto só para cozinha, impressão, acompanhamento, planilha e carrinho. */
+export const removalsText = (removals: readonly string[]) => (removals.length ? `SEM ${removals.map((r) => r.toLowerCase()).join(", ")}` : null)
 
 export interface OrderView {
   id: string
@@ -261,6 +266,8 @@ export const cartInputSchema = z
         .array(z.object({ ingredientId: uuid, quantity: z.number().int().min(1).max(10) }))
         .max(30)
         .default([]),
+      // "SEM ___": ids de ingredientes da ficha do lanche (create_order confere se podem ser tirados)
+      removals: z.array(uuid).max(30).default([]),
     }),
   )
   .min(1, "Adicione pelo menos um item")
