@@ -1,6 +1,6 @@
 /** Impressão do pedido para impressora térmica de 58mm (abre uma janela e chama o print do navegador). */
 import { formatDateTimeSP } from "@/lib/dates"
-import { changeText, formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, TYPE_LABEL, type OrderWithItemsView } from "@/lib/order-shared"
+import { changeText, formatBRL, fullAddress, lineTotal, PAYMENT_LABEL, removalsText, TYPE_LABEL, type OrderWithItemsView } from "@/lib/order-shared"
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
@@ -15,6 +15,7 @@ export function printOrder(order: OrderWithItemsView, storeName: string) {
       <div class="item">
         <div class="row"><strong>${i.quantity}x ${e(i.name)}</strong><span>${formatBRL(lineTotal(i))}</span></div>
         ${i.extras.map((x) => `<div class="extra">+ ${x.quantity}x ${e(x.name)}</div>`).join("")}
+        ${i.removals.length ? `<div class="sem">${e(removalsText(i.removals) ?? "").toUpperCase()}</div>` : ""}
       </div>`,
     )
     .join("")
@@ -27,7 +28,7 @@ export function printOrder(order: OrderWithItemsView, storeName: string) {
       body{font-family:'Courier New','Lucida Console',monospace;width:48mm;padding:2mm;font-size:10px;line-height:1.25;color:#000;background:#fff}
       h1{font-size:12px;text-align:center} .num{font-size:20px;text-align:center;margin:1mm 0 2mm}
       .row{display:flex;justify-content:space-between;gap:2mm} .item{border-bottom:1px dashed #000;padding:1mm 0}
-      .extra{padding-left:2mm;font-size:9px} .total{border-top:1px dashed #000;margin-top:2mm;padding-top:2mm;font-size:12px;font-weight:bold}
+      .extra{padding-left:2mm;font-size:9px} .sem{margin:1px 0 0 2mm;padding:0 1mm;border:1px solid #000;font-size:11px;font-weight:bold;display:inline-block} .total{border-top:1px dashed #000;margin-top:2mm;padding-top:2mm;font-size:12px;font-weight:bold}
       .box{margin-top:2mm;padding:1mm;border:1px dashed #000;font-size:9px} p{margin:1px 0}
       @media print{body{padding:1mm}}
     </style></head><body>

@@ -327,7 +327,7 @@ export function OrderFields({
           value={value.notes}
           onChange={(e) => set("notes", e.target.value)}
           maxLength={500}
-          placeholder="Ex.: sem cebola, ponto da carne… (opcional)"
+          placeholder="Ex.: ponto da carne, molho à parte… (opcional)"
           disabled={disabled}
           className="text-base"
           aria-invalid={!!errors.notes}

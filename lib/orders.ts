@@ -7,9 +7,10 @@ import { db } from "@/db"
 import { cancelOverduePix, createPixCharge, storeAccessToken, syncPixOrder } from "@/lib/mercadopago"
 import { distanceTiers, quoteDistance, quoteError } from "@/lib/geo"
 import { openStateLabel, parseHours, storeOpenState, weekSummary } from "@/lib/hours"
-import { categories, deliveryZones, ingredients, menuItemCategories, menuItems, orders, stores } from "@/db/schema"
+import { categories, deliveryZones, ingredients, menuItemCategories, menuItemIngredients, menuItems, orders, stores } from "@/db/schema"
 import {
   addressLine,
+  removalsText,
   formatBRL,
   formatKm,
   type StoreLocation,
@@ -79,6 +80,8 @@ export interface MenuItemView {
   price: number
   imageUrl: string | null
   available: boolean
+  /** Ingredientes da ficha técnica que o cliente pode tirar (botões "sem ___"), na ordem da ficha */
+  removable: { id: string; name: string }[]
 }
 export interface IngredientView {
   id: string
@@ -91,11 +94,12 @@ export interface MenuView {
   items: MenuItemView[]
   /** Ordem dos itens que aparecem numa categoria além da principal: categoria → ids de item */
   extraOrder: Record<string, string[]>
+  /** Adicionais: só os ingredientes vendidos à parte (is_extra) */
   ingredients: IngredientView[]
 }
 
 export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
-  const [cats, items, ings, links] = await Promise.all([
+  const [cats, items, ings, links, recipe] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name, extrasEnabled: categories.extrasEnabled })
       .from(categories)
@@ -109,7 +113,7 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
     db
       .select()
       .from(ingredients)
-      .where(and(eq(ingredients.storeId, storeId), eq(ingredients.active, true)))
+      .where(and(eq(ingredients.storeId, storeId), eq(ingredients.active, true), eq(ingredients.isExtra, true)))
       .orderBy(asc(ingredients.groupName), asc(ingredients.name)),
     db
       .select({ itemId: menuItemCategories.menuItemId, categoryId: menuItemCategories.categoryId })
@@ -117,7 +121,16 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       .innerJoin(categories, eq(categories.id, menuItemCategories.categoryId))
       .where(eq(categories.storeId, storeId))
       .orderBy(asc(menuItemCategories.sortOrder)),
+    // Ficha técnica: só o que o cliente pode tirar (vira botão "sem ___")
+    db
+      .select({ itemId: menuItemIngredients.menuItemId, id: ingredients.id, name: ingredients.name })
+      .from(menuItemIngredients)
+      .innerJoin(ingredients, eq(ingredients.id, menuItemIngredients.ingredientId))
+      .where(and(eq(ingredients.storeId, storeId), eq(menuItemIngredients.removable, true)))
+      .orderBy(asc(menuItemIngredients.sortOrder), asc(ingredients.name)),
   ])
+  const removable = new Map<string, { id: string; name: string }[]>()
+  for (const r of recipe) removable.set(r.itemId, [...(removable.get(r.itemId) ?? []), { id: r.id, name: r.name }])
   const alsoIn = new Map<string, string[]>()
   const extraOrder: Record<string, string[]> = {}
   for (const l of links) {
@@ -137,6 +150,7 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       price: Number(i.price),
       imageUrl: i.imageUrl,
       available: i.available,
+      removable: removable.get(i.id) ?? [],
     })),
     ingredients: ings.map((i) => ({ id: i.id, name: i.name, price: Number(i.price), groupName: i.groupName })),
   }
@@ -178,6 +192,7 @@ const DB_ERRORS: Record<string, string> = {
   STORE_CLOSED: "A loja está fechada no momento e não está recebendo pedidos.",
   INVALID_ITEMS: "Seu carrinho tem itens inválidos. Atualize a página e monte o pedido de novo.",
   EXTRA_UNAVAILABLE: "Um dos adicionais escolhidos não está mais disponível. Revise seu carrinho.",
+  REMOVAL_INVALID: "Um lanche do carrinho mudou de ingredientes. Remova-o e escolha de novo o que quer tirar.",
   DELIVERY_UNAVAILABLE: "Esta loja não está fazendo entregas no momento. Escolha retirada.",
 }
 
@@ -283,7 +298,13 @@ async function attachPixCharge(storeId: string, publicToken: string): Promise<bo
     // Itens com os adicionais somados no preço unitário (o Mercado Pago confere: soma dos itens = total)
     const items = row.items.map((i) => ({
       title: i.nameSnapshot,
-      description: i.extras.length ? `+ ${i.extras.map((x) => (x.quantity > 1 ? `${x.quantity}x ${x.nameSnapshot}` : x.nameSnapshot)).join(", ")}` : null,
+      description:
+        [
+          i.extras.length ? `+ ${i.extras.map((x) => (x.quantity > 1 ? `${x.quantity}x ${x.nameSnapshot}` : x.nameSnapshot)).join(", ")}` : null,
+          removalsText(i.removals.map((r) => r.nameSnapshot)),
+        ]
+          .filter(Boolean)
+          .join(" · ") || null,
       unitPrice: Number(i.unitPrice) + i.extras.reduce((s, x) => s + Number(x.unitPrice) * x.quantity, 0),
       quantity: i.quantity,
     }))
@@ -317,6 +338,7 @@ type OrderRowWithItems = typeof orders.$inferSelect & {
     unitPrice: string
     quantity: number
     extras: { id: string; nameSnapshot: string; unitPrice: string; quantity: number }[]
+    removals: { nameSnapshot: string }[]
   }[]
 }
 
@@ -354,6 +376,7 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
       unitPrice: Number(i.unitPrice),
       quantity: i.quantity,
       extras: i.extras.map((e) => ({ id: e.id, name: e.nameSnapshot, unitPrice: Number(e.unitPrice), quantity: e.quantity })),
+      removals: i.removals.map((r) => r.nameSnapshot).sort((a, b) => a.localeCompare(b, "pt-BR")),
     })),
   }
 }
@@ -361,7 +384,10 @@ function toView(o: OrderRowWithItems): OrderWithItemsView {
 const withItems = {
   items: {
     columns: { id: true, nameSnapshot: true, unitPrice: true, quantity: true },
-    with: { extras: { columns: { id: true, nameSnapshot: true, unitPrice: true, quantity: true } } },
+    with: {
+      extras: { columns: { id: true, nameSnapshot: true, unitPrice: true, quantity: true } },
+      removals: { columns: { nameSnapshot: true } },
+    },
   },
 } as const
 

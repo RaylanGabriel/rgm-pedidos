@@ -11,7 +11,7 @@ import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/componen
 import { createCounterOrderAction } from "@/app/admin/actions"
 import { quoteDeliveryAction } from "@/app/loja/[slug]/finalizar/actions"
 import { addressText, partsFromFields, useDistanceQuote } from "@/components/order/distance-address"
-import type { CartLine } from "@/lib/cart"
+import { toOrderItem, type CartLine } from "@/lib/cart"
 import type { MenuView } from "@/lib/orders"
 import { previewDeliveryFee, type DeliveryConfig } from "@/lib/order-shared"
 
@@ -49,11 +49,7 @@ export function NewOrderForm({
       const result = await createCounterOrderAction({
         ...fields,
         ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
-        items: lines.map((l) => ({
-          menuItemId: l.menuItemId,
-          quantity: l.quantity,
-          extras: l.extras.map((x) => ({ ingredientId: x.ingredientId, quantity: x.quantity })),
-        })),
+        items: lines.map(toOrderItem),
       }, showPixQr && pixQr)
       if (!result.ok) {
         setError(result.error)

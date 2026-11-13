@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, Menu, Plus } from "lucide-react"
+import { Check, Menu, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BottomSheet, QuantityStepper } from "@/components/order/bottom-sheet"
-import type { CartExtra, CartLine } from "@/lib/cart"
+import type { CartExtra, CartLine, CartRemoval } from "@/lib/cart"
 import type { MenuItemView, MenuView } from "@/lib/orders"
 import { formatBRL } from "@/lib/order-shared"
 import { cn } from "@/lib/utils"
@@ -259,6 +259,7 @@ function ItemSheet({
   onAdd: (line: CartLine) => void
 }) {
   const [extras, setExtras] = useState<CartExtra[]>([])
+  const [removals, setRemovals] = useState<CartRemoval[]>([])
   const [qty, setQty] = useState(1)
   const [shown, setShown] = useState<MenuItemView | null>(item)
 
@@ -267,9 +268,15 @@ function ItemSheet({
     if (item) {
       setShown(item)
       setExtras([])
+      setRemovals([])
       setQty(1)
     }
   }, [item])
+
+  const toggleRemoval = (ing: { id: string; name: string }) =>
+    setRemovals((prev) =>
+      prev.some((r) => r.ingredientId === ing.id) ? prev.filter((r) => r.ingredientId !== ing.id) : [...prev, { ingredientId: ing.id, name: ing.name }],
+    )
 
   const groups = useMemo(() => {
     const g = new Map<string, MenuView["ingredients"]>()
@@ -302,7 +309,7 @@ function ItemSheet({
             type="button"
             size="lg"
             className="h-12 flex-1 rounded-full text-base font-semibold"
-            onClick={() => onAdd({ menuItemId: shown.id, name: shown.name, unitPrice: shown.price, quantity: qty, extras })}
+            onClick={() => onAdd({ menuItemId: shown.id, name: shown.name, unitPrice: shown.price, quantity: qty, extras, removals })}
           >
             Adicionar · {formatBRL(each * qty)}
           </Button>
@@ -318,6 +325,42 @@ function ItemSheet({
         {shown.description && <p className="text-muted-foreground">{shown.description}</p>}
         <p className="pt-1 text-lg font-bold text-primary">{formatBRL(shown.price)}</p>
       </div>
+
+      {/* Ficha técnica: tocar tira o ingrediente ("Sem cebola"). Não muda o preço. */}
+      {shown.removable.length > 0 && (
+        <fieldset className="px-5 pb-2 pt-3">
+          <legend className="mb-2 text-sm font-semibold">
+            Tirar algum ingrediente? <span className="font-normal text-muted-foreground">(toque no que não quer)</span>
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {shown.removable.map((ing) => {
+              const off = removals.some((r) => r.ingredientId === ing.id)
+              return (
+                <button
+                  key={ing.id}
+                  type="button"
+                  onClick={() => toggleRemoval(ing)}
+                  aria-pressed={off}
+                  aria-label={off ? `Sem ${ing.name.toLowerCase()} (toque para voltar)` : `Tirar ${ing.name.toLowerCase()}`}
+                  className={cn(
+                    "inline-flex min-h-11 items-center gap-1.5 rounded-full border-2 px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    off ? "border-destructive bg-destructive/10 text-destructive" : "border-border hover:border-muted-foreground/50",
+                  )}
+                >
+                  {off && <X className="h-4 w-4" strokeWidth={3} aria-hidden />}
+                  {off ? (
+                    <span>
+                      Sem <span className="line-through">{ing.name.toLowerCase()}</span>
+                    </span>
+                  ) : (
+                    ing.name
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+      )}
 
       {groups.length > 0 && (
         <div className="space-y-5 px-5 pb-6 pt-3">
