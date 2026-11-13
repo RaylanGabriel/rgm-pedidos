@@ -48,8 +48,17 @@ para todas as lojas** (cada loja só vê os pedidos feitos nela); v1 com dados p
 
 ## Ações do Raylan
 - [x] Envio de e-mail: Resend.
-- [ ] Resend: conta + domínio rgm.dev.br + `RESEND_API_KEY` no `.env.cloudflare` (eu ponho o DNS e envio a chave).
-- [ ] Google Cloud: projeto + tela de consentimento + credencial OAuth (passo a passo quando chegar a fase 3).
+- [x] Resend: conta + domínio rgm.dev.br (sa-east-1) + chaves no `.env.cloudflare`: `RESEND_ADMIN_KEY` (Full access,
+  só para o setup; pode ser apagada) e `RESEND_API_KEY` (Sending access; restringir ao rgm.dev.br após verificar).
+- [x] Google Cloud: cliente OAuth Web com retorno em rgm.dev.br e no preview da branch (conferido no Google: par
+  ID/segredo válido, os 2 retornos aceitos). [ ] Confirmar app "Em produção" (Público).
+
+## Setup feito (13/nov)
+- DNS na Cloudflare (sem proxy): TXT `resend._domainkey`, CNAME `send` → send.forge.rmta.net, CNAME `rsend` →
+  rsend-sae1.forge.rmta.net, TXT `_dmarc` `v=DMARC1; p=none;`. Nomes send/rsend/resend reservados (`db450b3`).
+- Segredos `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`: produção com `wrangler secret bulk`;
+  preview com `wrangler versions secret bulk --env preview` (o `secret bulk` falha no preview porque a última versão
+  é de branch e não está publicada) + novo build da branch (`98dbf61`) para herdar.
 
 ---
 

@@ -64,3 +64,10 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   pedir "Retry build" no painel ou esperar e repetir — não mexer no código. O site segue na versão anterior.
 - **Nunca publicar na Cloudflare um build feito nesta máquina.** O OpenNext copia os valores do `.env.local` para dentro
   do Worker. Deploy só via push (Workers Builds).
+- **Segredo novo no Worker de preview: `wrangler versions secret bulk <json> --env preview`**, não `secret bulk`.
+  (13/nov/2026: `secret bulk --env preview` falhou com "the latest version of your Worker isn't currently deployed",
+  porque a última versão é um upload de branch.) A versão criada herda o código e ganha os segredos; as próximas
+  versões herdam os segredos → depois, fazer um push na branch (commit vazio serve) para o alias do preview ter as
+  chaves. Na produção (`rgm-pedidos`) o `secret bulk` normal funciona (já publica uma versão nova).
+- **Reincidência (13/nov): esqueci o `export MSYS_NO_PATHCONV=1` numa chamada `cf.mjs POST /zones/...`** → 404 sem
+  criar nada. Regra: todo comando que passa `/zones/` ou `/accounts/` como argumento começa com o export.
