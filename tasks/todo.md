@@ -42,6 +42,18 @@ todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem
 - A loja de teste estava fechada (horário 18h) → o teste abre/restaura a loja (`loja-aberta.ts`). Não era bug.
 - [ ] OK do Raylan · [ ] `db:migrate:prod` · [ ] merge · [ ] conferir produção
 
+## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
+"Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
+adicionar. O ideal é puxar automático dos ingredientes de cada item."
+- [ ] `lib/recipe.ts`: `descriptionParts` ("Blend 120g, queijo, alface e tomate" → partes) + `suggestRemovable`
+  (sem número/medida e até 3 palavras) — usado no painel e no servidor.
+- [ ] Editar lanche: a lista de todos os ingredientes, o cadeado e o campo "Novos ingredientes" saem. Ficam chips
+  com as partes da **descrição** (atualizam ao digitar); toque liga/desliga "o cliente pode tirar". Padrão: sugestão
+  ligada só em categoria com adicionais. Manda os nomes ligados (`removable`).
+- [ ] Servidor: nomes → ingrediente **base** (`is_extra=false`) de mesmo nome ou cria; nunca liga um adicional.
+- [ ] Botão "Preencher pela descrição" para os lanches ainda sem botões (categorias com adicionais).
+- [ ] Sem migração nova (a ficha guarda só os removíveis; `removable` fica true). Teste E2E refeito no preview.
+
 ---
 
 # Deixar o site pronto para o 1º cliente (12/nov/2026) — ordem combinada com o Raylan

@@ -7,6 +7,7 @@ import { db } from "@/db"
 import { categories, ingredients, menuItemCategories, menuItemIngredients, menuItems } from "@/db/schema"
 import { isOwner, requireStore } from "@/lib/auth/session"
 import { formText, optional, priceSchema, zodErrorState, type FormState } from "@/lib/form-state"
+import { nameKey, pendingRemovable } from "@/lib/recipe"
 import { deleteImage, fileFrom, uploadImage } from "@/lib/storage"
 
 /*
@@ -142,49 +143,65 @@ export async function saveItemAction(_prev: FormState, fd: FormData): Promise<Fo
 }
 
 /**
- * Ficha técnica do lanche (o item já foi conferido como desta loja). Campos do formulário:
- * - `recipe`: ids dos ingredientes, na ordem dos botões "sem ___"; `fixed`: os que o cliente não pode tirar.
- * - `newIngredients`: "pão, cebola…" — cria os que não existem (como ingrediente base, sem preço) e põe na ficha.
- * Só aceita ingredientes desta loja. A ficha é pequena: apaga e grava de novo.
+ * Botões "sem ___" do lanche (o item já foi conferido como desta loja). O formulário manda `removable`: os nomes,
+ * tirados da descrição, que o cliente pode tirar. Formulário sem a seção (página antiga aberta): não mexe.
  */
 async function saveRecipe(storeId: string, itemId: string, fd: FormData) {
-  // Formulário sem a seção da ficha (ex.: página antiga aberta no navegador): não mexe na ficha
   if (!fd.has("recipeForm")) return
-  const fixed = new Set(fd.getAll("fixed").map(String))
-  const ids = [...new Set(fd.getAll("recipe").map(String))].filter((v) => uuid.safeParse(v).success).slice(0, 40)
-  const typed = [
-    ...new Map(
-      formText(fd, "newIngredients")
-        .split(/[,;\n]+/)
-        .map((n) => n.trim().replace(/\s+/g, " ").slice(0, 60))
-        .filter((n) => n.length >= 2)
-        .map((n) => [n.toLowerCase(), n]),
-    ).values(),
-  ].slice(0, 30)
+  const names = fd.getAll("removable").map((v) => String(v).replace(/\s+/g, " ").trim()).filter((n) => n.length >= 2 && n.length <= 60)
+  await setRemovable(storeId, itemId, names)
+}
 
-  const existing = await db
+/**
+ * Grava os botões "sem ___" de um lanche. Cada nome vira o ingrediente **base** da loja de mesmo nome (sem
+ * diferenciar maiúsculas), criado se faltar. Nunca usa um adicional: para não querer um adicional, é só não escolher.
+ * A lista é pequena: apaga e grava de novo.
+ */
+async function setRemovable(storeId: string, itemId: string, rawNames: string[]) {
+  const names = [...new Map(rawNames.map((n) => [nameKey(n), n])).values()].slice(0, 30)
+  const base = await db
     .select({ id: ingredients.id, name: ingredients.name })
     .from(ingredients)
-    .where(eq(ingredients.storeId, storeId))
-  const byName = new Map(existing.map((i) => [i.name.toLowerCase(), i.id]))
-  const mine = new Set(existing.map((i) => i.id))
+    .where(and(eq(ingredients.storeId, storeId), eq(ingredients.isExtra, false)))
+  const byName = new Map(base.map((i) => [nameKey(i.name), i.id]))
 
-  const toCreate = typed.filter((n) => !byName.has(n.toLowerCase()))
+  const toCreate = names.filter((n) => !byName.has(nameKey(n)))
   if (toCreate.length) {
     const created = await db
       .insert(ingredients)
       .values(toCreate.map((name) => ({ storeId, name: name[0].toUpperCase() + name.slice(1), price: "0", groupName: "Base", isExtra: false })))
       .returning({ id: ingredients.id, name: ingredients.name })
-    for (const c of created) byName.set(c.name.toLowerCase(), c.id)
+    for (const c of created) byName.set(nameKey(c.name), c.id)
   }
-  const wanted = [...new Set([...ids.filter((i) => mine.has(i)), ...typed.map((n) => byName.get(n.toLowerCase())!)])]
+  const wanted = [...new Set(names.map((n) => byName.get(nameKey(n))!))]
 
   await runBatch([
     db.delete(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, itemId)),
-    ...wanted.map((ingredientId, sortOrder) =>
-      db.insert(menuItemIngredients).values({ menuItemId: itemId, ingredientId, removable: !fixed.has(ingredientId), sortOrder }),
-    ),
+    ...wanted.map((ingredientId, sortOrder) => db.insert(menuItemIngredients).values({ menuItemId: itemId, ingredientId, removable: true, sortOrder })),
   ])
+}
+
+/**
+ * "Preencher pela descrição": lanches de categorias com adicionais que ainda não têm botões "sem ___" recebem a
+ * sugestão (ingredientes curtos, sem medida). O dono confere cada um em "Editar".
+ */
+export async function fillRemovableAction() {
+  const ctx = await isOwner()
+  if (!ctx) return
+  const storeId = ctx.store.id
+  const [items, cats, done] = await Promise.all([
+    db.select({ id: menuItems.id, description: menuItems.description, categoryId: menuItems.categoryId }).from(menuItems).where(eq(menuItems.storeId, storeId)),
+    db.select({ id: categories.id, extrasEnabled: categories.extrasEnabled }).from(categories).where(eq(categories.storeId, storeId)),
+    db
+      .selectDistinct({ itemId: menuItemIngredients.menuItemId })
+      .from(menuItemIngredients)
+      .innerJoin(menuItems, eq(menuItems.id, menuItemIngredients.menuItemId))
+      .where(eq(menuItems.storeId, storeId)),
+  ])
+  for (const item of pendingRemovable(items, cats, done.map((d) => d.itemId))) {
+    await setRemovable(storeId, item.id, item.names)
+  }
+  refresh(ctx.store.slug)
 }
 
 /** Esgotado/disponível — liberado também para funcionários. */

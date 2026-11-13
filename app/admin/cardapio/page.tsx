@@ -10,10 +10,12 @@ import { ActionButton } from "@/components/admin/form-ui"
 import { requireStore } from "@/lib/auth/session"
 import { storeUrl } from "@/lib/site-url"
 import { formatBRL } from "@/lib/order-shared"
+import { pendingRemovable } from "@/lib/recipe"
 import {
   deleteCategoryAction,
   deleteIngredientAction,
   deleteItemAction,
+  fillRemovableAction,
   moveCategoryAction,
   moveExtraItemAction,
   moveItemAction,
@@ -46,15 +48,15 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
       .where(eq(categories.storeId, store.id))
       .orderBy(asc(menuItemCategories.sortOrder)),
     db
-      .select({ itemId: menuItemIngredients.menuItemId, ingredientId: menuItemIngredients.ingredientId, removable: menuItemIngredients.removable })
+      .select({ itemId: menuItemIngredients.menuItemId, ingredientId: menuItemIngredients.ingredientId, name: ingredients.name })
       .from(menuItemIngredients)
       .innerJoin(ingredients, eq(ingredients.id, menuItemIngredients.ingredientId))
       .where(eq(ingredients.storeId, store.id))
       .orderBy(asc(menuItemIngredients.sortOrder)),
   ])
-  const catOptions = cats.map((c) => ({ id: c.id, name: c.name }))
-  const ingOptions = [...ings].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).map((i) => ({ id: i.id, name: i.name }))
-  const recipeOf = (itemId: string) => recipes.filter((r) => r.itemId === itemId).map((r) => ({ ingredientId: r.ingredientId, removable: r.removable }))
+  const catOptions = cats.map((c) => ({ id: c.id, name: c.name, extrasEnabled: c.extrasEnabled }))
+  const removableOf = (itemId: string) => recipes.filter((r) => r.itemId === itemId).map((r) => r.name)
+  const pending = pendingRemovable(items, cats, [...new Set(recipes.map((r) => r.itemId))])
   const usedIn = (ingId: string) => recipes.filter((r) => r.ingredientId === ingId).length
   const extras = ings.filter((i) => i.isExtra)
   const baseOnly = ings.filter((i) => !i.isExtra)
@@ -110,8 +112,26 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
               <Card>
                 <CardContent className="pt-6">
                   <Collapsible summary="+ Adicionar item" defaultOpen={items.length === 0}>
-                    <ItemForm categories={catOptions} ingredients={ingOptions} defaultCategoryId={cats[0]?.id} />
+                    <ItemForm categories={catOptions} defaultCategoryId={cats[0]?.id} />
                   </Collapsible>
+                </CardContent>
+              </Card>
+            )}
+
+            {canEdit && pending.length > 0 && (
+              <Card className="border-primary/40">
+                <CardContent className="flex flex-wrap items-center gap-3 pt-6">
+                  <p className="min-w-56 flex-1 text-sm">
+                    <span className="font-medium">
+                      {pending.length === 1 ? "1 lanche ainda não tem" : `${pending.length} lanches ainda não têm`} os botões “sem ___”.
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      Preenchemos pela descrição (ex.: “sem cebola”, “sem picles”); depois confira cada um em Editar.
+                    </span>
+                  </p>
+                  <ActionButton action={fillRemovableAction} size="sm">
+                    Preencher pela descrição
+                  </ActionButton>
                 </CardContent>
               </Card>
             )}
@@ -183,10 +203,9 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                                   active: item.active,
                                   imageUrl: item.imageUrl,
                                   alsoIn: alsoIn(item.id),
-                                  recipe: recipeOf(item.id),
+                                  removable: removableOf(item.id),
                                 }}
                                 categories={catOptions}
-                                ingredients={ingOptions}
                               />
                               <ActionButton
                                 action={deleteItemAction.bind(null, item.id)}

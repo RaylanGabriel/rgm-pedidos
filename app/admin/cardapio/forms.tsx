@@ -1,7 +1,8 @@
 "use client"
 
 import { useContext, useState } from "react"
-import { Lock, LockOpen, Plus, X } from "lucide-react"
+import { Check, Plus } from "lucide-react"
+import { descriptionParts, nameKey, suggestRemovable } from "@/lib/recipe"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
@@ -14,11 +15,6 @@ const selectClass =
 
 const priceText = (v?: string | number) => (v === undefined ? "" : Number(v).toFixed(2).replace(".", ","))
 
-export interface RecipeEntry {
-  ingredientId: string
-  removable: boolean
-}
-
 export interface ItemFormData {
   id: string
   name: string
@@ -28,27 +24,28 @@ export interface ItemFormData {
   active: boolean
   imageUrl: string | null
   alsoIn: string[]
-  recipe: RecipeEntry[]
+  /** Nomes dos ingredientes que o cliente pode tirar (botões "sem ___") */
+  removable: string[]
 }
 
 /** Criar (sem `item`) ou editar um lanche. */
 export function ItemForm({
   item,
   categories,
-  ingredients,
   defaultCategoryId,
 }: {
   item?: ItemFormData
-  categories: { id: string; name: string }[]
-  /** Todos os ingredientes da loja (para montar a ficha técnica) */
-  ingredients: { id: string; name: string }[]
+  categories: { id: string; name: string; extrasEnabled: boolean }[]
   defaultCategoryId?: string | null
 }) {
   const close = useContext(CloseContext)
   const initialCategory = item ? (item.categoryId ?? "") : (defaultCategoryId ?? "")
   const [primary, setPrimary] = useState(initialCategory)
-  const [resetKey, setResetKey] = useState(0) // novo item salvo: zera a ficha também
+  const [description, setDescription] = useState(item?.description ?? "")
+  const [resetKey, setResetKey] = useState(0) // novo item salvo: zera as escolhas do "sem ___" também
   const descId = `desc-${item?.id ?? "novo"}`
+  // Bebidas, sobremesas…: categoria sem adicionais não sugere botões "sem ___" (o dono ainda pode ligar)
+  const suggest = categories.find((c) => c.id === primary)?.extrasEnabled ?? true
   return (
     <ActionForm
       action={saveItemAction}
@@ -58,6 +55,7 @@ export function ItemForm({
           ? close
           : () => {
               setPrimary(initialCategory)
+              setDescription("")
               setResetKey((k) => k + 1)
             }
       }
@@ -87,8 +85,9 @@ export function ItemForm({
               name="description"
               rows={2}
               maxLength={300}
-              defaultValue={item?.description ?? ""}
-              placeholder="Ingredientes, tamanho… (opcional)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ingredientes separados por vírgula: pão brioche, carne 120g, queijo, cebola e picles"
             />
             {s.fieldErrors?.description && <p className="text-sm text-destructive mt-1">{s.fieldErrors.description}</p>}
           </div>
@@ -137,12 +136,12 @@ export function ItemForm({
               </div>
             </fieldset>
           )}
-          {/* key: renasce ao salvar (novo item) ou quando a ficha salva muda (ingredientes recém-criados viram chips) */}
-          <RecipePicker
-            key={`${resetKey}:${(item?.recipe ?? []).map((r) => `${r.ingredientId}${r.removable ? "" : "!"}`).join(",")}:${ingredients.length}`}
-            ingredients={ingredients}
-            initial={item?.recipe ?? []}
-            descriptionId={descId}
+          {/* key: renasce ao salvar um item novo ou quando o que foi salvo muda */}
+          <RemovablePicker
+            key={`${resetKey}:${(item?.removable ?? []).join("|")}`}
+            description={description}
+            saved={item?.removable ?? []}
+            suggest={suggest}
           />
           <SubmitButton>{item ? "Salvar alterações" : "Adicionar item"}</SubmitButton>
         </>
@@ -151,121 +150,66 @@ export function ItemForm({
   )
 }
 
-/** "Pão brioche, smash 90g e cebola." → ["Pão brioche", "smash 90g", "cebola"] (sugestão; o dono revisa antes de salvar) */
-const splitIngredients = (text: string) =>
-  text
-    .split(/[,;\n]+|\s+e\s+/i)
-    .map((s) => s.trim().replace(/[.!]+$/, ""))
-    .filter((s) => s.length >= 2 && s.length <= 60)
-
 /**
- * Ficha técnica do lanche: quais ingredientes ele leva e quais o cliente pode tirar ("sem cebola").
- * Manda `recipe` (ids, na ordem), `fixed` (não pode tirar) e `newIngredients` (texto) para saveItemAction.
+ * Botões "sem ___" do lanche: saem da descrição (atualizam ao digitar) e o dono toca no que o cliente pode tirar.
+ * Adicionais não entram (para não querer um adicional, é só não escolher). Manda `removable` (nomes) para
+ * saveItemAction.
  */
-function RecipePicker({ ingredients, initial, descriptionId }: { ingredients: { id: string; name: string }[]; initial: RecipeEntry[]; descriptionId: string }) {
-  const [recipe, setRecipe] = useState<RecipeEntry[]>(initial)
-  const [typed, setTyped] = useState("")
-  const name = new Map(ingredients.map((i) => [i.id, i.name]))
-  const chosen = new Set(recipe.map((r) => r.ingredientId))
-  const others = ingredients.filter((i) => !chosen.has(i.id))
-
-  const add = (id: string) => setRecipe((r) => [...r, { ingredientId: id, removable: true }])
-  const drop = (id: string) => setRecipe((r) => r.filter((x) => x.ingredientId !== id))
-  const toggleFixed = (id: string) => setRecipe((r) => r.map((x) => (x.ingredientId === id ? { ...x, removable: !x.removable } : x)))
-  const fromDescription = () => {
-    const desc = (document.getElementById(descriptionId) as HTMLTextAreaElement | null)?.value ?? ""
-    const known = new Set(recipe.map((r) => (name.get(r.ingredientId) ?? "").toLowerCase()))
-    const parts = splitIngredients(desc).filter((p) => !known.has(p.toLowerCase()))
-    // Os que já existem no cadastro entram direto; os novos vão para o campo de texto (criados ao salvar)
-    const byName = new Map(ingredients.map((i) => [i.name.toLowerCase(), i.id]))
-    const existing = parts.map((p) => byName.get(p.toLowerCase())).filter((id): id is string => !!id && !chosen.has(id))
-    const fresh = parts.filter((p) => !byName.has(p.toLowerCase()))
-    setRecipe((r) => [...r, ...[...new Set(existing)].map((id) => ({ ingredientId: id, removable: true }))])
-    if (fresh.length) setTyped((t) => [t, fresh.join(", ")].filter(Boolean).join(", "))
-  }
+function RemovablePicker({ description, saved, suggest }: { description: string; saved: string[]; suggest: boolean }) {
+  const parts = descriptionParts(description)
+  // Escolhas do dono por nome. Lanche já salvo: o que está na descrição e não foi salvo começa desligado.
+  const [choice, setChoice] = useState(() => {
+    const on = new Set(saved.map(nameKey))
+    return saved.length ? new Map(parts.map((p) => [nameKey(p), on.has(nameKey(p))])) : new Map<string, boolean>()
+  })
+  const isOn = (p: string) => choice.get(nameKey(p)) ?? (suggest && suggestRemovable(p))
+  const chosen = parts.filter(isOn)
 
   return (
     <fieldset className="rounded-lg border p-3">
       <input type="hidden" name="recipeForm" value="1" />
-      {recipe.map((r) => (
-        <span key={r.ingredientId}>
-          <input type="hidden" name="recipe" value={r.ingredientId} />
-          {!r.removable && <input type="hidden" name="fixed" value={r.ingredientId} />}
-        </span>
+      {chosen.map((p) => (
+        <input key={p} type="hidden" name="removable" value={p} />
       ))}
-      <legend className="px-1 text-sm font-medium">Ingredientes deste lanche</legend>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Viram os botões “sem cebola” para o cliente. Toque no cadeado no que não dá para tirar (ex.: pão, carne).
-      </p>
-
-      {recipe.length > 0 ? (
-        <ul className="mb-3 flex flex-wrap gap-2" aria-label="Ingredientes escolhidos">
-          {recipe.map((r) => (
-            <li key={r.ingredientId} className="flex items-center rounded-full border-2 border-primary bg-primary/10 text-sm">
-              <span className="pl-3 font-medium">{name.get(r.ingredientId) ?? "?"}</span>
-              <button
-                type="button"
-                onClick={() => toggleFixed(r.ingredientId)}
-                aria-pressed={!r.removable}
-                title={r.removable ? "O cliente pode tirar. Toque para travar." : "Fixo: o cliente não pode tirar. Toque para liberar."}
-                className="ml-1 inline-flex h-8 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {r.removable ? <LockOpen className="h-3.5 w-3.5" aria-hidden /> : <Lock className="h-3.5 w-3.5 text-foreground" aria-hidden />}
-                <span>{r.removable ? "pode tirar" : "fixo"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => drop(r.ingredientId)}
-                aria-label={`Tirar ${name.get(r.ingredientId)} da ficha`}
-                className="mr-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mb-3 text-sm text-muted-foreground">Nenhum ingrediente ainda: o cliente não vê botões “sem ___” neste lanche.</p>
-      )}
-
-      {others.length > 0 && (
-        <div className="mb-3">
-          <p className="mb-1.5 text-xs font-medium text-muted-foreground">Adicionar da lista</p>
-          <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-            {others.map((i) => (
-              <button
-                key={i.id}
-                type="button"
-                onClick={() => add(i.id)}
-                className="inline-flex h-8 items-center gap-1 rounded-full border border-dashed px-3 text-sm text-muted-foreground hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden />
-                {i.name}
-              </button>
-            ))}
+      <legend className="px-1 text-sm font-medium">O cliente pode tirar</legend>
+      {parts.length ? (
+        <>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Vem da descrição acima. Toque no que o cliente pode pedir “sem” (ex.: cebola, picles); deixe apagado o que
+            não sai (carne, pão).
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {parts.map((p) => {
+              const on = isOn(p)
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setChoice((c) => new Map(c).set(nameKey(p), !on))}
+                  className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    on
+                      ? "border-2 border-primary bg-primary/10 font-medium text-foreground"
+                      : "border border-dashed text-muted-foreground hover:border-primary hover:text-foreground"
+                  }`}
+                >
+                  {on ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Plus className="h-3.5 w-3.5" aria-hidden />}
+                  {p}
+                </button>
+              )
+            })}
           </div>
-        </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {chosen.length
+              ? `O cliente verá: ${chosen.map((p) => `“Sem ${p.toLowerCase()}”`).join(", ")}.`
+              : "Nenhum marcado: o cliente não vê botões “sem ___” neste item."}
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Escreva os ingredientes na descrição, separados por vírgula, e escolha aqui o que o cliente pode tirar.
+        </p>
       )}
-
-      <div className="flex flex-wrap items-end gap-2">
-        <Field
-          label="Novos ingredientes"
-          name="newIngredients"
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          placeholder="Ex.: pão brioche, cebola roxa, picles"
-          maxLength={600}
-          hint="Separe por vírgula. São criados ao salvar e já entram neste lanche."
-          className="min-w-56 flex-1"
-        />
-        <button
-          type="button"
-          onClick={fromDescription}
-          className="mb-5 inline-flex h-9 items-center rounded-md border px-3 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          Copiar da descrição
-        </button>
-      </div>
     </fieldset>
   )
 }
