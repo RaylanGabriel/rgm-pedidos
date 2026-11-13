@@ -169,7 +169,6 @@ export const menuItems = pgTable(
   (t) => [index("menu_items_store_idx").on(t.storeId)],
 )
 
-/** Adicionais/ingredientes extras (bacon, cheddar...). */
 /**
  * Categorias extras de um item ("Mais vendidos", "Vegetarianos"…), além da principal (menu_items.category_id).
  * A principal decide os adicionais e onde o item fica no painel; aqui ele só aparece também em outras seções.
@@ -188,6 +187,11 @@ export const menuItemCategories = pgTable(
   (t) => [uniqueIndex("menu_item_categories_pk").on(t.menuItemId, t.categoryId), index("menu_item_categories_cat_idx").on(t.categoryId)],
 )
 
+/**
+ * Ingredientes da loja — um cadastro só para a ficha técnica dos lanches e para os adicionais.
+ * - `isExtra`: também é vendido à parte como adicional (+ `price`). Base (pão, carne, cebola): false, preço 0.
+ * - Usado na ficha técnica (menu_item_ingredients) e, no futuro, no controle de estoque.
+ */
 export const ingredients = pgTable(
   "ingredients",
   {
@@ -198,10 +202,30 @@ export const ingredients = pgTable(
     name: text("name").notNull(),
     price: numeric("price", { precision: 10, scale: 2 }).notNull(),
     groupName: text("group_name").notNull().default("Adicionais"), // ex.: Proteína, Queijo, Molho
+    isExtra: boolean("is_extra").notNull().default(true), // oferecido como adicional pago
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("ingredients_store_idx").on(t.storeId)],
+)
+
+/**
+ * Ficha técnica: ingredientes que cada lanche leva. `removable`: o cliente pode pedir "sem" (pão e carne, não).
+ * Os dois lados são da mesma loja (garantido nas ações do painel).
+ */
+export const menuItemIngredients = pgTable(
+  "menu_item_ingredients",
+  {
+    menuItemId: uuid("menu_item_id")
+      .notNull()
+      .references(() => menuItems.id, { onDelete: "cascade" }),
+    ingredientId: uuid("ingredient_id")
+      .notNull()
+      .references(() => ingredients.id, { onDelete: "cascade" }),
+    removable: boolean("removable").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0), // ordem dos botões "sem ___"
+  },
+  (t) => [uniqueIndex("menu_item_ingredients_pk").on(t.menuItemId, t.ingredientId), index("menu_item_ingredients_ing_idx").on(t.ingredientId)],
 )
 
 // ---------- Entrega ----------
@@ -359,6 +383,20 @@ export const orderItemIngredients = pgTable(
   (t) => [index("order_item_ingredients_item_idx").on(t.orderItemId)],
 )
 
+/** "SEM cebola": ingrediente da ficha que o cliente pediu para tirar. Cópia do nome; não mexe no preço. */
+export const orderItemRemovals = pgTable(
+  "order_item_removals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderItemId: uuid("order_item_id")
+      .notNull()
+      .references(() => orderItems.id, { onDelete: "cascade" }),
+    ingredientId: uuid("ingredient_id").references(() => ingredients.id, { onDelete: "set null" }),
+    nameSnapshot: text("name_snapshot").notNull(),
+  },
+  (t) => [index("order_item_removals_item_idx").on(t.orderItemId)],
+)
+
 // ---------- Relações (para db.query.*) ----------
 export const storesRelations = relations(stores, ({ many }) => ({
   members: many(storeMembers),
@@ -382,6 +420,11 @@ export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   menuItem: one(menuItems, { fields: [orderItems.menuItemId], references: [menuItems.id] }),
   extras: many(orderItemIngredients),
+  removals: many(orderItemRemovals),
+}))
+
+export const orderItemRemovalsRelations = relations(orderItemRemovals, ({ one }) => ({
+  orderItem: one(orderItems, { fields: [orderItemRemovals.orderItemId], references: [orderItems.id] }),
 }))
 
 export const orderItemIngredientsRelations = relations(orderItemIngredients, ({ one }) => ({

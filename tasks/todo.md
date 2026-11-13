@@ -1,3 +1,38 @@
+# 9a. Ficha técnica dos lanches + botões "sem ___" (13/nov/2026, branch `feat/ficha-tecnica`)
+
+Decisões do Raylan (13/nov): um cadastro só de ingredientes; o dono marca o que não pode tirar; botões no balcão e
+no cardápio online.
+
+Hoje não há ligação lanche ↔ ingredientes: `ingredients` é a lista de adicionais pagos da loja, oferecida inteira a
+todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem cebola…" (gambiarra atual).
+
+## Modelo (migração 0025)
+- `ingredients.is_extra` (padrão true): **um cadastro só de ingredientes**. Adicional = ingrediente vendido à parte
+  (+R$). Base (pão, carne, cebola) = `is_extra=false`, preço 0. Os adicionais de hoje continuam iguais.
+- `menu_item_ingredients(menu_item_id, ingredient_id, removable)`: a ficha de cada lanche. `removable=false` para o
+  que não se tira (pão, carne). Quantidade por lanche fica para o 9b (estoque).
+- `order_item_removals(order_item_id, ingredient_id set null, name_snapshot)`: o "sem X" de cada lanche do pedido,
+  separado dos adicionais (relatórios de adicionais não mudam). Cópia do nome, como já é feito com nome e preço.
+- `create_order` (CREATE OR REPLACE, mesma assinatura): aceita `removals: [ingredientId]` por item; só aceita
+  ingrediente da ficha daquele lanche, desta loja, com `removable`; não mexe no preço.
+
+## Telas
+- **Painel → Cardápio:** aba "Adicionais" vira "Ingredientes" (cada um: vendido como adicional? preço). No editar
+  lanche: "Ingredientes deste lanche" — marcar quais leva e se o cliente pode tirar; campo rápido "pão, carne,
+  cebola…" que cria os que faltam como ingrediente base.
+- **Escolher o lanche (cardápio online e balcão):** seção "Tirar algum ingrediente?" com botões "sem Cebola"
+  (liga/desliga) só com os ingredientes removíveis daquele lanche. Adicionais: só os `is_extra`.
+- **Mostrar "SEM cebola" em destaque:** carrinho, cozinha, impressão, acompanhamento do cliente, planilha (coluna
+  "Sem"), descrição da cobrança Pix. Placeholder das observações deixa de sugerir "sem cebola".
+- Carrinho salvo no aparelho: valida o "sem" contra a ficha atual (ingrediente que saiu da ficha é descartado).
+
+## Testes
+- Preview: cadastrar ficha → pedir online com "sem cebola" → cozinha/impressão/acompanhamento mostram → pedido do
+  balcão idem → tentar mandar "sem pão" (não removível) ou de outro lanche pela API → recusado → relatório de
+  adicionais inalterado → planilha com a coluna.
+
+---
+
 # Deixar o site pronto para o 1º cliente (12/nov/2026) — ordem combinada com o Raylan
 
 1. [ ] "Conectar Mercado Pago" com a conta real de outra pessoa → **erro do MP (`allow_flow` vazio); chamado aberto no suporte**
