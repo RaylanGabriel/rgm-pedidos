@@ -23,12 +23,16 @@
   ],
   "workers_dev": true,
   "preview_urls": true,
-  // Manutenção a cada 5 min (lib/maintenance.ts): entregas esquecidas, Pix vencido, sessões e tentativas antigas.
+  // Manutenção a cada 5 min (lib/maintenance.ts) e backup diário às 06:00 UTC = 03:00 Brasília (lib/backup.ts).
   // Precisa do segredo CRON_SECRET no Worker. Herdado pelo preview (que roda no banco de testes).
-  "triggers": { "crons": ["*/5 * * * *"] },
+  "triggers": { "crons": ["*/5 * * * *", "0 6 * * *"] },
 
   "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos" }],
-  "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos" }],
+  "r2_buckets": [
+    { "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos" },
+    // Backup diário: bucket PRIVADO (sem endereço público), apaga sozinho o que tem mais de 30 dias
+    { "binding": "BACKUPS", "bucket_name": "rgm-pedidos-backups" },
+  ],
   "vars": {
     "ROOT_DOMAIN": "rgm.dev.br",
     "SITE_URL": "https://painel.rgm.dev.br",
@@ -46,7 +50,10 @@
       "routes": [],
       "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos-preview" }],
       // Bucket separado: um teste nunca apaga foto de loja real
-      "r2_buckets": [{ "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos-preview" }],
+      "r2_buckets": [
+        { "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos-preview" },
+        { "binding": "BACKUPS", "bucket_name": "rgm-pedidos-backups-preview" },
+      ],
       "vars": {
         // Vazios de propósito: lojas pelo caminho /loja/<slug> e links com o endereço de acesso (*.workers.dev)
         "ROOT_DOMAIN": "",
