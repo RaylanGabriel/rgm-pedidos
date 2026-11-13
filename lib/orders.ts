@@ -20,6 +20,7 @@ import {
   type OrderStatus,
   type OrderWithItemsView,
 } from "@/lib/order-shared"
+import { includedItems } from "@/lib/recipe"
 
 // ---------- Loja ----------
 export type StoreRow = typeof stores.$inferSelect
@@ -105,11 +106,8 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       .from(categories)
       .where(eq(categories.storeId, storeId))
       .orderBy(asc(categories.sortOrder), asc(categories.name)),
-    db
-      .select()
-      .from(menuItems)
-      .where(and(eq(menuItems.storeId, storeId), eq(menuItems.active, true)))
-      .orderBy(asc(menuItems.sortOrder), asc(menuItems.name)),
+    // Todos (os ocultos também): um combo herda os botões "sem ___" do lanche que inclui, mesmo oculto
+    db.select().from(menuItems).where(eq(menuItems.storeId, storeId)).orderBy(asc(menuItems.sortOrder), asc(menuItems.name)),
     db
       .select()
       .from(ingredients)
@@ -129,8 +127,12 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       .where(and(eq(ingredients.storeId, storeId), eq(menuItemIngredients.removable, true)))
       .orderBy(asc(menuItemIngredients.sortOrder), asc(ingredients.name)),
   ])
-  const removable = new Map<string, { id: string; name: string }[]>()
-  for (const r of recipe) removable.set(r.itemId, [...(removable.get(r.itemId) ?? []), { id: r.id, name: r.name }])
+  const own = new Map<string, { id: string; name: string }[]>()
+  for (const r of recipe) own.set(r.itemId, [...(own.get(r.itemId) ?? []), { id: r.id, name: r.name }])
+  // Os do próprio item + os dos itens que ele inclui (combo), sem repetir ingrediente
+  const removable = (i: (typeof items)[number]) => [
+    ...new Map([i, ...includedItems(i, items)].flatMap((x) => own.get(x.id) ?? []).map((r) => [r.id, r] as const)).values(),
+  ]
   const alsoIn = new Map<string, string[]>()
   const extraOrder: Record<string, string[]> = {}
   for (const l of links) {
@@ -141,7 +143,7 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
   return {
     categories: cats,
     extraOrder,
-    items: items.map((i) => ({
+    items: items.filter((i) => i.active).map((i) => ({
       id: i.id,
       categoryId: i.categoryId,
       alsoIn: (alsoIn.get(i.id) ?? []).filter((c) => c !== i.categoryId),
@@ -150,7 +152,7 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       price: Number(i.price),
       imageUrl: i.imageUrl,
       available: i.available,
-      removable: removable.get(i.id) ?? [],
+      removable: removable(i),
     })),
     ingredients: ings.map((i) => ({ id: i.id, name: i.name, price: Number(i.price), groupName: i.groupName })),
   }
