@@ -46,8 +46,11 @@ export function Turnstile({
   onToken?: (token: string | null) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  // Guarda a função mais recente sem recriar o widget (atualizada fora da renderização)
   const onTokenRef = useRef(onToken)
-  onTokenRef.current = onToken
+  useEffect(() => {
+    onTokenRef.current = onToken
+  })
 
   useEffect(() => {
     let id: string | undefined

@@ -107,7 +107,7 @@ export default async function PagamentosPage({ searchParams }: { searchParams: S
               <>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
                   <li>• O dinheiro cai na <strong className="text-foreground">sua</strong> conta do Mercado Pago, não passa pela plataforma.</li>
-                  <li>• O pedido só vai para a cozinha depois de pago: acabou o "paguei, mas não caiu".</li>
+                  <li>• O pedido só vai para a cozinha depois de pago: acabou o “paguei, mas não caiu”.</li>
                   <li>• Você não precisa conferir comprovante.</li>
                   <li>• Sua conta do Mercado Pago precisa ter uma <strong className="text-foreground">chave Pix</strong> cadastrada.</li>
                 </ul>

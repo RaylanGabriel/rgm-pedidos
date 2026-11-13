@@ -8,9 +8,13 @@
  * Se a manutenção devolver um alerta de erros (lib/alerts.ts), o e-mail sai daqui: o módulo `cloudflare:email`
  * só existe no Worker, não dentro do Next.
  */
-// @ts-ignore -- módulo do runtime da Cloudflare (resolvido pelo wrangler no deploy)
+// Os dois imports abaixo usam ts-ignore (e não ts-expect-error) de propósito: só existem em alguns momentos
+// (runtime da Cloudflare / depois do build), e o ts-expect-error quebraria o tsc quando existem.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- módulo do runtime da Cloudflare (resolvido pelo wrangler)
+// @ts-ignore
 import { EmailMessage } from "cloudflare:email"
-// @ts-ignore -- gerado no build (opennextjs-cloudflare build); não existe antes dele
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- gerado no build (opennextjs-cloudflare build)
+// @ts-ignore
 import { default as openNext } from "./.open-next/worker.js"
 
 type EmailBinding = { send(message: unknown): Promise<void> }
@@ -25,7 +29,7 @@ const BACKUP_CRON = "0 6 * * *"
 /** Remetente: precisa ser do domínio com Email Routing ligado (rgm.dev.br) */
 const ALERT_FROM = "alertas@rgm.dev.br"
 
-export default {
+const worker = {
   fetch: next.fetch,
 
   async scheduled(controller: { cron: string }, env: Env, ctx: Ctx) {
@@ -44,6 +48,8 @@ export default {
     if (result.alerta) await sendAlert(env, result.alerta)
   },
 }
+
+export default worker
 
 /** Manda o alerta para ALERT_EMAIL (segredo; sem ele — como no preview — só registra no log). */
 async function sendAlert(env: Env, alert: { subject: string; text: string }) {
