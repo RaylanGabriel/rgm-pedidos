@@ -83,6 +83,17 @@ export function CartSummary({
                   {line.removals.length > 0 && (
                     <p className="mt-0.5 text-sm font-semibold text-destructive">{removalsText(line.removals.map((r) => r.name))}</p>
                   )}
+                  {canEdit(line) && (
+                    <button
+                      type="button"
+                      onClick={() => setEditing(index)}
+                      className="-ml-1 mt-0.5 inline-flex min-h-8 items-center gap-1 rounded-md px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Editar ${line.name}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      Editar
+                    </button>
+                  )}
                 </div>
                 <span className="shrink-0 font-bold tabular-nums">{formatBRL(lineTotal(line))}</span>
               </div>
@@ -90,17 +101,6 @@ export function CartSummary({
                 <div className="mt-2 flex flex-wrap items-center gap-1">
                   {onQuantity && (
                     <QuantityStepper value={line.quantity} onChange={(q) => changeQty(index, line, q)} size="sm" label={`quantidade de ${line.name}`} />
-                  )}
-                  {canEdit(line) && (
-                    <button
-                      type="button"
-                      onClick={() => setEditing(index)}
-                      className="flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Editar ${line.name}`}
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden />
-                      Editar
-                    </button>
                   )}
                   {onRemove && (
                     <button
