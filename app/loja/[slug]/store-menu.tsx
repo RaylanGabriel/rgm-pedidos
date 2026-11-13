@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ChevronRight, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,8 @@ import { BottomSheet } from "@/components/order/bottom-sheet"
 import { CartSummary, cartTotal } from "@/components/order/cart-summary"
 import { CartSuggestions } from "@/components/order/cart-suggestions"
 import { ItemPicker } from "@/components/order/item-picker"
-import { useCart, useRecentOrders } from "@/lib/cart"
+import { reconcile, useCart, useRecentOrders } from "@/lib/cart"
+import { reorderAction } from "./conta/actions"
 import type { MenuView, PublicStore } from "@/lib/orders"
 import { formatBRL } from "@/lib/order-shared"
 
@@ -16,7 +17,36 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
   const cart = useCart(store.slug, menu)
   const recent = useRecentOrders(store.slug)
   const [cartOpen, setCartOpen] = useState(false)
+  const [reorderMsg, setReorderMsg] = useState<string | null>(null)
   const count = cart.lines.reduce((s, l) => s + l.quantity, 0)
+
+  // "Pedir de novo" (Minha conta → ?pedirDeNovo=<token>): põe no carrinho o que ainda existe no cardápio, com preço atual
+  const { loaded, addMany } = cart
+  useEffect(() => {
+    if (!loaded) return
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get("pedirDeNovo")
+    if (!token) return
+    params.delete("pedirDeNovo")
+    history.replaceState(null, "", `${location.pathname}${params.size ? `?${params}` : ""}${location.hash}`)
+    reorderAction(store.slug, token).then((raw) => {
+      if (!raw) return setReorderMsg("Não encontramos esse pedido nesta loja.")
+      const lines = reconcile(raw, menu)
+      if (lines.length) {
+        addMany(lines)
+        setCartOpen(true)
+      }
+      setReorderMsg(
+        !lines.length
+          ? "Os itens desse pedido não estão mais disponíveis."
+          : lines.length < raw.length
+            ? "Pusemos no carrinho o que ainda está no cardápio (alguns itens saíram ou estão esgotados)."
+            : "Pronto! O pedido está no carrinho, com os preços de hoje.",
+      )
+    })
+    // roda uma vez, quando o carrinho salvo terminou de carregar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded])
   const total = cartTotal(cart.lines)
   const checkoutHref = `${store.base}/finalizar`
 
@@ -34,6 +64,14 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
 
   return (
     <div className={`container mx-auto max-w-6xl px-4 pb-8 ${count > 0 ? "pb-32 lg:pb-8" : ""}`}>
+      {reorderMsg && (
+        <div role="status" className="mt-5 flex items-start justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-sm">
+          <p>{reorderMsg}</p>
+          <button type="button" onClick={() => setReorderMsg(null)} className="shrink-0 font-semibold text-primary">
+            OK
+          </button>
+        </div>
+      )}
       {!store.isOpen && (
         <div role="status" className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
           <p className="font-semibold">A loja está fechada agora{store.openLabel ? ` · ${store.openLabel.toLowerCase()}` : ""}</p>

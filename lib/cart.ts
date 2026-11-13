@@ -64,7 +64,7 @@ function write(key: string, value: unknown) {
  * Mantém só itens/adicionais que ainda existem no cardápio, com nome e preço atuais.
  * O "sem ___" só fica se o ingrediente ainda está na ficha do lanche e pode ser tirado.
  */
-function reconcile(lines: unknown, menu: MenuLike): CartLine[] {
+export function reconcile(lines: unknown, menu: MenuLike): CartLine[] {
   if (!Array.isArray(lines)) return []
   const items = new Map(menu.items.map((i) => [i.id, i]))
   const ings = new Map(menu.ingredients.map((i) => [i.id, i]))
@@ -111,6 +111,8 @@ export function useCart(slug: string, menu: MenuLike) {
     lines,
     loaded,
     add: (line: CartLine) => update((p) => [...p, line]),
+    /** Vários de uma vez ("Pedir de novo") */
+    addMany: (more: CartLine[]) => update((p) => [...p, ...more]),
     remove: (index: number) => update((p) => p.filter((_, i) => i !== index)),
     setQuantity: (index: number, quantity: number) =>
       update((p) => p.map((l, i) => (i === index ? { ...l, quantity: Math.min(20, Math.max(1, quantity)) } : l))),

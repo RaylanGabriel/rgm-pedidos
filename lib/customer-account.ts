@@ -100,14 +100,34 @@ export async function listCustomerOrders(customerId: string): Promise<CustomerOr
   }))
 }
 
-/** Liga um pedido recém-criado à conta e marca o endereço usado. */
-export async function attachOrder(customerId: string, orderId: string, addressId?: string | null) {
-  await db.update(orders).set({ customerId }).where(eq(orders.id, orderId))
-  if (addressId)
-    await db
-      .update(customerAddresses)
-      .set({ lastUsedAt: new Date() })
-      .where(and(eq(customerAddresses.id, addressId), eq(customerAddresses.customerId, customerId)))
+/**
+ * Depois do pedido feito com a conta: liga o pedido à conta, marca/salva o endereço usado e completa nome e
+ * WhatsApp da conta se ainda estiverem vazios. Nunca derruba o pedido (que já foi criado).
+ */
+export async function afterOrder(
+  customer: { id: string; name: string | null; phone: string | null },
+  publicToken: string,
+  opts: { addressId?: string | null; newAddress?: AddressInput | null; name?: string; phone?: string },
+) {
+  try {
+    await db.update(orders).set({ customerId: customer.id }).where(eq(orders.publicToken, publicToken))
+    if (opts.addressId)
+      await db
+        .update(customerAddresses)
+        .set({ lastUsedAt: new Date() })
+        .where(and(eq(customerAddresses.id, opts.addressId), eq(customerAddresses.customerId, customer.id)))
+    else if (opts.newAddress) {
+      const id = await saveAddress(customer.id, opts.newAddress).catch(() => null) // limite de 10: só não salva
+      if (id) await db.update(customerAddresses).set({ lastUsedAt: new Date() }).where(eq(customerAddresses.id, id))
+    }
+    const patch: { name?: string; phone?: string } = {}
+    if (!customer.name && opts.name && opts.name.length >= 2) patch.name = opts.name.slice(0, 80)
+    const digits = opts.phone?.replace(/\D/g, "")
+    if (!customer.phone && digits && digits.length >= 10 && digits.length <= 13) patch.phone = digits
+    if (Object.keys(patch).length) await db.update(customers).set(patch).where(eq(customers.id, customer.id))
+  } catch (err) {
+    console.error("conta: falha ao ligar o pedido à conta", err instanceof Error ? err.message : err)
+  }
 }
 
 /**
