@@ -8,7 +8,7 @@
    (no checkout atrasava o cliente; lá ficam o limite por IP e a regra da borda em `/finalizar`)
 6. [x] E-mail `contato@`/`suporte@`/`raylan@rgm.dev.br` → Gmail (Email Routing; MX/SPF/DKIM ok; Raylan recebeu o teste)
 7. [x] Web Analytics da Cloudflare (automático, sem cookies; script presente nas páginas)
-8. [~] Alerta de erros por e-mail (branch `feat/alertas`, testado localmente) + monitor externo UptimeRobot (Raylan)
+8. [x] Alerta de erros por e-mail (Raylan recebeu o teste real) + monitor externo UptimeRobot (painel e loja, "Up")
 9. [x] Backup do banco → cópia diária no R2, 1º de produção conferido (plano pago do Neon fica para depois)
 10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
 11. [ ] ESLint
@@ -113,7 +113,9 @@
 - [x] Teste local (`wrangler dev --test-scheduled`, banco preview, rota temporária que falha): erro registrado com rota e
       mensagem; cron gerou o e-mail (remetente, assunto e acentos certos, horário de Brasília); 2ª execução dentro de
       30 min não reenviou. Rota temporária, `.dev.vars`, build local e erros de teste apagados.
-- [ ] OK · [ ] `db:migrate:prod` · [ ] merge · [ ] `ALERT_EMAIL` na produção · [ ] e-mail real de teste · [ ] UptimeRobot
+- [x] OK · [x] `db:migrate:prod` · [x] merge (13/nov) · [x] `ALERT_EMAIL` na produção · [x] e-mail real: erro de teste
+      inserido às 11:51 UTC → cron das 11:55 enviou "RGM Pedidos: 1 erro no site" → Raylan recebeu; erro de teste apagado
+- [x] UptimeRobot (Raylan): monitores `RGM Pedidos - painel` (/admin/login) e `RGM Pedidos - loja` (mrsmash), 5 min, "Up"
 
 ---
 
