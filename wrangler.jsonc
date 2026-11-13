@@ -5,7 +5,7 @@
 // - rgm-pedidos-preview  → testes/branches (banco Neon `preview`, Pix de teste)
 //
 // Aqui ficam só valores públicos. Segredos (DATABASE_URL, MP_CLIENT_SECRET, MP_TOKEN_KEY, ...) nunca entram neste arquivo.
-// Atenção: "routes" É herdado (por isso o preview zera); "vars", "services" e "r2_buckets" NÃO são herdados pelo env "preview" — mantenha os dois blocos alinhados.
+// Atenção: "routes" É herdado (por isso o preview zera); "vars", "services", "r2_buckets" e "send_email" NÃO são herdados pelo env "preview" — mantenha os dois blocos alinhados.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "rgm-pedidos",
@@ -33,6 +33,9 @@
     // Backup diário: bucket PRIVADO (sem endereço público), apaga sozinho o que tem mais de 30 dias
     { "binding": "BACKUPS", "bucket_name": "rgm-pedidos-backups" },
   ],
+  // Alerta de erros por e-mail (worker.ts, de alertas@rgm.dev.br). O destino é o segredo ALERT_EMAIL, que precisa ser
+  // um destino verificado no Email Routing. Sem ALERT_EMAIL (como no preview), o alerta só vai para o log.
+  "send_email": [{ "name": "ALERTAS" }],
   "vars": {
     "ROOT_DOMAIN": "rgm.dev.br",
     "SITE_URL": "https://painel.rgm.dev.br",
@@ -55,6 +58,7 @@
         { "binding": "FOTOS", "bucket_name": "rgm-pedidos-fotos-preview" },
         { "binding": "BACKUPS", "bucket_name": "rgm-pedidos-backups-preview" },
       ],
+      "send_email": [{ "name": "ALERTAS" }],
       "vars": {
         // Vazios de propósito: lojas pelo caminho /loja/<slug> e links com o endereço de acesso (*.workers.dev)
         "ROOT_DOMAIN": "",

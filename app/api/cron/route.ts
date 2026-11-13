@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto"
+import { recordError } from "@/lib/alerts"
 import { runBackup } from "@/lib/backup"
 import { runMaintenance } from "@/lib/maintenance"
 
@@ -11,11 +12,14 @@ export async function POST(request: Request) {
   if (!authorized(request.headers.get("x-cron-secret"))) return new Response("Not Found", { status: 404 })
   const task = new URL(request.url).searchParams.get("tarefa") ?? "manutencao"
   try {
+    // Manutenção pode devolver `alerta` (resumo de erros): o worker.ts manda por e-mail
     const result = task === "backup" ? await runBackup() : await runMaintenance()
-    console.log(`cron ${task}:`, JSON.stringify(result))
+    const { alerta, ...summary } = result as typeof result & { alerta?: { subject: string } }
+    console.log(`cron ${task}:`, JSON.stringify(summary), alerta ? `| alerta: ${alerta.subject}` : "")
     return Response.json(result)
   } catch (err) {
     console.error(`cron ${task} falhou:`, err instanceof Error ? err.message : err)
+    await recordError("cron", task, err)
     return Response.json({ erro: true }, { status: 500 })
   }
 }

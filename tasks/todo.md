@@ -8,7 +8,7 @@
    (no checkout atrasava o cliente; lá ficam o limite por IP e a regra da borda em `/finalizar`)
 6. [x] E-mail `contato@`/`suporte@`/`raylan@rgm.dev.br` → Gmail (Email Routing; MX/SPF/DKIM ok; Raylan recebeu o teste)
 7. [x] Web Analytics da Cloudflare (automático, sem cookies; script presente nas páginas)
-8. [ ] Alerta quando o Worker der erro
+8. [~] Alerta de erros por e-mail (branch `feat/alertas`, testado localmente) + monitor externo UptimeRobot (Raylan)
 9. [~] Backup do banco → cópia diária no R2 (decisão do Raylan; plano pago do Neon fica para depois)
 10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
 11. [ ] ESLint
@@ -101,6 +101,18 @@
 - [x] Preview: backup gerado (13 tabelas, 126 linhas, 10 KB); conferir bate; restaurado por cima do banco de teste →
       **13/13 tabelas idênticas** (hash de todas as linhas antes × depois); site de teste ok.
 - [x] OK · [x] merge (13/nov) · [ ] conferir o 1º backup de produção (`npm run backup -- conferir`) depois das 06:00 UTC
+
+## 8. Alerta de erros por e-mail (branch `feat/alertas`)
+- Plano aprovado pelo Raylan (13/nov), com o monitor externo (UptimeRobot) para o site fora do ar.
+- `instrumentation.ts` (`onRequestError`, só runtime Node) e falhas do cron → `recordError()` → tabela `error_events`
+  (migração `0024`; mensagem resumida, sem usuário/senha de URLs; fora do backup; apagada após 30 dias).
+- Cron a cada 5 min → `pendingAlert()`: erros ainda não avisados viram um resumo, no máximo 1 e-mail a cada 30 min →
+  `worker.ts` envia pelo Email Routing (`send_email` ALERTAS), de `alertas@rgm.dev.br` para o segredo `ALERT_EMAIL`
+  (Gmail do Raylan, destino verificado). Preview sem `ALERT_EMAIL` → alerta só no log.
+- [x] Teste local (`wrangler dev --test-scheduled`, banco preview, rota temporária que falha): erro registrado com rota e
+      mensagem; cron gerou o e-mail (remetente, assunto e acentos certos, horário de Brasília); 2ª execução dentro de
+      30 min não reenviou. Rota temporária, `.dev.vars`, build local e erros de teste apagados.
+- [ ] OK · [ ] `db:migrate:prod` · [ ] merge · [ ] `ALERT_EMAIL` na produção · [ ] e-mail real de teste · [ ] UptimeRobot
 
 ---
 

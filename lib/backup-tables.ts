@@ -7,8 +7,8 @@ import { is } from "drizzle-orm"
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core"
 import * as schema from "@/db/schema"
 
-/** Descartáveis: sessões (todos fazem login de novo), tentativas de login e cache de endereços. */
-const SKIP = new Set(["sessions", "login_attempts", "geocode_cache"])
+/** Descartáveis: sessões (todos fazem login de novo), tentativas de login, cache de endereços e registro de erros. */
+const SKIP = new Set(["sessions", "login_attempts", "geocode_cache", "error_events"])
 
 export const BACKUP_FORMAT = 1
 

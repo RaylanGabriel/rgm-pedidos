@@ -247,6 +247,25 @@ export const geocodeCache = pgTable("geocode_cache", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * Erros do servidor (instrumentation.ts → onRequestError, e falhas do cron). O cron manda um e-mail de alerta com os
+ * que ainda não foram avisados (`alerted_at` nulo), no máximo 1 a cada 30 min, e apaga os com mais de 30 dias.
+ * Fica fora do backup (lib/backup-tables.ts).
+ */
+export const errorEvents = pgTable(
+  "error_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: text("source").notNull(), // "requisição" | "cron"
+    path: text("path"), // rota (sem query string)
+    message: text("message").notNull(), // resumida (até 500 caracteres)
+    digest: text("digest"), // código que o Next mostra na tela de erro
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    alertedAt: timestamp("alerted_at", { withTimezone: true }),
+  },
+  (t) => [index("error_events_created_idx").on(t.createdAt), index("error_events_pending_idx").on(t.alertedAt)],
+)
+
 // ---------- Pedidos ----------
 /**
  * Conta do Mercado Pago conectada pela loja (OAuth). Tokens criptografados (AES-256-GCM, lib/crypto.ts).

@@ -169,6 +169,13 @@
       "when": 1794427410156,
       "tag": "0023_store_is_demo",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794567774695,
+      "tag": "0024_error_events",
+      "breakpoints": true
     }
   ]
 }
