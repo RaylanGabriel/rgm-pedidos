@@ -59,6 +59,14 @@ para todas as lojas** (cada loja só vê os pedidos feitos nela); v1 com dados p
 - Segredos `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`: produção com `wrangler secret bulk`;
   preview com `wrangler versions secret bulk --env preview` (o `secret bulk` falha no preview porque a última versão
   é de branch e não está publicada) + novo build da branch (`98dbf61`) para herdar.
+- Domínio verificado no Resend (DKIM + 2 SPF).
+
+## Teste do login real (13/nov, preview `98dbf61`)
+- Código por e-mail com `delivered@resend.dev` (código lido pela API do Resend): e-mail de `acesso@rgm.dev.br`
+  entregue; código certo → Minha conta, cookie `csid` httpOnly/secure/90 dias; código errado → "Código errado. Você
+  tem mais 4 tentativas." e continua fora. Conta de teste apagada.
+- Google: botão aparece; `/auth/cliente/google` → accounts.google.com com o retorno do preview, PKCE S256 e cookie
+  `g_oauth`. [ ] Falta o Raylan entrar com a conta Google dele (precisa de pessoa).
 
 ---
 
