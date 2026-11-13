@@ -9,11 +9,12 @@ export const nameKey = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase(
 /**
  * "Blend de carne 120g, queijo cheddar, alface e tomate. Para quem tem fome" →
  * ["Blend de carne 120g", "Queijo cheddar", "Alface", "Tomate", "Para quem tem fome"]
+ * Combos: "Smash Clássico + batata frita média" → ["Smash Clássico", "Batata frita média"]
  */
 export function descriptionParts(text: string | null | undefined): string[] {
   const seen = new Set<string>()
   const out: string[] = []
-  for (const raw of (text ?? "").split(/[,;\n]+|\.\s+|\s+e\s+/i)) {
+  for (const raw of (text ?? "").split(/[,;\n+]+|\.\s+|\s+e\s+/i)) {
     const p = raw.replace(/\s+/g, " ").trim().replace(/[.!]+$/, "").trim()
     const key = nameKey(p)
     if (p.length < 2 || p.length > 60 || seen.has(key)) continue
@@ -31,18 +32,29 @@ export function descriptionParts(text: string | null | undefined): string[] {
 export const suggestRemovable = (part: string) => !/\d/.test(part) && part.split(" ").length <= 3
 
 /**
+ * Itens do cardápio que este inclui, pelo nome na descrição: "Smash Clássico + batata + refri" inclui o
+ * "Smash Clássico". O combo herda os botões "sem ___" deles (mudou o lanche, o combo acompanha).
+ * A mesma regra está em `create_order` (drizzle/0026): nome contido na descrição, sem diferenciar maiúsculas.
+ */
+export function includedItems<T extends { id: string; name: string }>(self: { id: string; description: string | null }, items: T[]): T[] {
+  const desc = nameKey(self.description ?? "")
+  return desc ? items.filter((i) => i.id !== self.id && desc.includes(nameKey(i.name))) : []
+}
+
+/**
  * Lanches que o "Preencher pela descrição" vai preencher: ainda sem botões "sem ___", em categoria com adicionais
- * (ou sem categoria) e com alguma sugestão na descrição. Bebidas e sobremesas ficam de fora.
+ * (ou sem categoria) e com alguma sugestão na descrição. Bebidas e sobremesas ficam de fora; combos herdam dos
+ * lanches que incluem.
  */
 export function pendingRemovable(
-  items: { id: string; description: string | null; categoryId: string | null }[],
+  items: { id: string; name: string; description: string | null; categoryId: string | null }[],
   categories: { id: string; extrasEnabled: boolean }[],
   withButtons: string[],
 ) {
   const extras = new Map(categories.map((c) => [c.id, c.extrasEnabled]))
   const done = new Set(withButtons)
   return items.flatMap((i) => {
-    if (done.has(i.id) || (i.categoryId && !extras.get(i.categoryId))) return []
+    if (done.has(i.id) || (i.categoryId && !extras.get(i.categoryId)) || includedItems(i, items).length) return []
     const names = descriptionParts(i.description).filter(suggestRemovable)
     return names.length ? [{ id: i.id, names }] : []
   })

@@ -54,13 +54,14 @@ export default async function AdminPage() {
           <p className="text-xl text-muted-foreground text-center">Painel Administrativo · Olá, {user.name}</p>
         </div>
 
-        <div className="mb-6 flex justify-between items-center">
+        {/* Mesma largura do status e dos cartões abaixo (max-w-6xl centralizado); no celular os botões descem */}
+        <div className="max-w-6xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Flame className="w-6 h-6 text-primary" />
             Área Administrativa
           </h2>
           <div className="flex gap-2">
-            <Button asChild variant="ghost" size="sm">
+            <Button asChild variant="outline" size="sm">
               <Link href="/admin/conta">
                 <UserCog className="w-4 h-4 mr-2" />
                 Minha conta

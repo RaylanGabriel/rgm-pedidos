@@ -39,12 +39,25 @@ function socialLinks(store: SocialStore) {
 }
 
 /**
- * Botões das redes sociais (alvo de toque de 40px, abre em outra aba).
+ * Botões das redes sociais (abre em outra aba).
  * compact: no celular só o ícone (cabe numa linha no topo); o nome continua para leitor de tela.
+ * iconsOnly: só o ícone em qualquer tela, círculo de 44px (rodapé).
  */
-function SocialLinks({ store, compact = false, className = "" }: { store: SocialStore; compact?: boolean; className?: string }) {
+function SocialLinks({
+  store,
+  compact = false,
+  iconsOnly = false,
+  className = "",
+}: {
+  store: SocialStore
+  compact?: boolean
+  iconsOnly?: boolean
+  className?: string
+}) {
   const links = socialLinks(store)
   if (links.length === 0) return null
+  const size = iconsOnly ? "h-11 w-11" : compact ? "h-10 w-10 sm:w-auto sm:px-4" : "h-10 px-4"
+  const text = iconsOnly ? "sr-only" : compact ? "sr-only sm:not-sr-only" : ""
   return (
     <ul className={`flex flex-wrap gap-2 ${className}`} aria-label="Redes sociais da loja">
       {links.map(({ key, label, icon: Icon, href }) => (
@@ -53,13 +66,11 @@ function SocialLinks({ store, compact = false, className = "" }: { store: Social
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            title={compact ? label : undefined}
-            className={`inline-flex h-10 items-center justify-center gap-2 rounded-full border bg-card text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-              compact ? "w-10 sm:w-auto sm:px-4" : "px-4"
-            }`}
+            title={compact || iconsOnly ? label : undefined}
+            className={`inline-flex items-center justify-center gap-2 rounded-full border bg-card text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${size}`}
           >
-            <Icon className={compact ? "h-[18px] w-[18px] sm:h-4 sm:w-4" : "h-4 w-4"} aria-hidden />
-            <span className={compact ? "sr-only sm:not-sr-only" : ""}>{label}</span>
+            <Icon className={iconsOnly ? "h-5 w-5" : compact ? "h-[18px] w-[18px] sm:h-4 sm:w-4" : "h-4 w-4"} aria-hidden />
+            <span className={text}>{label}</span>
             <span className="sr-only"> (abre em outra aba)</span>
           </a>
         </li>
@@ -167,7 +178,11 @@ export function StoreHeader({ store }: { store: Pick<PublicStore, "base" | "name
   )
 }
 
-/** Rodapé: nome + endereço (abre o mapa) à esquerda, redes sociais à direita. Some se a loja não tiver nenhum dos dois. */
+/**
+ * Rodapé. Ordem: nome → redes (ícones) → endereço + "Ver no mapa" → horário. Celular: tudo centralizado.
+ * Computador: as 2 colunas da página (loja embaixo do cardápio, horário embaixo do carrinho).
+ * Sem endereço, horário nem redes: só a linha legal.
+ */
 export function StoreFooter({
   store,
 }: {
@@ -175,8 +190,8 @@ export function StoreFooter({
 }) {
   const map = mapsLink(store.address)
   const legal = (
-    <p className="container mx-auto max-w-6xl px-4 pb-6 text-center text-xs text-muted-foreground sm:text-left">
-      Pedidos online por RGM Pedidos ·{" "}
+    <p className="container mx-auto max-w-6xl px-4 pb-6 text-center text-xs text-muted-foreground lg:text-left">
+      Pedidos online por <span className="font-semibold text-foreground">RGM Pedidos</span> ·{" "}
       <Link href="/termos" className="underline underline-offset-2 hover:text-foreground">
         Termos de uso
       </Link>{" "}
@@ -186,37 +201,46 @@ export function StoreFooter({
       </Link>
     </p>
   )
-  if (!map && !store.weekHours && socialLinks(store).length === 0)
-    return <footer className="mt-16 border-t bg-card pt-6">{legal}</footer>
+  // Fundo neutro (um degradê com a cor da loja foi testado em 13/nov e o Raylan preferiu sem)
+  const footerClass = "mt-16 border-t bg-card"
+  if (!map && !store.weekHours && socialLinks(store).length === 0) return <footer className={`${footerClass} pt-6`}>{legal}</footer>
   return (
-    <footer className="mt-16 border-t bg-card">
-      <div className="container mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
-        <div className="min-w-0 space-y-1">
-          <p className="font-bold">{store.name}</p>
+    <footer className={footerClass}>
+      {/* Computador: mesmas 2 colunas do cardápio + carrinho (lg:grid-cols-[1fr_360px]) */}
+      <div className="container mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] justify-items-center gap-6 px-4 py-8 text-center lg:grid-cols-[minmax(0,1fr)_360px] lg:justify-items-start lg:gap-8 lg:text-left">
+        <div className="min-w-0 space-y-3">
+          <p className="text-lg font-bold">{store.name}</p>
+          <SocialLinks store={store} iconsOnly className="justify-center lg:justify-start" />
           {map && (
-            <a
-              href={map}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-balance text-sm text-muted-foreground hover:text-foreground hover:underline"
-            >
+            <p className="text-balance text-sm text-muted-foreground">
               <MapPin className="mr-1 inline h-4 w-4 align-[-3px]" aria-hidden />
               {store.address}
-              <span className="sr-only"> (abre o mapa)</span>
-            </a>
+              <br />
+              <a
+                href={map}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                Ver no mapa →<span className="sr-only"> (abre em outra aba)</span>
+              </a>
+            </p>
           )}
-          {store.weekHours && (
-            <dl className="pt-1 text-sm text-muted-foreground">
+        </div>
+        {store.weekHours && (
+          <div>
+            <p className="mb-1 hidden font-bold lg:block">Horário</p>
+            {/* Grade de 2 colunas: os horários começam todos na mesma linha vertical */}
+            <dl className="inline-grid grid-cols-[auto_auto] gap-x-2 text-sm text-muted-foreground">
               {store.weekHours.map(([days, time]) => (
-                <div key={days} className="flex justify-center gap-2 sm:justify-start">
-                  <dt>{days}:</dt>
-                  <dd className="font-medium tabular-nums text-foreground/80">{time}</dd>
+                <div key={days} className="contents">
+                  <dt className="text-right lg:text-left">{days}:</dt>
+                  <dd className="text-left font-medium tabular-nums text-foreground/80">{time}</dd>
                 </div>
               ))}
             </dl>
-          )}
-        </div>
-        <SocialLinks store={store} compact className="justify-center" />
+          </div>
+        )}
       </div>
       {legal}
     </footer>

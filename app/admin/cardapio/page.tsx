@@ -56,6 +56,8 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
   ])
   const catOptions = cats.map((c) => ({ id: c.id, name: c.name, extrasEnabled: c.extrasEnabled }))
   const removableOf = (itemId: string) => recipes.filter((r) => r.itemId === itemId).map((r) => r.name)
+  /** Para o editor mostrar o que um combo herda dos lanches que inclui */
+  const menuOptions = items.map((i) => ({ id: i.id, name: i.name, removable: removableOf(i.id) }))
   const pending = pendingRemovable(items, cats, [...new Set(recipes.map((r) => r.itemId))])
   const usedIn = (ingId: string) => recipes.filter((r) => r.ingredientId === ingId).length
   const extras = ings.filter((i) => i.isExtra)
@@ -112,7 +114,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
               <Card>
                 <CardContent className="pt-6">
                   <Collapsible summary="+ Adicionar item" defaultOpen={items.length === 0}>
-                    <ItemForm categories={catOptions} defaultCategoryId={cats[0]?.id} />
+                    <ItemForm categories={catOptions} menu={menuOptions} defaultCategoryId={cats[0]?.id} />
                   </Collapsible>
                 </CardContent>
               </Card>
@@ -206,6 +208,7 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
                                   removable: removableOf(item.id),
                                 }}
                                 categories={catOptions}
+                                menu={menuOptions}
                               />
                               <ActionButton
                                 action={deleteItemAction.bind(null, item.id)}

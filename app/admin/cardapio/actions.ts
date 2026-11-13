@@ -190,7 +190,10 @@ export async function fillRemovableAction() {
   if (!ctx) return
   const storeId = ctx.store.id
   const [items, cats, done] = await Promise.all([
-    db.select({ id: menuItems.id, description: menuItems.description, categoryId: menuItems.categoryId }).from(menuItems).where(eq(menuItems.storeId, storeId)),
+    db
+      .select({ id: menuItems.id, name: menuItems.name, description: menuItems.description, categoryId: menuItems.categoryId })
+      .from(menuItems)
+      .where(eq(menuItems.storeId, storeId)),
     db.select({ id: categories.id, extrasEnabled: categories.extrasEnabled }).from(categories).where(eq(categories.storeId, storeId)),
     db
       .selectDistinct({ itemId: menuItemIngredients.menuItemId })

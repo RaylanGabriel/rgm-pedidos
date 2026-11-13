@@ -2,7 +2,7 @@
 
 import { useContext, useState } from "react"
 import { Check, Plus } from "lucide-react"
-import { descriptionParts, nameKey, suggestRemovable } from "@/lib/recipe"
+import { descriptionParts, includedItems, nameKey, suggestRemovable } from "@/lib/recipe"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
@@ -28,14 +28,23 @@ export interface ItemFormData {
   removable: string[]
 }
 
+export interface MenuOption {
+  id: string
+  name: string
+  removable: string[]
+}
+
 /** Criar (sem `item`) ou editar um lanche. */
 export function ItemForm({
   item,
   categories,
+  menu,
   defaultCategoryId,
 }: {
   item?: ItemFormData
   categories: { id: string; name: string; extrasEnabled: boolean }[]
+  /** Itens da loja com os botões "sem ___" de cada um (um combo herda os do lanche que inclui) */
+  menu: MenuOption[]
   defaultCategoryId?: string | null
 }) {
   const close = useContext(CloseContext)
@@ -142,6 +151,7 @@ export function ItemForm({
             description={description}
             saved={item?.removable ?? []}
             suggest={suggest}
+            included={includedItems({ id: item?.id ?? "", description }, menu)}
           />
           <SubmitButton>{item ? "Salvar alterações" : "Adicionar item"}</SubmitButton>
         </>
@@ -152,18 +162,30 @@ export function ItemForm({
 
 /**
  * Botões "sem ___" do lanche: saem da descrição (atualizam ao digitar) e o dono toca no que o cliente pode tirar.
- * Adicionais não entram (para não querer um adicional, é só não escolher). Manda `removable` (nomes) para
- * saveItemAction.
+ * Adicionais não entram (para não querer um adicional, é só não escolher). Combo: herda os botões dos lanches que
+ * inclui (nome na descrição); o resto (batata, refri) começa apagado. Manda `removable` (nomes) para saveItemAction.
  */
-function RemovablePicker({ description, saved, suggest }: { description: string; saved: string[]; suggest: boolean }) {
-  const parts = descriptionParts(description)
+function RemovablePicker({
+  description,
+  saved,
+  suggest,
+  included,
+}: {
+  description: string
+  saved: string[]
+  suggest: boolean
+  included: MenuOption[]
+}) {
+  const parts = descriptionParts(description).filter((p) => !included.some((i) => nameKey(p).includes(nameKey(i.name))))
+  const inherited = [...new Map(included.flatMap((i) => i.removable).map((n) => [nameKey(n), n])).values()]
   // Escolhas do dono por nome. Lanche já salvo: o que está na descrição e não foi salvo começa desligado.
   const [choice, setChoice] = useState(() => {
     const on = new Set(saved.map(nameKey))
     return saved.length ? new Map(parts.map((p) => [nameKey(p), on.has(nameKey(p))])) : new Map<string, boolean>()
   })
-  const isOn = (p: string) => choice.get(nameKey(p)) ?? (suggest && suggestRemovable(p))
+  const isOn = (p: string) => choice.get(nameKey(p)) ?? (suggest && !included.length && suggestRemovable(p))
   const chosen = parts.filter(isOn)
+  const seen = [...new Map([...inherited, ...chosen].map((n) => [nameKey(n), n])).values()]
 
   return (
     <fieldset className="rounded-lg border p-3">
@@ -172,11 +194,26 @@ function RemovablePicker({ description, saved, suggest }: { description: string;
         <input key={p} type="hidden" name="removable" value={p} />
       ))}
       <legend className="px-1 text-sm font-medium">O cliente pode tirar</legend>
+      {included
+        .filter((i) => i.removable.length)
+        .map((i) => (
+          <p key={i.id} className="mb-3 rounded-md bg-muted px-3 py-2 text-sm">
+            <span className="font-medium">Do {i.name}:</span> {i.removable.join(", ")}{" "}
+            <span className="text-xs text-muted-foreground">(automático: muda junto com o lanche)</span>
+          </p>
+        ))}
+      {included.some((i) => !i.removable.length) && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Também inclui {included.filter((i) => !i.removable.length).map((i) => i.name).join(", ")} (sem botões “sem ___”; dá para
+          escolher no próprio item).
+        </p>
+      )}
       {parts.length ? (
         <>
           <p className="mb-3 text-xs text-muted-foreground">
-            Vem da descrição acima. Toque no que o cliente pode pedir “sem” (ex.: cebola, picles); deixe apagado o que
-            não sai (carne, pão).
+            {included.length
+              ? "O resto do combo, se o cliente puder tirar algo:"
+              : "Vem da descrição acima. Toque no que o cliente pode pedir “sem” (ex.: cebola, picles); deixe apagado o que não sai (carne, pão)."}
           </p>
           <div className="flex flex-wrap gap-2">
             {parts.map((p) => {
@@ -199,15 +236,19 @@ function RemovablePicker({ description, saved, suggest }: { description: string;
               )
             })}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {chosen.length
-              ? `O cliente verá: ${chosen.map((p) => `“Sem ${p.toLowerCase()}”`).join(", ")}.`
-              : "Nenhum marcado: o cliente não vê botões “sem ___” neste item."}
-          </p>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Escreva os ingredientes na descrição, separados por vírgula, e escolha aqui o que o cliente pode tirar.
+        !included.length && (
+          <p className="text-sm text-muted-foreground">
+            Escreva os ingredientes na descrição, separados por vírgula, e escolha aqui o que o cliente pode tirar.
+          </p>
+        )
+      )}
+      {(parts.length > 0 || included.length > 0) && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {seen.length
+            ? `O cliente verá: ${seen.map((p) => `“Sem ${p.toLowerCase()}”`).join(", ")}.`
+            : "Nenhum marcado: o cliente não vê botões “sem ___” neste item."}
         </p>
       )}
     </fieldset>

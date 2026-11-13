@@ -45,6 +45,29 @@ todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem
   cardápio com os dados dos botões "sem", crons `*/5` e `0 6` mantidos, loja/finalizar/painel/termos 200.
   Os 2 primeiros deploys falharam com erro 10013 da Cloudflare (lado deles); "Retry build" no painel resolveu.
 
+## Combos sem botões "sem ___" (Raylan, 13/nov, já na produção) — branch `fix/combos-sem`
+A descrição do combo ("Smash Clássico + batata frita média + refrigerante lata") não lista ingredientes.
+- [x] Combo **herda** os botões dos itens cujo nome está na descrição (`includedItems` em `lib/recipe.ts`), na hora
+  de mostrar — mudou o lanche, o combo acompanha. Sem tabela nova.
+- [x] `create_order` (migração 0026, só a função): aceita o "sem" da ficha do item OU de item incluído (mesma regra:
+  nome contido na descrição, minúsculas, espaços normalizados).
+- [x] Editor do combo: "Do Smash Clássico: queijo cheddar, alface…" (automático); o resto (batata, refri) começa
+  apagado. "Preencher pela descrição" pula combos.
+- [x] Banco preview, direto no SQL (5 casos): combo sem cebola do lanche aceito e gravado; sem pão (fixo) e sem molho
+  de outro lanche recusados; lanche sozinho continua; lanche não herda do outro.
+- [x] Navegador (preview `0a2e9e9`): editor do combo mostra o herdado; cliente vê no Combo Clássico os 4 botões do
+  Smash Clássico; pedido "sem tomate" aceito; acompanhamento e cozinha mostram SEM tomate. Dados apagados.
+- [x] Junto (pedido do Raylan, roadmap 10a): cabeçalho "Área Administrativa" com a mesma largura do status e dos
+  cartões (`max-w-6xl mx-auto`), "Minha conta" e "Sair" no mesmo estilo, quebra no celular. Preview `51bb7bf`:
+  bordas iguais às do status (1600 px: 224–1376; 390 px: 16–374), fotos conferidas.
+- [x] Junto (Raylan): rodapé da loja. Ordem nome → ícones das redes (44 px) → endereço + "Ver no mapa →" →
+  horário (grade, horários alinhados); computador nas 2 colunas da página (loja embaixo do cardápio, Horário embaixo
+  do carrinho); "RGM Pedidos" em negrito. Degradê com a cor da loja testado e descartado pelo Raylan (fundo neutro).
+  Fotos 1900/900/468 px conferidas.
+- Workers Builds não recebeu os pushes `e3666be`…`7bcf2a8` (incidente da Cloudflare: "Workers API availability");
+  um commit vazio depois disparou o build.
+- [ ] OK do Raylan · [ ] `db:migrate:prod` (0026) · [ ] merge · [ ] conferir produção
+
 ## Ajuste pedido pelo Raylan no teste (13/nov): "sem ___" sai da descrição, sem adicionais
 "Achei confuso: aparecem todos os itens, inclusive os adicionais. Não faz sentido tirar um adicional, é só não
 adicionar. O ideal é puxar automático dos ingredientes de cada item."
