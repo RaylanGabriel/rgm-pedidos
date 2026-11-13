@@ -8,7 +8,7 @@
 6. [ ] E-mail `contato@`/`suporte@rgm.dev.br` (Email Routing)
 7. [ ] Web Analytics da Cloudflare
 8. [ ] Alerta quando o Worker der erro
-9. [ ] Conferir o backup do banco (histórico do Neon)
+9. [~] Backup do banco → cópia diária no R2 (decisão do Raylan; plano pago do Neon fica para depois)
 10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
 11. [ ] ESLint
 12. [ ] Atualizar `docs/ROADMAP.md` (Vercel → Cloudflare)
@@ -89,6 +89,17 @@
 - [x] OK · [x] merge (12/nov) · [ ] chaves de produção · [ ] regra de rate limit
 
 
+
+## 9. Backup diário no R2 (branch `feat/backup`)
+- Neon Free = 6 h de histórico (`history_retention_seconds=21600`). Raylan escolheu: cópia diária própria no R2
+  (grátis); plano pago do Neon (até 7 dias, qualquer minuto) fica para depois.
+- Buckets **privados** `rgm-pedidos-backups` e `-preview` (sem endereço público), regra de ciclo de vida: apaga > 30 dias.
+- Cron `0 6 * * *` (03:00 Brasília) → `/api/cron?tarefa=backup` → `lib/backup.ts`: todas as tabelas (lista e ordem pelas
+  chaves estrangeiras, do schema) em JSON gzip `AAAA-MM-DD.json.gz`. Fora: sessões, tentativas de login, cache de endereços.
+- `npm run backup[:teste] -- conferir|restaurar`: simula por padrão; produção exige `--valer --sim-producao`; uma transação.
+- [x] Preview: backup gerado (13 tabelas, 126 linhas, 10 KB); conferir bate; restaurado por cima do banco de teste →
+      **13/13 tabelas idênticas** (hash de todas as linhas antes × depois); site de teste ok.
+- [ ] OK · [ ] merge · [ ] conferir o 1º backup de produção (`npm run backup -- conferir`) depois das 06:00 UTC
 
 ---
 
