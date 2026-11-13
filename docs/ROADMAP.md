@@ -253,6 +253,25 @@ Para a visita comercial: monta em ~30 s a loja **do próprio cliente** (`<loja>.
   cria o login com senha provisória, apaga pedidos de teste, numeração volta ao #1) · `apagar <slug>` (só demos).
 - A pasta `demos/` fica fora do Git (dados de possíveis clientes).
 
+## 💭 9. Ficha técnica dos lanches → "sem cebola" e controle de estoque (ideias do Raylan, 12/nov/2026)
+Depois dos itens 1–12 de "deixar pronto para o 1º cliente" (`tasks/todo.md`). As duas ideias usam a mesma base, então
+a ordem é 9a → 9b.
+
+**9a. Ingredientes de cada lanche + botões "sem ___"**
+- Cadastro de ingredientes da loja (pão, carne, queijo, cebola, pimentão…) e, em cada item do cardápio, quais ele leva
+  (a "ficha técnica"; quantidade por lanche já fica registrada para o 9b).
+- **Balcão / Novo pedido:** ao escolher o lanche, aparecem botões só com os ingredientes daquele lanche: "sem cebola",
+  "sem pimentão"… (toque liga/desliga). Vale também no **cardápio online** (opção "Retirar ingredientes").
+- Cozinha, impressão e acompanhamento mostram **SEM cebola** em destaque. Fica guardado no pedido como cópia (mudar a
+  ficha depois não altera pedidos antigos), como já é feito com nome e preço.
+
+**9b. Controle de estoque (card no painel, só dono)**
+- Saldo por ingrediente com unidade (un, kg, fatia…), entrada de compras ("chegaram 100 pães"), ajuste/perda.
+- Cada pedido **pago** desconta pela ficha técnica (X-Bacon → 1 pão, 1 carne, 2 bacon…); "sem cebola" não desconta
+  cebola; pedido cancelado devolve.
+- Alerta de "acabando" (mínimo por ingrediente) e, opcional, lanche **esgotado automático** quando faltar ingrediente.
+- Relatório: consumo por período e o que comprar.
+
 ## 💭 Depois
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
