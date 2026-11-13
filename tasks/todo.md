@@ -10,9 +10,11 @@
 7. [x] Web Analytics da Cloudflare (automático, sem cookies; script presente nas páginas)
 8. [x] Alerta de erros por e-mail (Raylan recebeu o teste real) + monitor externo UptimeRobot (painel e loja, "Up")
 9. [x] Backup do banco → cópia diária no R2, 1º de produção conferido (plano pago do Neon fica para depois)
-10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
-11. [ ] ESLint
-12. [ ] Atualizar `docs/ROADMAP.md` (Vercel → Cloudflare)
+10. [x] Dados do Mr. Smash: endereço e WhatsApp feitos pelo Raylan; item de R$ 0,70 mantido de propósito por enquanto
+11. [~] ESLint (branch `chore/eslint`): ESLint 9 + `eslint-config-next` 16.4.6; 0 erros, 8 avisos (`set-state-in-effect`,
+    padrão intencional). Corrigidos: refs na renderização (Turnstile, entrega), fontes Geist nunca aplicadas, aspas,
+    diretiva sem uso, export nomeado. Preview: login ok; cálculo de entrega idêntico ao da `main`. Falta o OK do Raylan
+12. [x] `docs/ROADMAP.md` atualizado (Cloudflare no lugar da Vercel; seção "pronto para o 1º cliente")
 
 ## 2. Login da equipe — especificação
 - `/admin/equipe`, só dono (ou superadmin). Card "Equipe" no painel para quem gerencia.
