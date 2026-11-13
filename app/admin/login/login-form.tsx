@@ -84,6 +84,15 @@ export function LoginForm() {
                   ← Voltar para página inicial
                 </Link>
               </div>
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                <Link href="/termos" className="underline underline-offset-2 hover:text-foreground">
+                  Termos de uso
+                </Link>{" "}
+                ·{" "}
+                <Link href="/privacidade" className="underline underline-offset-2 hover:text-foreground">
+                  Política de privacidade
+                </Link>
+              </p>
             </form>
           </CardContent>
         </Card>

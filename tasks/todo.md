@@ -1,8 +1,8 @@
 # Deixar o site pronto para o 1º cliente (12/nov/2026) — ordem combinada com o Raylan
 
-1. [ ] "Conectar Mercado Pago" com a conta real de outra pessoa (Raylan testa; se falhar, chamado no MP Developers)
-2. [ ] Login da equipe: `/admin/equipe` (branch `feat/equipe`)
-3. [ ] Termos de uso + política de privacidade (LGPD)
+1. [ ] "Conectar Mercado Pago" com a conta real de outra pessoa → **erro do MP (`allow_flow` vazio); chamado aberto no suporte**
+2. [x] Login da equipe: `/admin/equipe` (testado pelo Raylan; merge 12/nov)
+3. [x] Termos de uso + política de privacidade (LGPD) (OK do Raylan; merge 12/nov)
 4. [ ] Cron da Cloudflare (Pix vencido, entregas esquecidas, limpeza de tentativas de login)
 5. [ ] Turnstile no checkout e no login + regras de rate limit na borda
 6. [ ] E-mail `contato@`/`suporte@rgm.dev.br` (Email Routing)
@@ -34,6 +34,23 @@
   remover → aviso no topo, some da lista, sessão cai, login recusado, conta apagada; sem botões na linha do dono.
 - Achado no teste e corrigido: ao remover, a mensagem sumia junto com a linha da pessoa → agora aparece no topo.
 - Contas de teste apagadas do banco preview.
+
+## 3. Termos de uso e política de privacidade (12/nov/2026, branch `feat/termos`)
+
+- `/termos` e `/privacidade` abrem em qualquer endereço (middleware: sem reescrita na loja, sem redirecionar na raiz).
+- Responsável e contato num lugar só (`lib/legal.ts`): Raylan Gabriel dos Santos Miranda, `contato@rgm.dev.br`,
+  **CPF não publicado** (nome + contato bastam; com MEI, entra o CNPJ). Sugestões minhas, a confirmar com o Raylan.
+- Papéis LGPD: loja = controladora dos dados do pedido; plataforma = operadora (e controladora das contas do painel).
+- Cada afirmação confere com o código (IP 24 h, sessão 30 dias, hash do endereço, sem cookie no cardápio, o que vai
+  ao Mercado Pago/ViaCEP/Nominatim, Neon em São Paulo).
+- Compromisso novo, que vira processo manual: apagar os pedidos de uma loja em até 90 dias depois que ela sai.
+- Links: rodapé de toda loja, aviso no checkout (abre em outra aba), tela de login.
+- [x] Teste no preview (páginas 200, 8 e 9 seções, rodapé, aviso no checkout em outra aba, login; visual no celular ok) · [x] OK do Raylan · [x] merge · [ ] conferir `mrsmash.rgm.dev.br/termos` e `rgm.dev.br/privacidade`
+
+## Achado fora da lista: IP forjável (`fix/ip-cloudflare`, na produção desde 12/nov)
+- `clientIp()` lia o 1º valor do `x-forwarded-for`, que na Cloudflare vem do visitante → limites por IP burláveis
+  (pedidos, cálculo de entrega, login por IP). Comprovado no preview (login errado registrado como `ip:9.9.9.9`).
+  Corrigido para `cf-connecting-ip`; retestado no preview e na produção: registra o IP real mesmo com o cabeçalho forjado.
 
 ---
 

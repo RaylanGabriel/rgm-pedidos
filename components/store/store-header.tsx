@@ -174,7 +174,20 @@ export function StoreFooter({
   store: Pick<PublicStore, "name" | "phone" | "address" | "instagram" | "facebook" | "weekHours">
 }) {
   const map = mapsLink(store.address)
-  if (!map && !store.weekHours && socialLinks(store).length === 0) return <div className="mt-16" aria-hidden />
+  const legal = (
+    <p className="container mx-auto max-w-6xl px-4 pb-6 text-center text-xs text-muted-foreground sm:text-left">
+      Pedidos online por RGM Pedidos ·{" "}
+      <Link href="/termos" className="underline underline-offset-2 hover:text-foreground">
+        Termos de uso
+      </Link>{" "}
+      ·{" "}
+      <Link href="/privacidade" className="underline underline-offset-2 hover:text-foreground">
+        Privacidade
+      </Link>
+    </p>
+  )
+  if (!map && !store.weekHours && socialLinks(store).length === 0)
+    return <footer className="mt-16 border-t bg-card pt-6">{legal}</footer>
   return (
     <footer className="mt-16 border-t bg-card">
       <div className="container mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-8 text-center sm:flex-row sm:justify-between sm:text-left">
@@ -205,6 +218,7 @@ export function StoreFooter({
         </div>
         <SocialLinks store={store} compact className="justify-center" />
       </div>
+      {legal}
     </footer>
   )
 }
