@@ -32,14 +32,23 @@ para todas as lojas** (cada loja só vê os pedidos feitos nela); v1 com dados p
 - Privacidade: novos dados (e-mail, id do Google, endereços), cookie `csid`, como apagar. Termos: conta opcional.
 
 ## Fases
-1. [ ] Banco + sessão do cliente + "Minha conta" (dados, endereços, pedidos, pedir de novo, apagar) — testável no
-   preview com sessão criada por script.
-2. [ ] Código por e-mail (depende do serviço de envio).
-3. [ ] Google (depende do Raylan criar o app no Google Cloud).
-4. [ ] Finalizar integrado + política de privacidade + teste completo no preview → OK → migração → merge.
+1. [x] Banco + sessão do cliente + "Minha conta" (dados, endereços, pedidos, pedir de novo, apagar).
+2. [x] Código por e-mail (código pronto; falta a chave do Resend para enviar de verdade).
+3. [x] Google (código pronto; falta o app no Google Cloud).
+4. [x] Finalizar integrado + política de privacidade. [ ] Teste do login real (código e Google) → OK → migração → merge.
+
+## Revisão (13/nov, preview `1e712e8`, sessão de cliente criada por script)
+- Sem conta: topo mostra "Entrar"; /conta mostra a tela de entrar (sem Resend/Google configurados: aviso).
+- Com conta: salvar nome/WhatsApp e endereço "Casa"; topo mostra o 1º nome; finalizar preenchido ("Pedido na sua
+  conta"), endereço salvo oferecido na entrega; pedido #36 (retirada) **ligado à conta** no banco.
+- Meus pedidos lista o pedido; "Pedir de novo" põe o Smash Bacon no carrinho e limpa o endereço (?pedirDeNovo);
+  Sair volta para "Entrar"; Apagar conta: conta e endereços somem, o pedido fica com a loja sem ligação.
+- Bug achado e corrigido (`e7f993b`): o "Pedir de novo" abria a sacola do celular também no computador (cobria a
+  página). Dados de teste apagados. Nenhuma loja da produção usa os nomes reservados (conta, entrar, auth).
 
 ## Ações do Raylan
-- [ ] Escolher o envio de e-mail (Cloudflare Email Service com Workers Paid, ou Resend grátis).
+- [x] Envio de e-mail: Resend.
+- [ ] Resend: conta + domínio rgm.dev.br + `RESEND_API_KEY` no `.env.cloudflare` (eu ponho o DNS e envio a chave).
 - [ ] Google Cloud: projeto + tela de consentimento + credencial OAuth (passo a passo quando chegar a fase 3).
 
 ---
