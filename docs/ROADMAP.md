@@ -290,7 +290,7 @@ a ordem é 9a → 9b.
 **✅ 10a. Cabeçalho do painel desalinhado** (computador e celular): "Área Administrativa", "Minha conta" e "Sair"
 agora têm a mesma largura do status e dos cartões; os botões no mesmo estilo e, no celular, abaixo do título.
 
-**10b. "Para acompanhar" no carrinho vira carrossel**
+**✅ 10b. "Para acompanhar" no carrinho vira carrossel** (13/nov)
 - Hoje os cards têm alturas diferentes (nome em 1 ou 2 linhas muda o tamanho). Todos com a mesma altura (nome em até
   2 linhas, preço sempre no mesmo lugar).
 - Rolagem lateral com encaixe (scroll-snap), setas no computador e mais itens na lista.
