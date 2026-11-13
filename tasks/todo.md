@@ -64,7 +64,7 @@
 - [x] Teste local (`wrangler dev --test-scheduled`, banco preview): rota sem segredo/segredo errado → 404; cron →
       `{"entregasFechadas":1,"pixVencidosCancelados":1,"sessoesVencidasApagadas":1,"tentativasAntigasApagadas":1}`;
       2ª execução → tudo 0. Dados de teste, `.dev.vars` e `.open-next` apagados.
-- [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [x] OK do Raylan · [x] merge · [ ] confirmar nos logs da produção que o cron rodou
+- [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [x] OK do Raylan · [x] merge · [x] produção: cron rodando (00:55 e 01:00 UTC, outcome ok; começou ~25 min após o deploy)
 
 ## 1. "Conectar Mercado Pago" de terceiros (teste do Raylan, 12/nov)
 
@@ -84,7 +84,9 @@
 - Preview: chaves de TESTE oficiais (sempre passam). Produção: desligado até o Raylan criar o widget no painel.
 - Borda (Raylan, no painel): 1 regra de rate limit (plano Free) para POST em `/admin/login` e `/finalizar`.
   **Não ligar o Bot Fight Mode**: no plano Free ele não tem exceção e pode barrar o webhook do Mercado Pago.
-- [ ] Preview · [ ] OK · [ ] merge · [ ] chaves de produção · [ ] regra de rate limit
+- [x] Preview (navegador): login espera o token e gera outro a cada tentativa; script bloqueado → botão travado e envio
+      forçado sem token recusado pelo servidor; checkout completo (dinheiro) → pedido criado. Dados de teste apagados.
+- [ ] OK · [ ] merge · [ ] chaves de produção · [ ] regra de rate limit
 
 
 
