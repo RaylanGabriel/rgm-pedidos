@@ -66,7 +66,8 @@ para todas as lojas** (cada loja só vê os pedidos feitos nela); v1 com dados p
   entregue; código certo → Minha conta, cookie `csid` httpOnly/secure/90 dias; código errado → "Código errado. Você
   tem mais 4 tentativas." e continua fora. Conta de teste apagada.
 - Google: botão aparece; `/auth/cliente/google` → accounts.google.com com o retorno do preview, PKCE S256 e cookie
-  `g_oauth`. [ ] Falta o Raylan entrar com a conta Google dele (precisa de pessoa).
+  `g_oauth`. [x] Raylan entrou com a conta Google dele (13/nov 17:32): conta criada com `google_sub`, depois saiu
+  (0 sessões abertas).
 
 ---
 
