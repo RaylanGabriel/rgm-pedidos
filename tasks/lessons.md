@@ -32,6 +32,12 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
 
 ## Windows / PowerShell
 
+- **`Get-Content`/`Set-Content` do PowerShell 5.1 estragam acentos** (lê como ANSI, grava UTF-8 com BOM): "pão" vira
+  "pÃ£o". (13/nov/2026: um arquivo de teste ficou com o texto quebrado e o botão "Salvar alterações" não era achado.)
+  Regra: editar arquivos com o Edit/Write ou com `node` (`fs.readFileSync(f, "utf8")`), nunca com Get/Set-Content.
+- **Arquivos com CRLF:** trocas de texto com várias linhas por script falham em silêncio (o trecho tem `\r\n`).
+  Normalizar (`.replace(/\r\n/g, "\n")`) antes, ou usar o Edit; e o script deve falhar (`throw`) se não achar o trecho.
+
 - **`| Select-Object -First N` encerra o comando depois de N linhas** — num script longo (cópia de fotos), ele para no
   meio sem erro. (12/nov/2026: a cópia para o R2 parou na 3ª linha.) Regra: para scripts que gravam algo, guardar a
   saída inteira (`$o = cmd 2>&1`) e só então filtrar, ou usar `-Last`.

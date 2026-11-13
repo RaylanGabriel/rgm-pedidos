@@ -31,6 +31,17 @@ todo item de categoria com adicionais. A observação do pedido sugere "Ex.: sem
   balcão idem → tentar mandar "sem pão" (não removível) ou de outro lanche pela API → recusado → relatório de
   adicionais inalterado → planilha com a coluna.
 
+## Revisão (13/nov)
+- Migração `0025` aplicada no banco preview. `create_order` testada direto no banco (6 casos): "sem" removível aceito e
+  gravado; "sem pão" (fixo) e ingrediente fora da ficha → `REMOVAL_INVALID`; ingrediente base como adicional →
+  `EXTRA_UNAVAILABLE`; adicional de verdade aceito; "sem" repetido grava 1 vez.
+- Navegador no preview da branch: dono criou 3 ingredientes pelo campo rápido e travou o pão; aba Ingredientes (e o
+  link antigo `?aba=adicionais`) mostra "em 1 lanche"; cliente vê só "Cebola"/"Picles" (pão fixo fora), a cebola não
+  aparece nos adicionais, botão vira "Sem cebola", carrinho e acompanhamento mostram "SEM cebola"; balcão "sem
+  picles"; cozinha com as duas faixas vermelhas; preço não muda. Pedidos, ingredientes e sessão de teste apagados.
+- A loja de teste estava fechada (horário 18h) → o teste abre/restaura a loja (`loja-aberta.ts`). Não era bug.
+- [ ] OK do Raylan · [ ] `db:migrate:prod` · [ ] merge · [ ] conferir produção
+
 ---
 
 # Deixar o site pronto para o 1º cliente (12/nov/2026) — ordem combinada com o Raylan
