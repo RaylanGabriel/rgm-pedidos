@@ -35,6 +35,8 @@
     "MP_REDIRECT_URI": "https://painel.rgm.dev.br/admin/mercado-pago/retorno",
     "MP_TEST_MODE": "false",
     "FOTOS_PUBLIC_URL": "https://fotos.rgm.dev.br",
+    // Turnstile (anti-robô no checkout e no login). Vazio = desligado. Precisa também do segredo TURNSTILE_SECRET_KEY.
+    "TURNSTILE_SITE_KEY": "",
   },
 
   "env": {
@@ -53,6 +55,8 @@
         "MP_TEST_MODE": "true",
         // Endereço público r2.dev do bucket de preview (só para testes: tem limite de acessos)
         "FOTOS_PUBLIC_URL": "https://pub-7178be0af245478695ef3fdfe20096af.r2.dev",
+        // Chave de TESTE oficial da Cloudflare (sempre passa); o segredo de teste correspondente está no Worker
+        "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
       },
     },
   },

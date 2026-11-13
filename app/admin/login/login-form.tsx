@@ -1,16 +1,24 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useState } from "react"
 import Link from "next/link"
 import { Lock, Flame, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Turnstile } from "@/components/turnstile"
 import { loginAction, type LoginState } from "./actions"
 
-export function LoginForm() {
-  const [state, formAction, isPending] = useActionState<LoginState, FormData>(loginAction, {})
+export function LoginForm({ turnstileSiteKey = null }: { turnstileSiteKey?: string | null }) {
+  // Anti-robô: o botão espera o token; cada tentativa gasta o token, então a seguinte usa um widget novo (key)
+  const [captcha, setCaptcha] = useState<{ token: string | null; key: number }>({ token: null, key: 0 })
+  const [state, formAction, isPending] = useActionState<LoginState, FormData>(async (prev, fd) => {
+    const result = await loginAction(prev, fd)
+    setCaptcha((c) => ({ token: null, key: c.key + 1 }))
+    return result
+  }, {})
+  const waitingCaptcha = !!turnstileSiteKey && !captcha.token
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-6">
@@ -68,11 +76,24 @@ export function LoginForm() {
                     <p className="text-sm text-destructive">{state.error}</p>
                   </div>
                 )}
-                <Button type="submit" className="w-full" disabled={isPending}>
+                {turnstileSiteKey && (
+                  <Turnstile
+                    key={captcha.key}
+                    siteKey={turnstileSiteKey}
+                    action="login"
+                    onToken={(token) => setCaptcha((c) => ({ ...c, token }))}
+                  />
+                )}
+                <Button type="submit" className="w-full" disabled={isPending || waitingCaptcha}>
                   {isPending ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Entrando...
+                    </>
+                  ) : waitingCaptcha ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Verificando segurança...
                     </>
                   ) : (
                     "Entrar"

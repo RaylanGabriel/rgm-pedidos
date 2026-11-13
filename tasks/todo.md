@@ -64,7 +64,7 @@
 - [x] Teste local (`wrangler dev --test-scheduled`, banco preview): rota sem segredo/segredo errado → 404; cron →
       `{"entregasFechadas":1,"pixVencidosCancelados":1,"sessoesVencidasApagadas":1,"tentativasAntigasApagadas":1}`;
       2ª execução → tudo 0. Dados de teste, `.dev.vars` e `.open-next` apagados.
-- [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [x] OK do Raylan · [x] merge · [ ] confirmar nos logs da produção que o cron rodou
+- [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [x] OK do Raylan · [x] merge · [x] produção: cron rodando (00:55 e 01:00 UTC, outcome ok; começou ~25 min após o deploy)
 
 ## 1. "Conectar Mercado Pago" de terceiros (teste do Raylan, 12/nov)
 
@@ -74,6 +74,19 @@
   **`allow_flow=[]`** (nenhum fluxo de autorização liberado) → causa provável; relatos de outros devs batem.
 - Caminho: Raylan confere o app no painel do MP (pendências, Configurações avançadas, permissões); se continuar vazio,
   chamado no suporte do MP Developers com esses dados (Raylan salvou as configurações avançadas de novo: continuou vazio → chamado aberto, pedindo também o Platform ID). PKCE só se o MP exigir (aí implementamos o `code_verifier`).
+
+## 5. Turnstile + limite na borda (branch `feat/turnstile`)
+- `lib/turnstile.ts`: confere o token no servidor (siteverify, com o IP real e a ação "pedido"/"login"). Recusa token
+  ausente/inválido/de outra ação; se a verificação em si falhar (rede/Cloudflare fora), deixa passar — o site não pode
+  parar de vender, e os limites por IP continuam. Sem `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY`: desligado.
+- `components/turnstile.tsx`: widget invisível (`interaction-only`, pt-br), só aparece se a Cloudflare desconfiar.
+  Checkout e login esperam o token ("Verificando segurança…") e geram outro a cada tentativa (o token vale uma vez).
+- Preview: chaves de TESTE oficiais (sempre passam). Produção: desligado até o Raylan criar o widget no painel.
+- Borda (Raylan, no painel): 1 regra de rate limit (plano Free) para POST em `/admin/login` e `/finalizar`.
+  **Não ligar o Bot Fight Mode**: no plano Free ele não tem exceção e pode barrar o webhook do Mercado Pago.
+- [x] Preview (navegador): login espera o token e gera outro a cada tentativa; script bloqueado → botão travado e envio
+      forçado sem token recusado pelo servidor; checkout completo (dinheiro) → pedido criado. Dados de teste apagados.
+- [ ] OK · [ ] merge · [ ] chaves de produção · [ ] regra de rate limit
 
 
 
