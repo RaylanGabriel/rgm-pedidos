@@ -58,5 +58,9 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   Regra: usar `MSYS_NO_PATHCONV=1` em comandos que recebem caminhos de URL (`vercel curl`, `vercel api`).
   Vale para **qualquer** programa, inclusive `node script.mjs /zones/...` (12/nov/2026: chamadas à API da Cloudflare
   falharam com 404 por isso). Colocar `export MSYS_NO_PATHCONV=1` no início do comando.
+- **Deploy do Workers Builds com `[code: 10013]` em `/versions` = falha temporária da Cloudflare**, não do código.
+  (13/nov/2026: 2 deploys seguidos falharam nos 2 Workers; o mesmo código/tamanho tinha subido 10 min antes; "Retry
+  build" no painel funcionou.) Regra: comparar com o último build bom (tamanho do upload, outro Worker); se bater,
+  pedir "Retry build" no painel ou esperar e repetir — não mexer no código. O site segue na versão anterior.
 - **Nunca publicar na Cloudflare um build feito nesta máquina.** O OpenNext copia os valores do `.env.local` para dentro
   do Worker. Deploy só via push (Workers Builds).
