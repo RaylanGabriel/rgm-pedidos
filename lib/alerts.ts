@@ -16,9 +16,14 @@ const KEEP_DAYS = 30
 /** Tira usuário/senha de URLs (ex.: string de conexão) e corta o tamanho. */
 const clean = (s: string, max: number) => s.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1<oculto>@").slice(0, max)
 
+const describe = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e))
+
 export async function recordError(source: string, path: string | null, err: unknown, digest?: string | null) {
   try {
-    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    // O motivo de verdade costuma estar no `cause` (ex.: o Drizzle embrulha a falha do banco em "Failed query: <sql>").
+    // Vai na frente para nunca ser cortado pelo limite de tamanho.
+    const cause = err instanceof Error ? err.cause : undefined
+    const message = cause ? `${describe(cause)} ← em: ${describe(err)}` : describe(err)
     await db.insert(errorEvents).values({
       source,
       path: path ? clean(path.split("?")[0], 200) : null,
