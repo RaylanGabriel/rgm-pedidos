@@ -400,21 +400,23 @@ export const AUTO_DELIVER_MINUTES = 60
 
 /**
  * Fecha as entregas que saíram há mais de AUTO_DELIVER_MINUTES e ninguém confirmou.
- * Roda ao ler pedidos (cozinha atualiza a cada 8s, cliente a cada 10s): não precisa de tarefa agendada.
- * Pedidos antigos sem `out_for_delivery_at` usam o horário do pedido.
+ * Roda ao ler pedidos (cozinha atualiza a cada 8s, cliente a cada 10s) e no cron a cada 5 min (sem `storeId` =
+ * todas as lojas). Pedidos antigos sem `out_for_delivery_at` usam o horário do pedido. Devolve quantos fechou.
  */
-export async function autoCompleteDeliveries(storeId: string) {
+export async function autoCompleteDeliveries(storeId?: string) {
   const since = sql`coalesce(${orders.outForDeliveryAt}, ${orders.createdAt})`
-  await db
+  const done = await db
     .update(orders)
     .set({ status: "delivered", autoDelivered: true, completedAt: sql`${since} + make_interval(mins => ${AUTO_DELIVER_MINUTES})` })
     .where(
       and(
-        eq(orders.storeId, storeId),
+        storeId ? eq(orders.storeId, storeId) : undefined,
         eq(orders.status, "out_for_delivery"),
         sql`${since} < now() - make_interval(mins => ${AUTO_DELIVER_MINUTES})`,
       ),
     )
+    .returning({ id: orders.id })
+  return done.length
 }
 
 /** Pedidos da loja, com filtros opcionais de período e status (mais recentes primeiro). */

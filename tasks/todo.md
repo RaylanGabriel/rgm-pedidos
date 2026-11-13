@@ -3,7 +3,7 @@
 1. [ ] "Conectar Mercado Pago" com a conta real de outra pessoa → **erro do MP (`allow_flow` vazio); chamado aberto no suporte**
 2. [x] Login da equipe: `/admin/equipe` (testado pelo Raylan; merge 12/nov)
 3. [x] Termos de uso + política de privacidade (LGPD) (OK do Raylan; merge 12/nov)
-4. [ ] Cron da Cloudflare (Pix vencido, entregas esquecidas, limpeza de tentativas de login)
+4. [x] Cron da Cloudflare (Pix vencido, entregas esquecidas, limpeza) (OK do Raylan; merge 12/nov)
 5. [ ] Turnstile no checkout e no login + regras de rate limit na borda
 6. [ ] E-mail `contato@`/`suporte@rgm.dev.br` (Email Routing)
 7. [ ] Web Analytics da Cloudflare
@@ -51,6 +51,31 @@
 - `clientIp()` lia o 1º valor do `x-forwarded-for`, que na Cloudflare vem do visitante → limites por IP burláveis
   (pedidos, cálculo de entrega, login por IP). Comprovado no preview (login errado registrado como `ip:9.9.9.9`).
   Corrigido para `cf-connecting-ip`; retestado no preview e na produção: registra o IP real mesmo com o cabeçalho forjado.
+
+## 4. Cron da Cloudflare
+
+- `worker.ts` (novo `main`): Worker do OpenNext + `scheduled`, que chama POST `/api/cron` com o segredo `CRON_SECRET`
+  (aleatório, diferente em cada Worker, nunca exibido). Sem o segredo certo → 404. Cron `*/5 * * * *` nos dois Workers.
+- `lib/maintenance.ts`: para todas as lojas → fecha entregas esquecidas (1 h), cancela Pix vencido, apaga sessões
+  vencidas e tentativas com mais de 24 h (a política de privacidade promete). Um passo falhar não impede os outros.
+- **Correção de risco achada no caminho:** `cancelOverduePix` cancelava sem consultar o Mercado Pago → um Pix PAGO cujo
+  webhook falhasse seria cancelado pela cozinha. Agora consulta antes: pago → cozinha; falha de rede/MP → não cancela e
+  tenta de novo; cobrança inexistente (404) → cancela.
+- [x] Teste local (`wrangler dev --test-scheduled`, banco preview): rota sem segredo/segredo errado → 404; cron →
+      `{"entregasFechadas":1,"pixVencidosCancelados":1,"sessoesVencidasApagadas":1,"tentativasAntigasApagadas":1}`;
+      2ª execução → tudo 0. Dados de teste, `.dev.vars` e `.open-next` apagados.
+- [x] Preview da branch (build ok; `/api/cron` sem segredo ou com segredo errado → 404) · [x] OK do Raylan · [x] merge · [ ] confirmar nos logs da produção que o cron rodou
+
+## 1. "Conectar Mercado Pago" de terceiros (teste do Raylan, 12/nov)
+
+- Erro "O aplicativo não está pronto para se conectar a Mercado Pago" com outra conta, na produção.
+- `GET /applications/8056007801718825` (só campos seguros): ativo, não bloqueado, URL de retorno certa
+  (`painel.rgm.dev.br/admin/mercado-pago/retorno`), `sandbox_mode=false`, `certification_status=not_certified`,
+  **`allow_flow=[]`** (nenhum fluxo de autorização liberado) → causa provável; relatos de outros devs batem.
+- Caminho: Raylan confere o app no painel do MP (pendências, Configurações avançadas, permissões); se continuar vazio,
+  chamado no suporte do MP Developers com esses dados (Raylan salvou as configurações avançadas de novo: continuou vazio → chamado aberto, pedindo também o Platform ID). PKCE só se o MP exigir (aí implementamos o `code_verifier`).
+
+
 
 ---
 

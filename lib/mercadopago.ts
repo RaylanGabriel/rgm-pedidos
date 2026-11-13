@@ -1,7 +1,7 @@
 import "server-only"
 
 import { createHmac, timingSafeEqual } from "node:crypto"
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { orders, storePaymentAccounts } from "@/db/schema"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
@@ -286,20 +286,40 @@ export async function dropPixCharge(orderId: string): Promise<"paid" | "ok"> {
   return "ok"
 }
 
-/** Pix não pago depois do prazo (+5 min de folga) vira cancelado. Roda ao ler pedidos, como a entrega automática. */
-export async function cancelOverduePix(storeId: string) {
-  await db
+/**
+ * Pix não pago depois do prazo (+5 min de folga) vira cancelado. Roda ao ler pedidos e no cron (sem `storeId` = todas
+ * as lojas). Antes de cancelar, consulta o Mercado Pago: se o aviso (webhook) falhou e ninguém estava com a tela aberta,
+ * um Pix PAGO seria cancelado. Se a consulta falhar (rede, Mercado Pago fora do ar), não cancela — tenta de novo na
+ * próxima vez. "Cobrança não encontrada" (404) é diferente: não existe, então não pode ser paga → cancela.
+ * Devolve quantos foram cancelados.
+ */
+export async function cancelOverduePix(storeId?: string) {
+  const overdue = and(
+    storeId ? eq(orders.storeId, storeId) : undefined,
+    eq(orders.paymentStatus, "pending"),
+    isNotNull(orders.mpOrderId),
+    eq(orders.status, "pending"),
+    lt(orders.pixExpiresAt, sql`now() - interval '5 minutes'`),
+  )
+  const rows = await db.select({ id: orders.id }).from(orders).where(overdue)
+  const toCancel: string[] = []
+  for (const { id } of rows) {
+    try {
+      const status = await syncPixOrder(id) // pago → entra na cozinha; vencido no MP → já cancela
+      if (status === "pending" || status === "ignored") toCancel.push(id)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message.startsWith("MP_API_404:")) toCancel.push(id)
+      else console.error("Pix vencido: falha ao consultar o Mercado Pago, fica para a próxima:", message)
+    }
+  }
+  if (!toCancel.length) return 0
+  const cancelled = await db
     .update(orders)
     .set({ status: "cancelled", completedAt: sql`now()` })
-    .where(
-      and(
-        eq(orders.storeId, storeId),
-        eq(orders.paymentStatus, "pending"),
-        isNotNull(orders.mpOrderId),
-        eq(orders.status, "pending"),
-        lt(orders.pixExpiresAt, sql`now() - interval '5 minutes'`),
-      ),
-    )
+    .where(and(overdue, inArray(orders.id, toCancel)))
+    .returning({ id: orders.id })
+  return cancelled.length
 }
 
 // ---------- Webhook ----------
