@@ -71,3 +71,11 @@ Padrões aprendidos com correções. Revisar no início de cada sessão.
   chaves. Na produção (`rgm-pedidos`) o `secret bulk` normal funciona (já publica uma versão nova).
 - **Reincidência (13/nov): esqueci o `export MSYS_NO_PATHCONV=1` numa chamada `cf.mjs POST /zones/...`** → 404 sem
   criar nada. Regra: todo comando que passa `/zones/` ou `/accounts/` como argumento começa com o export.
+- **Trocas de texto com barra invertida ou `/.../` NÃO vão em `node -e '...'` pelo Git Bash** (13/nov/2026: 3 vezes no
+  mesmo dia — `\s` virou `s`, `\/` quebrou a regex, CRLF fez o alvo não bater). Regra: script de troca em arquivo
+  (`.cjs` no scratchpad, lendo com `.replace(/\r\n/g, "\n")` e regravando no formato original) ou a ferramenta Edit.
+- **Server action muda de assinatura → aceitar a chamada antiga por um tempo.** Tablet da cozinha fica aberto horas com
+  o JavaScript de antes do deploy; se o id da ação não muda, ele chama a ação nova com os argumentos velhos e a cozinha
+  para até alguém recarregar. (13/nov/2026, `updateOrderStatusAction(orderId, from, status?)`.)
+- **Função do banco com parâmetros novos:** criar uma versão nova SEM valores padrão (não fica ambígua com a antiga),
+  migrar a produção antes do merge, e só depois do deploy apagar a antiga numa migração seguinte (0028 → 0029).

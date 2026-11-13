@@ -1,7 +1,10 @@
 # Correção dos 3 bugs de prioridade alta (13/nov/2026, branch `fix/bugs-revisao`)
 
-Um commit por bug + ajustes de uma revisão independente → preview testado → [ ] OK do Raylan → [ ] 0028 em prod → [ ] merge
-→ [ ] produção conferida → [ ] depois: migração que apaga a create_order antiga (12 parâmetros).
+Um commit por bug + ajustes de uma revisão independente → preview testado → [x] OK do Raylan → [x] 0028 em prod → [x] merge (`d003941`)
+→ [x] produção conferida → [x] 0029 apaga a create_order antiga (`fd4c8d4`, prod com só a versão de 14 parâmetros).
+
+Produção (13/nov): build ok; create_order nova chamada na produção dentro de transação desfeita (repetição = mesmo
+pedido, troco gravado, nada ficou: 22 pedidos e numeração iguais); loja, finalizar e login sem erro de JS; 0 erros.
 
 ## Bug 1 — Pix pago cancelado sozinho (`091f808`)
 - [x] `syncPixOrder` sem token da loja devolve `"unverifiable"`; `cancelOverduePix` não cancela: o pedido fica em
@@ -39,11 +42,11 @@ revisores (segurança e bugs). Nenhuma falha crítica; isolamento entre lojas ok
 "Conferido" = confirmado por mim no código ou no site no ar.
 
 ## Alta
-- [ ] 1. Pix PAGO cancelado sozinho quando a loja fica sem token MP (syncPixOrder devolve "pending" sem token →
+- [x] 1. (corrigido em 13/nov, `d003941`) Pix PAGO cancelado sozinho quando a loja fica sem token MP (syncPixOrder devolve "pending" sem token →
   cancelOverduePix cancela). Conferido. Sem token → "não verificável", não cancelar, avisar.
-- [ ] 2. Pedido duplicado: UPDATE do troco depois do create_order no mesmo try (lib/orders.ts) → cliente vê erro e repete;
+- [x] 2. (corrigido em 13/nov, `d003941`) Pedido duplicado: UPDATE do troco depois do create_order no mesmo try (lib/orders.ts) → cliente vê erro e repete;
   getCustomer em finalizar/actions.ts idem. Conferido. Troco dentro do create_order + chave de idempotência por checkout.
-- [ ] 3. Mudança de etapa da cozinha sem "etapa esperada": tablet atrasado volta pedido cancelado/entregue.
+- [x] 3. (corrigido em 13/nov, `d003941`) Mudança de etapa da cozinha sem "etapa esperada": tablet atrasado volta pedido cancelado/entregue.
 - [ ] 4. Redirecionamento aberto: safeReturn aceita "/<TAB>/site.com" (lib/auth/google.ts:26, conta/page.tsx). Conferido.
 - [ ] 5. Código por e-mail: attempts lido e gravado (não atômico) + verifyCodeAction sem rate limit.
 
