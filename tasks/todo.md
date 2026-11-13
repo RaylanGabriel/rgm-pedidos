@@ -35,7 +35,14 @@ para todas as lojas** (cada loja só vê os pedidos feitos nela); v1 com dados p
 1. [x] Banco + sessão do cliente + "Minha conta" (dados, endereços, pedidos, pedir de novo, apagar).
 2. [x] Código por e-mail (código pronto; falta a chave do Resend para enviar de verdade).
 3. [x] Google (código pronto; falta o app no Google Cloud).
-4. [x] Finalizar integrado + política de privacidade. [ ] Teste do login real (código e Google) → OK → migração → merge.
+4. [x] Finalizar integrado + política de privacidade. [x] Teste do login real (código e Google) → [x] OK do Raylan →
+   [x] migração 0027 em prod → [x] merge (`854c84b`) → [x] produção conferida.
+
+## Produção (13/nov, `854c84b`)
+- Build ok; loja, /conta, /finalizar, painel e /privacidade respondem 200; Google leva ao accounts.google.com com
+  retorno `https://rgm.dev.br/auth/cliente/google/retorno` (PKCE).
+- Código por e-mail real em mrsmash.rgm.dev.br: entregue, entra, cookie `csid` em `.rgm.dev.br` (90 dias, httpOnly,
+  secure); código errado recusado. Conta de teste apagada (0 contas em prod). 0 erros desde o deploy.
 
 ## Revisão (13/nov, preview `1e712e8`, sessão de cliente criada por script)
 - Sem conta: topo mostra "Entrar"; /conta mostra a tela de entrar (sem Resend/Google configurados: aviso).

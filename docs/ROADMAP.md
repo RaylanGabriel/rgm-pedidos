@@ -207,10 +207,13 @@ Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
   nome/sobrenome do comprador. Falta: Device ID (script de segurança do MP, útil para cartão) e Platform ID (comercial do MP).
 - Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 
-## 💭 6. Conta do cliente (opcional) com Google
-- Botão "Entrar com Google" no checkout, nunca obrigatório.
-- Endereços salvos, histórico de pedidos, base para fidelidade.
-- Exige política de privacidade (LGPD) e opção de apagar a conta.
+## ✅ 6. Conta do cliente (opcional) — em produção em 13/nov/2026
+- Entrar com **Google** ou **código de 6 dígitos por e-mail** (Resend, `acesso@rgm.dev.br`), sem senha; nunca
+  obrigatório (pedir sem conta continua igual). **Uma conta para todas as lojas** (cookie `csid` em `.rgm.dev.br`).
+- Dados preenchidos no finalizar, vários endereços, Meus pedidos + **Pedir de novo**, Sair, **Apagar conta** (LGPD);
+  política de privacidade atualizada.
+- Separada da conta do painel (dono/equipe continuam com e-mail e senha; sem Google no painel, decisão do Raylan).
+- Depois (ideias): "sair de todos os aparelhos", ligar pedidos antigos à conta, base para fidelidade.
 
 ## 📚 Estudo: entender o que foi construído (depois das demandas atuais)
 Quando terminarmos o domínio e o Pix em produção, o Claude explica passo a passo, com o código aberto, para o Raylan
