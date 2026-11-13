@@ -22,6 +22,8 @@ export function middleware(request: NextRequest) {
   if (LEGAL_PATHS.includes(pathname)) return withHeaders(NextResponse.next())
 
   if (host.kind === "root") {
+    // Retorno do "Entrar com Google" do cliente: endereço único (o Google não aceita *.rgm.dev.br)
+    if (pathname.startsWith("/auth/cliente/")) return withHeaders(NextResponse.next())
     const panel = panelOrigin()
     if (panel) return redirect(`${panel}/admin`) // por enquanto; depois aqui entra o site pessoal
   }

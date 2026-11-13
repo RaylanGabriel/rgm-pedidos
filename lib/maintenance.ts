@@ -2,7 +2,7 @@ import "server-only"
 
 import { lt } from "drizzle-orm"
 import { db } from "@/db"
-import { loginAttempts, sessions } from "@/db/schema"
+import { customerLoginCodes, customerSessions, loginAttempts, sessions } from "@/db/schema"
 import { cleanOldErrors, pendingAlert, recordError, type Alert } from "@/lib/alerts"
 import { cancelOverduePix } from "@/lib/mercadopago"
 import { autoCompleteDeliveries } from "@/lib/orders"
@@ -28,6 +28,12 @@ export async function runMaintenance() {
   await step("entregasFechadas", () => autoCompleteDeliveries())
   await step("pixVencidosCancelados", () => cancelOverduePix())
   await step("sessoesVencidasApagadas", async () => (await db.delete(sessions).where(lt(sessions.expiresAt, new Date())).returning({ id: sessions.id })).length)
+  await step("sessoesClientesVencidasApagadas", async () =>
+    (await db.delete(customerSessions).where(lt(customerSessions.expiresAt, new Date())).returning({ id: customerSessions.id })).length,
+  )
+  await step("codigosLoginVencidosApagados", async () =>
+    (await db.delete(customerLoginCodes).where(lt(customerLoginCodes.expiresAt, new Date())).returning({ id: customerLoginCodes.id })).length,
+  )
   await step("tentativasAntigasApagadas", async () => {
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000) // a política de privacidade promete apagar em até 24 h
     return (await db.delete(loginAttempts).where(lt(loginAttempts.createdAt, dayAgo)).returning({ id: loginAttempts.id })).length

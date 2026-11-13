@@ -35,6 +35,9 @@ export const RESERVED_SUBDOMAINS = new Set([
   "loja",
   "pedido",
   "pedidos",
+  "conta",
+  "entrar",
+  "auth",
   // outros projetos em rgm.dev.br: acrescente aqui
 ])
 
