@@ -1,3 +1,42 @@
+# Deixar o site pronto para o 1º cliente (12/nov/2026) — ordem combinada com o Raylan
+
+1. [ ] "Conectar Mercado Pago" com a conta real de outra pessoa (Raylan testa; se falhar, chamado no MP Developers)
+2. [ ] Login da equipe: `/admin/equipe` (branch `feat/equipe`)
+3. [ ] Termos de uso + política de privacidade (LGPD)
+4. [ ] Cron da Cloudflare (Pix vencido, entregas esquecidas, limpeza de tentativas de login)
+5. [ ] Turnstile no checkout e no login + regras de rate limit na borda
+6. [ ] E-mail `contato@`/`suporte@rgm.dev.br` (Email Routing)
+7. [ ] Web Analytics da Cloudflare
+8. [ ] Alerta quando o Worker der erro
+9. [ ] Conferir o backup do banco (histórico do Neon)
+10. [ ] Dados do Mr. Smash (endereço, WhatsApp, categorias "Teste", preço do item de R$ 0,70)
+11. [ ] ESLint
+12. [ ] Atualizar `docs/ROADMAP.md` (Vercel → Cloudflare)
+
+## 2. Login da equipe — especificação
+- `/admin/equipe`, só dono (ou superadmin). Card "Equipe" no painel para quem gerencia.
+- Lista: nome, e-mail, Dono/Funcionário, "ainda não trocou a senha", último acesso (sessão mais recente).
+- **Adicionar funcionário** (nome + e-mail): conta nova → senha provisória mostrada uma vez, troca obrigatória no 1º
+  acesso. E-mail que já tem conta → só vincula como funcionário (entra com a senha que já usa). Já é da loja → erro.
+- **Nova senha** e **Remover acesso**: só para funcionários, nunca para dono nem para si mesmo.
+  - Nova senha: só se o funcionário não estiver em outra loja (senão a troca afetaria a outra loja → suporte).
+  - Remover: apaga o vínculo e as sessões dele nesta loja. Sem nenhuma outra loja (e sem ser superadmin) → apaga a
+    conta inteira (o e-mail fica livre para ser adicionado de novo).
+- Fora do escopo: promover a dono / sócio (o superadmin faz), "login do tablet" (avaliar com o cliente).
+- Teste: preview da branch com sessão de dono → adicionar → entrar como funcionário (troca de senha, vê só cozinha/
+  cardápio) → nova senha → remover (sessão do funcionário cai na hora).
+
+### Revisão do item 2
+- `tsc` ok. Teste no navegador (`feat-equipe-rgm-pedidos-preview…`), banco preview, 22 verificações ok: card e tela só
+  para o dono; senha provisória mostrada; e-mail repetido recusado; 1º acesso do funcionário cai em `/admin/conta`
+  (o primeiro teste conferia o endereço cedo demais); funcionário vê só Cozinha/Cardápio/Novo Pedido e é mandado de volta
+  ao painel em Equipe/Relatórios/Pagamentos/Configurações; último login na lista; nova senha desconecta o funcionário;
+  remover → aviso no topo, some da lista, sessão cai, login recusado, conta apagada; sem botões na linha do dono.
+- Achado no teste e corrigido: ao remover, a mensagem sumia junto com a linha da pessoa → agora aparece no topo.
+- Contas de teste apagadas do banco preview.
+
+---
+
 # Faxina — tirar a Vercel do código (12/nov/2026, branch `chore/remove-vercel`)
 
 Produção já está 100% na Cloudflare. Objetivo: nada no código depende da Vercel, para o Raylan apagar o projeto e o Blob.

@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Clock, ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog, Wallet } from "lucide-react"
+import { Clock, ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog, Users, Wallet } from "lucide-react"
 import { toggleStoreOpenAction } from "./actions"
 import Image from "next/image"
 import { requireStore } from "@/lib/auth/session"
@@ -230,6 +230,23 @@ export default async function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">Conecte sua conta: o cliente paga o Pix pelo site e o pedido só entra na cozinha depois de pago</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+
+          {canManage && (
+            <Link href="/admin/equipe" className="group">
+              <Card className="h-full transition-all hover:shadow-lg hover:scale-105 border-2 hover:border-primary">
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mb-4 group-hover:bg-accent transition-colors">
+                    <Users className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Equipe</CardTitle>
+                  <CardDescription>Login dos funcionários</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Cada funcionário com o próprio acesso à cozinha e ao balcão, sem ver faturamento nem pagamentos</p>
                 </CardContent>
               </Card>
             </Link>
