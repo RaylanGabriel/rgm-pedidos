@@ -295,11 +295,12 @@ agora têm a mesma largura do status e dos cartões; os botões no mesmo estilo 
   2 linhas, preço sempre no mesmo lugar).
 - Rolagem lateral com encaixe (scroll-snap), setas no computador e mais itens na lista.
 
-**10c. Escolhas por lanche, não por pedido**
-- Com o 9a, o "sem ___" já é de cada lanche: um X-Bacon completo e outro sem cebola viram duas linhas no carrinho.
-- Falta: (1) a **observação** ("ponto da carne", "molho à parte") ainda é do pedido inteiro → passar a ter uma por
-  lanche, mostrada na cozinha/impressão embaixo do item; (2) quando a quantidade é 2+, todos saem iguais → deixar claro
-  ("para fazer diferente, adicione de novo") ou separar as unidades.
+**✅ 10c. Escolhas por lanche, não por pedido** (13/nov)
+- Carrinho como o do iFood: foto do lanche, ✏️ Editar (abre o lanche com as escolhas da linha) e, em lanche com
+  "sem ___"/adicionais, o "+" cria outro lanche logo abaixo para personalizar. Cardápio, finalizar e balcão.
+- 💭 Bônus para o futuro (Raylan: "não há necessidade agora"): **observação por lanche** ("ponto da carne", "molho
+  à parte") em vez de uma só para o pedido, mostrada na cozinha/impressão embaixo do item. Precisa de coluna nova em
+  `order_items` e mudar o `create_order`.
 
 **10d. Cardápio em PDF para imprimir** (dono, no painel → Cardápio)
 - Layout bonito: logo e cores da loja, categorias, nome, descrição e preço, contato/endereço e um QR code para o
