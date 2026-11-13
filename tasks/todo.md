@@ -86,7 +86,7 @@
   **Não ligar o Bot Fight Mode**: no plano Free ele não tem exceção e pode barrar o webhook do Mercado Pago.
 - [x] Preview (navegador): login espera o token e gera outro a cada tentativa; script bloqueado → botão travado e envio
       forçado sem token recusado pelo servidor; checkout completo (dinheiro) → pedido criado. Dados de teste apagados.
-- [x] OK · [x] merge (12/nov) · [ ] chaves de produção · [ ] regra de rate limit
+- [x] OK · [x] merge (12/nov) · [x] chaves de produção (segredo validado no siteverify; ligado 13/nov) · [x] regra de rate limit (25 POSTs → 429 a partir do 24º)
 
 
 
@@ -99,7 +99,7 @@
 - `npm run backup[:teste] -- conferir|restaurar`: simula por padrão; produção exige `--valer --sim-producao`; uma transação.
 - [x] Preview: backup gerado (13 tabelas, 126 linhas, 10 KB); conferir bate; restaurado por cima do banco de teste →
       **13/13 tabelas idênticas** (hash de todas as linhas antes × depois); site de teste ok.
-- [ ] OK · [ ] merge · [ ] conferir o 1º backup de produção (`npm run backup -- conferir`) depois das 06:00 UTC
+- [x] OK · [x] merge (13/nov) · [ ] conferir o 1º backup de produção (`npm run backup -- conferir`) depois das 06:00 UTC
 
 ---
 
