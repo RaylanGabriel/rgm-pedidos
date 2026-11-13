@@ -76,7 +76,7 @@ export function StoreMenu({ store, menu }: { store: PublicStore; menu: MenuView 
           ) : (
             <div className="space-y-4">
               <CartSummary lines={cart.lines} onQuantity={cart.setQuantity} onRemove={cart.remove} />
-              <CartSuggestions menu={menu} lines={cart.lines} onAdd={cart.add} max={4} />
+              <CartSuggestions menu={menu} lines={cart.lines} onAdd={cart.add} />
               {checkoutButton}
             </div>
           )}
