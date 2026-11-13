@@ -284,6 +284,27 @@ a ordem é 9a → 9b.
 - Alerta de "acabando" (mínimo por ingrediente) e, opcional, lanche **esgotado automático** quando faltar ingrediente.
 - Relatório: consumo por período e o que comprar.
 
+## 💭 10. Ajustes e ideias do Raylan (13/nov/2026)
+**10a. Cabeçalho do painel desalinhado** (computador e celular): "Área Administrativa", "Minha conta" e "Sair" não
+ficam na mesma linha/altura. Alinhar e conferir nas duas larguras.
+
+**10b. "Para acompanhar" no carrinho vira carrossel**
+- Hoje os cards têm alturas diferentes (nome em 1 ou 2 linhas muda o tamanho). Todos com a mesma altura (nome em até
+  2 linhas, preço sempre no mesmo lugar).
+- Rolagem lateral com encaixe (scroll-snap), setas no computador e mais itens na lista.
+
+**10c. Escolhas por lanche, não por pedido**
+- Com o 9a, o "sem ___" já é de cada lanche: um X-Bacon completo e outro sem cebola viram duas linhas no carrinho.
+- Falta: (1) a **observação** ("ponto da carne", "molho à parte") ainda é do pedido inteiro → passar a ter uma por
+  lanche, mostrada na cozinha/impressão embaixo do item; (2) quando a quantidade é 2+, todos saem iguais → deixar claro
+  ("para fazer diferente, adicione de novo") ou separar as unidades.
+
+**10d. Cardápio em PDF para imprimir** (dono, no painel → Cardápio)
+- Layout bonito: logo e cores da loja, categorias, nome, descrição e preço, contato/endereço e um QR code para o
+  cardápio online. Tamanho A4 (e talvez A5/meia folha para balcão).
+- Caminho simples: página de impressão (`/admin/cardapio/imprimir`) com CSS de impressão → "Salvar como PDF" do
+  navegador. Gerar o PDF no servidor só se precisar (é mais pesado no Worker).
+
 ## 💭 Depois
 - Cupons / fidelidade ("10º lanche grátis") — a lista de melhores clientes já ajuda.
 - Cobrança das lojas (plano mensal) quando houver clientes.
