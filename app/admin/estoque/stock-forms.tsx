@@ -141,7 +141,7 @@ export function RecipeQtyForm({
       aria-label={`Incluir ingrediente${itemName ? ` em ${itemName}` : ""}`}
       value=""
       onChange={(e) => e.target.value && setShown((s) => [...s, e.target.value])}
-      className={`${selectClass} w-auto text-primary`}
+      className={selectClass.replace("w-full", "w-auto") + " font-medium text-primary"}
     >
       <option value="">+ Ingrediente</option>
       {rest.map((t) => (
