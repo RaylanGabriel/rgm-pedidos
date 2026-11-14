@@ -169,7 +169,7 @@ webhook** de pagamento. Se trocarmos o domínio depois, tem que reconfigurar tud
   envia é o funcionário, sem a API paga. Depois de tocar mostra "Avisado" (lembrado no aparelho). Nas outras etapas, atalho
   com o ícone do WhatsApp para conversar.
 
-## 🔨 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
+## ✅ 5. Pix pelo Mercado Pago (cada dono conecta a própria conta)
 Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v1/orders`, pix/bank_transfer).
 
 **Feito (em teste — `MP_TEST_MODE=true`):**
@@ -198,17 +198,19 @@ Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
   "Usar a conta dona da plataforma"), sem OAuth.
 - Em produção, conexão feita em modo de teste não gera Pix: o painel pede para reconectar.
 
+**✅ OAuth de outras contas funcionando (14/nov/2026):** depois da "atualização interna" do suporte no app (ticket
+WCS-58750, 13/nov 09:42), o Raylan conectou a conta "zezinho" na loja dogao-do-ze (modo produção, renovação automática
+até mai/2027) e fez um Pix real: pedido #1 de R$ 0,70 pago em 33 s, sem erros. O `allow_flow` continua `[]` na API
+(não era ele que bloqueava). Antes: "O aplicativo não está pronto para se conectar" (testado em 12/nov).
+
 **Falta:**
-- **"Conectar Mercado Pago" (OAuth) de outras contas** dá "O aplicativo não está pronto para se conectar" — testado de
-  novo em 12/nov com a conta real de outra pessoa, depois de pagamentos reais. Causa provável: `allow_flow` vazio na
-  aplicação (`GET /applications/<id>`). **Chamado aberto no suporte do MP Developers** (pedindo também o Platform ID).
+- Platform ID (pedido no mesmo ticket).
 - ✅ Nota de qualidade: a cobrança agora envia `items` (lanche com adicionais no preço + "Taxa de entrega"; o Mercado Pago
   recusa se a soma não bater, então sem itens nesse caso), `statement_descriptor` (nome da loja sem acento, até 22) e
   nome/sobrenome do comprador. Falta: Device ID (script de segurança do MP, útil para cartão) e Platform ID (comercial do MP).
 - Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
 - **Logo depois do OAuth funcionar** (Raylan, 14/nov): itens 7, 8, 9 e 11 da revisão geral (`tasks/todo.md`) — pedidos
   falsos em massa, bloqueio do dono por terceiros, dados pessoais nos alertas, tela de erro do painel.
-- 13/nov: o suporte (ticket WCS-58750) fez uma "atualização interna" no app e pediu nova tentativa de vinculação.
 
 ## ✅ 6. Conta do cliente (opcional) — em produção em 13/nov/2026
 - Entrar com **Google** ou **código de 6 dígitos por e-mail** (Resend, `acesso@rgm.dev.br`), sem senha; nunca
