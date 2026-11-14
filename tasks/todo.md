@@ -20,6 +20,19 @@ Um commit por item → preview testado → [ ] OK do Raylan → [ ] merge (sem m
 - [x] app/admin/error.tsx (cozinha tenta sozinha a cada 15 s), app/error.tsx, app/global-error.tsx. Conferido com
   `next dev` local e páginas temporárias que davam erro (apagadas). O `next dev` cria um AGENTS.md: apagado, fora do commit.
 
+## Verificação geral dos itens 1–11 (14/nov, 3 agentes em paralelo + testes)
+- **Falha achada em produção:** o redirecionamento aberto (item 4) ainda passava com `/.//site.com` (o navegador apaga
+  o "/." e sobra "//site.com"). Corrigido (`eeb7335`): localPath confere o caminho já normalizado; 30 ataques testados.
+- Item 9 incompleto: o caminho do instrumentation vem como "GET /pedido/<token>?…" e passava sem tirar o token (e o
+  "?…" voltou a ser guardado). Corrigido; logs do Worker também sem os valores da consulta.
+- Item 7: recusa passou a ocupar vaga (bloqueio renovável, tabela inchando) → a recusa apaga a própria batida.
+- Outros (`a5c8219`): safeReturn sempre absoluto (evita 500 no Google), IPv6 mapeado/malformado, aviso se o Turnstile não
+  carregar + "Verificando…", chave só troca depois de pedido feito, QR do balcão no "mudou", cozinha só confere Pix dos
+  últimos 30 min, state do MP em bytes, README.
+- Preview (`a5c8219`): redirecionamentos, login real, checkout/resposta perdida/mudou, 2 tablets, rajada e login do dono — ok.
+- Ficou anotado (baixo): login do painel e troca de senha ainda checam antes de gravar (Turnstile/sessão seguram);
+  `orderBurst` conta pedidos do balcão; Pix vencido há mais de 2 dias não é revisto pelo cron; React #418 no quadro.
+
 ---
 
 # Correção dos 3 bugs de prioridade alta (13/nov/2026, branch `fix/bugs-revisao`)
