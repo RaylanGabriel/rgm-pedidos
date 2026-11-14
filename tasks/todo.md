@@ -1,3 +1,47 @@
+# 9b. Controle de estoque (14/nov/2026, branch `feat/estoque`) — PLANO, aguardando OK do Raylan
+
+Decisões do Raylan (14/nov): estoque só dos ingredientes que o dono escolher; desconta quando o pedido ENTRA NA
+COZINHA (dinheiro/cartão/Pix direto: ao criar; Pix online: quando o pagamento cai) e devolve se for cancelado; ingrediente
+zerado ESGOTA SOZINHO os lanches que usam; v1 com alerta de "acabando", entradas/perdas e relatório de consumo.
+Pendentes anotados para depois: 10d (cardápio em PDF) e itens 10, 12–26 da revisão geral.
+
+## Modelo (migração 0030)
+- `ingredients`: + `track_stock` (liga/desliga), `unit` (un, g, kg, ml, L, fatia), `stock` (saldo, pode ficar
+  negativo), `min_stock` (alerta "acabando"), `extra_amount` (quanto 1 adicional gasta; ex.: bacon extra = 2 fatias).
+- `menu_item_ingredients`: + `quantity` (quanto 1 lanche gasta). Ingrediente fixo (pão, carne) entra com
+  removable=false, como o 9a já previa.
+- `stock_movements`: loja, ingrediente, quantidade (+/−), tipo (pedido | devolução | entrada | perda | ajuste), pedido,
+  observação, quem lançou, quando. O saldo em `ingredients.stock` muda na mesma operação (nunca diverge do histórico).
+- `orders.stock_applied_at` / `stock_returned_at`: o desconto e a devolução acontecem uma vez só por pedido.
+
+## Regras
+- Consumo de um item do pedido = (quantidade da ficha × qtd) dos ingredientes controlados, menos os "sem ___" daquele
+  lanche, mais adicionais controlados (extra_amount × qtd do adicional × qtd do lanche).
+- Combo: usa a ficha própria; se não tiver quantidades, soma a ficha dos lanches que ele inclui (mesma regra do 9a).
+- Funções no banco `apply_order_stock(pedido)` / `return_order_stock(pedido)` (uma transação, idempotentes). Chamadas
+  em: pedido criado que já vai para a cozinha, Pix pago (webhook/tela/cron), Pix do balcão trocado por outra forma,
+  cancelamento pela cozinha. Cron de conferência: pedido na cozinha sem desconto → desconta (nada se perde).
+- Esgotado automático: lanche (ou adicional) cujo ingrediente controlado não tem saldo para 1 unidade some do cardápio e o
+  `create_order` recusa (ITEM_UNAVAILABLE / EXTRA_UNAVAILABLE). Volta sozinho com uma entrada. O "esgotado" manual continua.
+- Pix online ainda não pago não reserva estoque (dois clientes podem pagar a última unidade: saldo pode ficar negativo e
+  o painel avisa).
+
+## Telas (só dono)
+- Cardápio → Ingredientes: "Controlar estoque", unidade, mínimo, (adicional: quanto gasta).
+- Cardápio → Editar lanche: "Ficha de estoque" com a quantidade de cada ingrediente controlado (inclui pão, carne).
+- `/admin/estoque`: saldos (ok / acabando / acabou), Entrada, Perda/Ajuste, histórico, consumo do período e sugestão de
+  compra (consumo médio × 7 dias + mínimo − saldo).
+- Início do painel: card "Estoque" com quantos estão acabando/acabaram.
+
+## Fases (um commit cada, tudo na mesma branch; preview → OK → migração em prod → merge)
+1. [ ] Banco (0030) + ingredientes controlados + ficha com quantidades + tela Estoque (saldo, entradas, perdas, histórico).
+2. [ ] Desconto/devolução automáticos + cron de conferência.
+3. [ ] Esgotado automático (cardápio, balcão, `create_order`) + alerta "acabando" no painel.
+4. [ ] Relatório de consumo + sugestão de compra.
+5. [ ] Testes (banco + navegador no preview), revisão por agente, docs.
+
+---
+
 # Revisão: itens 7, 8, 9 e 11 (14/nov/2026, branch `fix/revisao-7-8-9-11`)
 
 Um commit por item → preview testado → [x] OK do Raylan → [x] merge (`f685758`, 14/nov) → [x] produção conferida
