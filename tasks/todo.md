@@ -53,6 +53,9 @@ revisores (segurança e bugs). Nenhuma falha crítica; isolamento entre lojas ok
   10 códigos/e-mail/dia) Código por e-mail: attempts lido e gravado (não atômico) + verifyCodeAction sem rate limit.
 
 ## Média
+> **Próximos, logo depois do Mercado Pago (Raylan, 14/nov):** 7 (pedidos falsos em massa), 8 (bloqueio do dono por
+> terceiros), 9 (dados pessoais nos alertas) e 11 (tela de erro do painel; o quadro já trata falha de conexão).
+
 - [x] 6. (`bb4d9e0`: workers_dev/preview_urls false na produção, true no preview; produção conferida: workers.dev dá 404, domínios 200, login real ok, cron ok) Produção em rgm-pedidos.raylanmiranda1.workers.dev (workers_dev/preview_urls true). Conferido (200).
 - [ ] 7. Rate limit não atômico + checkout sem anti-robô → pedidos falsos em dinheiro.
 - [ ] 8. Bloqueio do dono por terceiros (5 erros por e-mail bloqueiam até a senha certa).

@@ -206,6 +206,9 @@ Aplicação **RGM-PEDIDOS** (Checkout Transparente). API de **Orders** (`POST /v
   recusa se a soma não bater, então sem itens nesse caso), `statement_descriptor` (nome da loja sem acento, até 22) e
   nome/sobrenome do comprador. Falta: Device ID (script de segurança do MP, útil para cartão) e Platform ID (comercial do MP).
 - Depois: comissão da plataforma (`marketplace_fee`), estorno pelo painel.
+- **Logo depois do OAuth funcionar** (Raylan, 14/nov): itens 7, 8, 9 e 11 da revisão geral (`tasks/todo.md`) — pedidos
+  falsos em massa, bloqueio do dono por terceiros, dados pessoais nos alertas, tela de erro do painel.
+- 13/nov: o suporte (ticket WCS-58750) fez uma "atualização interna" no app e pediu nova tentativa de vinculação.
 
 ## ✅ 6. Conta do cliente (opcional) — em produção em 13/nov/2026
 - Entrar com **Google** ou **código de 6 dígitos por e-mail** (Resend, `acesso@rgm.dev.br`), sem senha; nunca
