@@ -1,4 +1,4 @@
-# 9b. Controle de estoque (14/nov/2026, branch `feat/estoque`) — PLANO, aguardando OK do Raylan
+# 9b. Controle de estoque (14/nov/2026, branch `feat/estoque`) — pronto no preview, aguardando OK para produção
 
 Decisões do Raylan (14/nov): estoque só dos ingredientes que o dono escolher; desconta quando o pedido ENTRA NA
 COZINHA (dinheiro/cartão/Pix direto: ao criar; Pix online: quando o pagamento cai) e devolve se for cancelado; ingrediente
@@ -34,11 +34,25 @@ Pendentes anotados para depois: 10d (cardápio em PDF) e itens 10, 12–26 da re
 - Início do painel: card "Estoque" com quantos estão acabando/acabaram.
 
 ## Fases (um commit cada, tudo na mesma branch; preview → OK → migração em prod → merge)
-1. [ ] Banco (0030) + ingredientes controlados + ficha com quantidades + tela Estoque (saldo, entradas, perdas, histórico).
-2. [ ] Desconto/devolução automáticos + cron de conferência.
-3. [ ] Esgotado automático (cardápio, balcão, `create_order`) + alerta "acabando" no painel.
-4. [ ] Relatório de consumo + sugestão de compra.
-5. [ ] Testes (banco + navegador no preview), revisão por agente, docs.
+1. [x] Banco (0030) + ingredientes controlados + ficha com quantidades + tela Estoque (saldo, entradas, perdas, histórico).
+2. [x] Desconto/devolução automáticos + cron de conferência.
+3. [x] Esgotado automático (cardápio, balcão, `create_order`) + alerta "acabando" no painel.
+4. [x] Relatório de consumo + sugestão de compra.
+5. [x] Testes (banco + navegador no preview), revisão por agente, docs.
+
+## Feito (commits 3467f4a, d02e11d, a5a7c46; migrações 0030 + 0031)
+- Mudança em relação ao plano: tudo do estoque fica numa tela só, `/admin/estoque` (abas Saldos, Fichas, Histórico,
+  Consumo), em vez de espalhar pelo Cardápio.
+- Conflito achado e resolvido: salvar os botões "sem ___" apagava a ficha inteira — agora só mexe na marca "pode tirar".
+- Revisão por agente: números com milhar ("1.500" virava 1,5), "sem bacon" × adicional de mesmo nome (dois saldos),
+  combo com ficha própria parava de descontar os lanches, ingrediente desativado contava, Pix nascendo sem cobrança
+  podia ser descontado pelo cron, cardápio fazendo conta em loja sem estoque, cron sem índice — tudo corrigido (0031).
+- Teste no banco (14 casos): ficha × qtd, "sem ___", adicional × porção, recusa acima do saldo, esgotado no cardápio,
+  devolução (uma vez só), Pix pendente/pago pelo cron, "sem bacon" pelo nome, desativado, loja sem estoque.
+- Navegador (preview a5a7c46): controlar, entrada, ficha, salvar lanche no Cardápio sem perder a ficha, pedido na loja
+  descontou (5 → 4), histórico, consumo e card do painel.
+- Limites conhecidos (anotados): o "acabou" não considera os "sem ___" do pedido nem soma duas linhas do mesmo lanche;
+  combo casa pelo nome na descrição (mesma regra do 9a); trocar a unidade não converte o saldo.
 
 ---
 
