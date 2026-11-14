@@ -9,6 +9,7 @@ import { googleConfigured } from "@/lib/auth/google"
 import { brandStyle } from "@/lib/color"
 import { getAddresses, listCustomerOrders } from "@/lib/customer-account"
 import { formatDateTimeSP } from "@/lib/dates"
+import { localPath } from "@/lib/links"
 import { emailConfigured } from "@/lib/email"
 import { formatBRL, STATUS_LABEL } from "@/lib/order-shared"
 import { getStoreBySlug, publicStore } from "@/lib/orders"
@@ -32,7 +33,8 @@ export default async function ContaPage({
   const me = await getCustomer()
   // Veio do checkout ("Tem conta? Entre"): depois de entrar, volta para lá (só caminho deste site)
   const { volta } = await searchParams
-  if (me && volta?.startsWith("/") && !volta.startsWith("//") && !volta.startsWith("/\\")) redirect(volta)
+  const back = localPath(volta)
+  if (me && back) redirect(back)
 
   return (
     <div style={brandStyle(pub.primaryColor)} className="flex min-h-screen flex-col bg-background">

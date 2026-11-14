@@ -58,3 +58,25 @@ export function formatPhone(phone: string | null | undefined) {
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
   return phone ?? ""
 }
+
+/** Caractere de controle (tab, quebra de linha…) ou barra invertida: o navegador os ignora/troca ao montar a URL. */
+const UNSAFE_URL_CHARS = /[\u0000-\u001f\u007f\\]/
+
+/**
+ * Caminho deste site para voltar depois de uma ação ("?volta=/finalizar"), ou null se não for.
+ * Não basta olhar o começo do texto: "/\t/site-falso.com" começa com uma barra só, mas o navegador apaga o tab e
+ * lê "//site-falso.com" (outro site). Por isso recusa caracteres de controle e confere montando a URL de verdade.
+ */
+export function localPath(raw: string | null | undefined): string | null {
+  if (!raw || !raw.startsWith("/") || UNSAFE_URL_CHARS.test(raw)) return null
+  const base = "https://local.invalid"
+  try {
+    const u = new URL(raw, base)
+    return u.origin === base ? `${u.pathname}${u.search}${u.hash}` : null
+  } catch {
+    return null
+  }
+}
+
+/** Endereço absoluto com caractere perigoso (ver localPath): nunca usar como destino de redirecionamento. */
+export const hasUnsafeUrlChars = (raw: string) => UNSAFE_URL_CHARS.test(raw)
