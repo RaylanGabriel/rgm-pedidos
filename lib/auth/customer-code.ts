@@ -1,7 +1,7 @@
 import "server-only"
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto"
-import { and, desc, eq, gt } from "drizzle-orm"
+import { and, desc, eq, gt, lt, sql } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { customerLoginCodes } from "@/db/schema"
@@ -11,8 +11,11 @@ import { clientIp, rateLimit } from "@/lib/rate-limit-server"
 
 /*
  * Entrar com código de 6 dígitos por e-mail (sem senha). Proteções:
- * - o código vale 10 min e aceita até 5 tentativas; no banco fica só o sha256;
- * - limite de envios: 3 por e-mail a cada 15 min e 10 por IP a cada hora;
+ * - o código vale 10 min e aceita até 5 tentativas, contadas no banco ANTES de comparar (tentativas em paralelo não
+ *   furam o limite); no banco fica só o sha256;
+ * - limite de envios: 3 por e-mail a cada 15 min, 10 por e-mail por dia e 10 por IP a cada hora (no pior caso, 50
+ *   palpites por dia num e-mail: chance de acertar ~0,005%);
+ * - limite de conferências: 30 por IP a cada 15 min (impede testar códigos de muitos e-mails do mesmo lugar);
  * - a resposta do pedido de código é a mesma para qualquer e-mail (não revela quem tem conta).
  */
 
@@ -29,7 +32,11 @@ export async function requestLoginCode(rawEmail: string, storeName: string | nul
   if (!emailConfigured()) return { error: "Entrar por e-mail ainda não está disponível. Use o Google ou peça sem conta." }
 
   const ip = await clientIp()
-  if (!(await rateLimit(`code-ip:${ip}`, 10, 60 * 60 * 1000)) || !(await rateLimit(`code-email:${email}`, 3, 15 * 60 * 1000))) {
+  if (
+    !(await rateLimit(`code-ip:${ip}`, 10, 60 * 60 * 1000)) ||
+    !(await rateLimit(`code-email:${email}`, 3, 15 * 60 * 1000)) ||
+    !(await rateLimit(`code-email-day:${email}`, 10, 24 * 60 * 60 * 1000))
+  ) {
     return { error: "Muitos códigos pedidos. Espere alguns minutos e tente de novo." }
   }
 
@@ -49,19 +56,30 @@ export async function verifyLoginCode(rawEmail: string, rawCode: string): Promis
   const email = emailSchema.safeParse(rawEmail)
   const code = rawCode.replace(/\D/g, "")
   if (!email.success || code.length !== 6) return { error: "Digite os 6 números do código." }
+  if (!(await rateLimit(`code-verify-ip:${await clientIp()}`, 30, 15 * 60 * 1000))) {
+    return { error: "Muitas tentativas. Espere alguns minutos e tente de novo." }
+  }
 
-  const [row] = await db
-    .select()
+  const [latest] = await db
+    .select({ id: customerLoginCodes.id })
     .from(customerLoginCodes)
     .where(and(eq(customerLoginCodes.email, email.data), gt(customerLoginCodes.expiresAt, new Date())))
     .orderBy(desc(customerLoginCodes.createdAt))
     .limit(1)
-  if (!row || row.attempts >= MAX_ATTEMPTS) return { error: "O código venceu ou teve tentativas demais. Peça um novo." }
+  // Gasta a tentativa ANTES de comparar, num único UPDATE que só passa enquanto sobrar tentativa: palpites em
+  // paralelo não leem todos "0 tentativas" (cada um consome a sua, e o 6º em diante não recebe nada).
+  const [row] = latest
+    ? await db
+        .update(customerLoginCodes)
+        .set({ attempts: sql`${customerLoginCodes.attempts} + 1` })
+        .where(and(eq(customerLoginCodes.id, latest.id), lt(customerLoginCodes.attempts, MAX_ATTEMPTS), gt(customerLoginCodes.expiresAt, new Date())))
+        .returning({ codeHash: customerLoginCodes.codeHash, attempts: customerLoginCodes.attempts })
+    : []
+  if (!row) return { error: "O código venceu ou teve tentativas demais. Peça um novo." }
 
   const ok = timingSafeEqual(hash(code), Buffer.from(row.codeHash, "hex"))
   if (!ok) {
-    await db.update(customerLoginCodes).set({ attempts: row.attempts + 1 }).where(eq(customerLoginCodes.id, row.id))
-    const left = MAX_ATTEMPTS - row.attempts - 1
+    const left = MAX_ATTEMPTS - row.attempts
     return { error: left > 0 ? `Código errado. Você tem mais ${left} tentativa${left > 1 ? "s" : ""}.` : "Código errado. Peça um novo." }
   }
 
