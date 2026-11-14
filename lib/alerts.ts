@@ -26,27 +26,31 @@ const describe = (e: unknown) => {
   return params >= 0 ? `${text.slice(0, params)} [valores omitidos]` : text
 }
 
+/** Mesma regra para os logs do Worker (console.error): erro sem os valores da consulta (dados de cliente). */
+export const safeErrorText = (e: unknown) => {
+  const cause = e instanceof Error ? e.cause : undefined
+  return cause ? `${describe(cause)} ← em: ${describe(e)}` : describe(e)
+}
+
 /**
  * Caminho sem os tokens: /pedido/<token> e /admin/pedidos/pix/<token> abrem o pedido de alguém (o token é a chave).
- * Qualquer trecho longo de letras/números (token, id) vira [token]; nomes curtos (lojas, páginas) ficam.
- * Só caminhos de página ("/..."): marcadores internos como "pix-sem-conexao/<id>" ficam inteiros (o cron usa o id
- * para saber que já avisou daquele pedido).
+ * O trecho logo depois de "pedido" ou "pix" vira [token]; o resto (nome da loja, página) fica. Corta o "?…" (pode ter
+ * código de login, state). Vale para "/caminho" e para "GET /caminho" (formato do instrumentation.ts). Marcadores
+ * internos como "pix-sem-conexao/<id>" ficam inteiros (o cron usa o id para saber que já avisou daquele pedido).
  */
 function redactPath(path: string) {
-  if (!path.startsWith("/")) return path
-  return path
-    .split("?")[0]
-    .split("/")
-    .map((seg) => (/^[A-Za-z0-9_-]{16,}$/.test(seg) ? "[token]" : seg))
-    .join("/")
+  const m = /^([A-Z]+ )?(\/.*)$/.exec(path)
+  if (!m) return path
+  const segs = m[2].split("?")[0].split("/")
+  const out = segs.map((seg, i) => (i > 0 && (segs[i - 1] === "pedido" || segs[i - 1] === "pix") && seg ? "[token]" : seg))
+  return `${m[1] ?? ""}${out.join("/")}`
 }
 
 export async function recordError(source: string, path: string | null, err: unknown, digest?: string | null) {
   try {
     // O motivo de verdade costuma estar no `cause` (ex.: o Drizzle embrulha a falha do banco em "Failed query: <sql>").
     // Vai na frente para nunca ser cortado pelo limite de tamanho.
-    const cause = err instanceof Error ? err.cause : undefined
-    const message = cause ? `${describe(cause)} ← em: ${describe(err)}` : describe(err)
+    const message = safeErrorText(err)
     await db.insert(errorEvents).values({
       source,
       path: path ? clean(redactPath(path), 200) : null,

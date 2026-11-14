@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 import { and, eq, gt, inArray, isNotNull, lt, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { errorEvents, orders, storePaymentAccounts, stores } from "@/db/schema"
-import { recordError } from "@/lib/alerts"
+import { recordError, safeErrorText } from "@/lib/alerts"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
 
 /**
@@ -132,7 +132,7 @@ export async function storeAccessToken(storeId: string): Promise<string | null> 
     await saveAccount(storeId, null, t)
     return t.access_token
   } catch (err) {
-    console.error("Mercado Pago: falha ao renovar token da loja", storeId, err)
+    console.error("Mercado Pago: falha ao renovar token da loja", storeId, safeErrorText(err))
     // ainda não venceu: usa o atual; venceu: loja precisa reconectar
     return row.expiresAt.getTime() > Date.now() ? decryptSecret(row.accessTokenEnc) : null
   }
@@ -306,7 +306,8 @@ export async function cancelOverduePix(storeId?: string) {
     isNotNull(orders.mpOrderId),
     eq(orders.status, "pending"),
     lt(orders.pixExpiresAt, sql`now() - interval '5 minutes'`),
-    gt(orders.pixExpiresAt, sql`now() - interval '2 days'`),
+    // cron (sem loja): até 2 dias; tela da cozinha/pedido: só os últimos 30 min (não repete o mesmo pedido a cada 8 s)
+    gt(orders.pixExpiresAt, storeId ? sql`now() - interval '30 minutes'` : sql`now() - interval '2 days'`),
   )
   const rows = await db
     .select({ id: orders.id, orderNumber: orders.orderNumber, slug: stores.slug })

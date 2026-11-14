@@ -53,7 +53,7 @@ export function NewOrderForm({
       ...(byDistance ? { deliveryAddress: addressText(fields.address), addressParts: partsFromFields(fields.address) } : {}),
       items: lines.map(toOrderItem),
     }
-    const sent = JSON.stringify(body)
+    const sent = JSON.stringify({ ...body, qr: showPixQr && pixQr }) // o "Mostrar QR" também conta como mudança
     attempt.current ??= { key: newAttemptKey(), sent }
     const idempotencyKey = attempt.current.key
     const changed = attempt.current.sent !== sent
@@ -65,14 +65,14 @@ export function NewOrderForm({
         setError("Sem resposta do servidor (conexão?). Toque em lançar de novo: se o pedido já tiver entrado, ele não será repetido.")
         return
       }
-      attempt.current = null
+      if (result.ok) attempt.current = null // só troca a chave depois de um pedido feito (ver checkout)
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
         return
       }
       if (result.duplicate && changed) {
-        setError(`O pedido #${result.orderNumber} já tinha entrado no quadro, sem a última alteração. Confira no quadro; se precisar, lance de novo (vira outro pedido).`)
+        setError(`O pedido #${result.orderNumber} já tinha entrado no quadro, sem a última alteração. Confira no quadro; lançar de novo cria OUTRO pedido com o carrinho todo.`)
         return
       }
       router.push(result.pixQr ? `/admin/pedidos/pix/${result.publicToken}` : "/admin/pedidos")

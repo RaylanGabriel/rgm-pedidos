@@ -49,7 +49,7 @@ export function CheckoutForm({
   const attempt = useRef<{ key: string; sent: string } | null>(null)
   const [received, setReceived] = useState<{ number: number; token: string } | null>(null)
   // Verificação anti-robô: desligada até o servidor pedir. O token vale um envio (key nova a cada resposta).
-  const [captcha, setCaptcha] = useState<{ needed: boolean; token: string | null; key: number }>({ needed: false, token: null, key: 0 })
+  const [captcha, setCaptcha] = useState<{ needed: boolean; token: string | null; key: number; failed?: boolean }>({ needed: false, token: null, key: 0 })
   const [remember, setRemember] = useState(true)
   const [usingSaved, setUsingSaved] = useState(false)
   // Conta: endereço salvo escolhido ("new" = digitar outro) e se o novo vai para a conta
@@ -149,7 +149,9 @@ export function CheckoutForm({
         setError("Não conseguimos confirmar o envio (conexão instável?). Toque em confirmar de novo: se o pedido já tiver chegado, ele não será repetido.")
         return
       }
-      attempt.current = null
+      // A chave só é trocada depois de um pedido feito: numa recusa (verificação, limite, campo) o servidor não criou
+      // nada COM ESTE envio, mas um envio anterior com a mesma chave pode ainda estar terminando — repetir com ela não duplica.
+      if (result.ok) attempt.current = null
       // token gasto: se a verificação estiver valendo (ou passou a valer agora), prepara outro
       if (captcha.needed || (!result.ok && result.needsCaptcha)) setCaptcha((c) => ({ needed: true, token: null, key: c.key + 1 }))
 
@@ -182,6 +184,11 @@ export function CheckoutForm({
     <>
       <Loader2 className="h-5 w-5 animate-spin" />
       Enviando pedido…
+    </>
+  ) : captcha.needed && turnstileSiteKey && !captcha.token && !captcha.failed ? (
+    <>
+      <Loader2 className="h-5 w-5 animate-spin" />
+      Verificando…
     </>
   ) : !store.isOpen ? (
     "Loja fechada no momento"
@@ -362,12 +369,23 @@ export function CheckoutForm({
             </div>
           )}
           {captcha.needed && turnstileSiteKey && (
-            <Turnstile key={captcha.key} siteKey={turnstileSiteKey} action="pedido" onToken={(token) => setCaptcha((c) => ({ ...c, token }))} />
+            <Turnstile
+              key={captcha.key}
+              siteKey={turnstileSiteKey}
+              action="pedido"
+              onToken={(token) => setCaptcha((c) => ({ ...c, token, failed: token ? false : c.failed }))}
+              onError={() => setCaptcha((c) => ({ ...c, failed: true }))}
+            />
+          )}
+          {captcha.needed && captcha.failed && (
+            <p role="alert" className="text-sm text-destructive">
+              A verificação não carregou (internet instável ou bloqueador de anúncios). Recarregue a página para tentar de novo.
+            </p>
           )}
           {received && (
             <div role="status" className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
               <p className="font-semibold">Seu pedido #{received.number} já tinha sido recebido — sem a última alteração.</p>
-              <p className="mt-1 text-muted-foreground">Confira o pedido. Se quiser também o que mudou, confirme de novo: vira um pedido separado.</p>
+              <p className="mt-1 text-muted-foreground">Confira o pedido. Confirmar de novo faz OUTRO pedido, com tudo o que está no carrinho — tire o que já veio no #{received.number}.</p>
               <Link href={`/pedido/${received.token}`} className="mt-2 inline-block font-semibold text-primary underline-offset-4 hover:underline">
                 Ver o pedido #{received.number}
               </Link>

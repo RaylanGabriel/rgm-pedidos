@@ -30,10 +30,15 @@ export async function clientIpKey() {
 
 export function ipBucket(ip: string) {
   if (!ip.includes(":")) return ip
-  const [head, tail = ""] = ip.toLowerCase().split("::")
+  // IPv4 escrito como IPv6 (::ffff:1.2.3.4): é um IPv4, conta inteiro (senão todos cairiam no mesmo grupo)
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip)
+  if (mapped) return mapped[1]
+  const [head, tail = ""] = ip.toLowerCase().split("%")[0].split("::")
   const left = head ? head.split(":") : []
   const right = tail ? tail.split(":") : []
-  const full = ip.includes("::") ? [...left, ...Array(8 - left.length - right.length).fill("0"), ...right] : left
+  const missing = 8 - left.length - right.length
+  if (ip.includes("::") && missing < 0) return ip // endereço malformado: usa como veio (nunca derruba a requisição)
+  const full = ip.includes("::") ? [...left, ...Array(missing).fill("0"), ...right] : left
   return `${full.slice(0, 4).map((h) => h.replace(/^0+(?=.)/, "")).join(":")}::/64`
 }
 
@@ -55,7 +60,10 @@ export async function recordHits(...keys: string[]) {
 export async function rateLimit(key: string, max: number, windowMs: number) {
   // Grava ANTES de contar: N pedidos simultâneos gravam os N e cada um conta pelo menos os que já gravaram, então
   // nunca passam mais que `max` (contar antes de gravar deixava todos verem o mesmo número e passarem juntos).
-  // Pedido recusado também conta: quem insiste continua bloqueado até a janela esvaziar.
-  await recordHits(key)
-  return (await hits(key, windowMs)) <= max
+  const [mine] = await db.insert(loginAttempts).values({ key }).returning({ id: loginAttempts.id })
+  if ((await hits(key, windowMs)) <= max) return true
+  // Recusado não ocupa vaga: apaga a própria batida. Senão um atacante mandando de propósito pedidos com o e-mail de
+  // alguém (ex.: código de login) manteria a chave da vítima sempre cheia, bloqueada para sempre.
+  await db.delete(loginAttempts).where(eq(loginAttempts.id, mine.id))
+  return false
 }
