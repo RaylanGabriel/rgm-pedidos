@@ -1,6 +1,7 @@
 # Revisão: itens 7, 8, 9 e 11 (14/nov/2026, branch `fix/revisao-7-8-9-11`)
 
-Um commit por item → preview testado → [ ] OK do Raylan → [ ] merge (sem migração) → [ ] produção conferida.
+Um commit por item → preview testado → [x] OK do Raylan → [x] merge (`f685758`, 14/nov) → [x] produção conferida
+(truques de /./ ficam no rgm.dev.br, páginas sem erro de JS, login real por código ok, cron ok, 0 erros).
 
 ## 7 — Pedidos falsos em massa (`85def0f`)
 - [x] rateLimit grava antes de contar (30 em paralelo com limite 10 → 0 passam; 12 em sequência → 10). Faxina >24 h só
@@ -94,11 +95,11 @@ revisores (segurança e bugs). Nenhuma falha crítica; isolamento entre lojas ok
 > terceiros), 9 (dados pessoais nos alertas) e 11 (tela de erro do painel; o quadro já trata falha de conexão).
 
 - [x] 6. (`bb4d9e0`: workers_dev/preview_urls false na produção, true no preview; produção conferida: workers.dev dá 404, domínios 200, login real ok, cron ok) Produção em rgm-pedidos.raylanmiranda1.workers.dev (workers_dev/preview_urls true). Conferido (200).
-- [ ] 7. Rate limit não atômico + checkout sem anti-robô → pedidos falsos em dinheiro.
-- [ ] 8. Bloqueio do dono por terceiros (5 erros por e-mail bloqueiam até a senha certa).
-- [ ] 9. Dados pessoais em error_events (params do Drizzle na mensagem de fora; token no path).
+- [x] 7. (em produção 14/nov, `f685758`) Rate limit não atômico + checkout sem anti-robô → pedidos falsos em dinheiro.
+- [x] 8. (em produção 14/nov, `f685758`) Bloqueio do dono por terceiros (5 erros por e-mail bloqueiam até a senha certa).
+- [x] 9. (em produção 14/nov, `f685758`) Dados pessoais em error_events (params do Drizzle na mensagem de fora; token no path).
 - [ ] 10. Sem CSP/HSTS.
-- [ ] 11. Sem error.tsx; ações sem try/catch derrubam o painel da cozinha.
+- [x] 11. (em produção 14/nov, `f685758`) Sem error.tsx; ações sem try/catch derrubam o painel da cozinha.
 - [ ] 12. Pix pendente conta como venda (relatórios, caixa, tempo de espera).
 - [ ] 13. Fechamento de caixa por dia do calendário (lojas que passam da meia-noite).
 - [ ] 14. Manutenção 2× a cada 8 s no quadro da cozinha.
