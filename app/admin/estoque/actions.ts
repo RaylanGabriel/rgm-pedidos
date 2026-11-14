@@ -134,6 +134,11 @@ export async function saveRecipeQtyAction(_prev: FormState, fd: FormData): Promi
     .where(and(eq(ingredients.storeId, storeId), eq(ingredients.trackStock, true)))
   const values: { ingredientId: string; qty: number | null }[] = []
   for (const { id } of tracked) {
+    // × na tela: marca "não usa" (quantidade 0) — some da ficha mesmo se estiver na descrição ou for botão "sem ___"
+    if (fd.has(`drop_${id}`)) {
+      values.push({ ingredientId: id, qty: 0 })
+      continue
+    }
     if (!fd.has(`q_${id}`)) continue
     const q = parseQty(formText(fd, `q_${id}`))
     if (q === undefined) return { error: "Quantidade inválida.", fieldErrors: { [`q_${id}`]: "Use um número, ex.: 1 ou 0,15" } }
@@ -141,7 +146,7 @@ export async function saveRecipeQtyAction(_prev: FormState, fd: FormData): Promi
   }
   if (!values.length) return { ok: true, message: "Nada para salvar." }
 
-  const set = values.filter((v) => v.qty !== null)
+  const set = values.filter((v) => v.qty !== null) // inclui o 0 do ×
   const clear = values.filter((v) => v.qty === null).map((v) => v.ingredientId)
   // Uma transação: grava as quantidades, limpa as que saíram e apaga a linha que não é botão "sem ___" nem gasta nada
   const upserts = set.map((v) =>

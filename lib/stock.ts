@@ -120,17 +120,21 @@ export async function listRecipes(storeId: string, tracked: { id: string; name: 
   ])
   const qty = new Map<string, Record<string, number>>()
   const linked = new Map<string, Set<string>>() // ids e nomes ligados ao lanche
+  const dropped = new Map<string, Set<string>>() // tirados pelo × (quantidade 0)
   for (const r of rows) {
     const set = linked.get(r.itemId) ?? new Set<string>()
     set.add(r.ingredientId).add(plain(r.name))
     linked.set(r.itemId, set)
     if (r.quantity !== null && Number(r.quantity) > 0) (qty.get(r.itemId) ?? qty.set(r.itemId, {}).get(r.itemId)!)[r.ingredientId] = Number(r.quantity)
+    if (r.quantity !== null && Number(r.quantity) === 0) (dropped.get(r.itemId) ?? dropped.set(r.itemId, new Set()).get(r.itemId)!).add(r.ingredientId)
   }
   return items.map((i) => {
     const quantities = qty.get(i.id) ?? {}
     const link = linked.get(i.id) ?? new Set<string>()
     const desc = plain(i.description ?? "")
+    const off = dropped.get(i.id) ?? new Set<string>()
     const mine = tracked
+      .filter((t) => !off.has(t.id))
       .filter((t) => quantities[t.id] || link.has(t.id) || link.has(plain(t.name)) || (plain(t.name).length >= 3 && desc.includes(plain(t.name))))
       .map((t) => t.id)
     return { id: i.id, name: i.name, active: i.active, quantities, mine }

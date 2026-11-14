@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { X } from "lucide-react"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
 import { Label } from "@/components/ui/label"
 import { fmtInput, UNIT_LABEL } from "@/lib/stock-format"
@@ -134,6 +135,17 @@ export function RecipeQtyForm({
   quantities: Record<string, number>
 }) {
   const [shown, setShown] = useState<string[]>(initial)
+  const [, startRemove] = useTransition()
+  // × tira o ingrediente do lanche na hora (zera a quantidade; a linha da ficha some se não for botão "sem ___")
+  const remove = (ingredientId: string) => {
+    setShown((s) => s.filter((id) => id !== ingredientId))
+    startRemove(async () => {
+      const fd = new FormData()
+      fd.set("itemId", itemId)
+      fd.set(`drop_${ingredientId}`, "1")
+      await saveRecipeQtyAction({}, fd)
+    })
+  }
   const fields = tracked.filter((t) => shown.includes(t.id))
   const rest = tracked.filter((t) => !shown.includes(t.id))
   const addSelect = rest.length > 0 && (
@@ -165,15 +177,25 @@ export function RecipeQtyForm({
           {fields.length > 0 && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {fields.map((t) => (
-                <Field
-                  key={t.id}
-                  label={`${t.name} (${t.unit})`}
-                  name={`q_${t.id}`}
-                  inputMode="decimal"
-                  defaultValue={quantities[t.id] ? fmtInput(quantities[t.id]) : ""}
-                  placeholder="0"
-                  error={s.fieldErrors?.[`q_${t.id}`]}
-                />
+                <div key={t.id} className="relative">
+                  <Field
+                    label={`${t.name} (${t.unit})`}
+                    name={`q_${t.id}`}
+                    inputMode="decimal"
+                    defaultValue={quantities[t.id] ? fmtInput(quantities[t.id]) : ""}
+                    placeholder="0"
+                    error={s.fieldErrors?.[`q_${t.id}`]}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => remove(t.id)}
+                    className="absolute -top-1 right-0 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                    aria-label={`Tirar ${t.name}${itemName ? ` de ${itemName}` : ""}`}
+                    title="Tirar este ingrediente do lanche"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
           )}

@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, asc, count, eq, inArray, isNull, max, not, notInArray, or, sql } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, max, not, notInArray } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { categories, ingredients, menuItemCategories, menuItemIngredients, menuItems } from "@/db/schema"
@@ -186,7 +186,7 @@ async function setRemovable(storeId: string, itemId: string, rawNames: string[])
         and(
           eq(menuItemIngredients.menuItemId, itemId),
           eq(menuItemIngredients.removable, false),
-          or(isNull(menuItemIngredients.quantity), sql`${menuItemIngredients.quantity} <= 0`),
+          isNull(menuItemIngredients.quantity), // quantidade 0 = "não usa" (marcado no Estoque): fica
         ),
       ),
     ...wanted.map((ingredientId, sortOrder) =>
