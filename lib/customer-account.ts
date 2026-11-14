@@ -5,6 +5,7 @@ import { z } from "zod"
 import { db } from "@/db"
 import { customerAddresses, customers, orders } from "@/db/schema"
 import type { OrderStatus } from "@/lib/order-shared"
+import { safeErrorText } from "@/lib/alerts"
 
 /*
  * Dados da conta do cliente: perfil, endereços, pedidos (de todas as lojas) e apagar a conta.
@@ -126,7 +127,7 @@ export async function afterOrder(
     if (!customer.phone && digits && digits.length >= 10 && digits.length <= 13) patch.phone = digits
     if (Object.keys(patch).length) await db.update(customers).set(patch).where(eq(customers.id, customer.id))
   } catch (err) {
-    console.error("conta: falha ao ligar o pedido à conta", err instanceof Error ? err.message : err)
+    console.error("conta: falha ao ligar o pedido à conta", safeErrorText(err))
   }
 }
 

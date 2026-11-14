@@ -1,3 +1,40 @@
+# Revisão: itens 7, 8, 9 e 11 (14/nov/2026, branch `fix/revisao-7-8-9-11`)
+
+Um commit por item → preview testado → [ ] OK do Raylan → [ ] merge (sem migração) → [ ] produção conferida.
+
+## 7 — Pedidos falsos em massa (`85def0f`)
+- [x] rateLimit grava antes de contar (30 em paralelo com limite 10 → 0 passam; 12 em sequência → 10). Faxina >24 h só
+  no cron. Erra para o lado seguro: rajada simultânea do mesmo IP é toda recusada.
+- [x] IPv6 por /64 (8 casos testados).
+- [x] Loja com 15+ pedidos em 5 min → checkout pede Turnstile. Preview: sem rajada passa direto; com rajada a 1ª tentativa
+  pede a verificação e a 2ª cria o pedido.
+
+## 8 — Login do dono bloqueável por terceiros (`e027a4e`)
+- [x] Limite por e-mail+IP (5), por IP (20) e teto por e-mail (50). Preview: 5 erros "de outro IP" → senha certa entra;
+  5 erros daqui → bloqueado.
+
+## 9 — Dados pessoais nos alertas (`9813c82`)
+- [x] Sem a linha "params:" do Drizzle; caminhos de página com token → [token]; marcador "pix-sem-conexao/<id>" intacto.
+
+## 11 — Tela de erro (`b6723a9`)
+- [x] app/admin/error.tsx (cozinha tenta sozinha a cada 15 s), app/error.tsx, app/global-error.tsx. Conferido com
+  `next dev` local e páginas temporárias que davam erro (apagadas). O `next dev` cria um AGENTS.md: apagado, fora do commit.
+
+## Verificação geral dos itens 1–11 (14/nov, 3 agentes em paralelo + testes)
+- **Falha achada em produção:** o redirecionamento aberto (item 4) ainda passava com `/.//site.com` (o navegador apaga
+  o "/." e sobra "//site.com"). Corrigido (`eeb7335`): localPath confere o caminho já normalizado; 30 ataques testados.
+- Item 9 incompleto: o caminho do instrumentation vem como "GET /pedido/<token>?…" e passava sem tirar o token (e o
+  "?…" voltou a ser guardado). Corrigido; logs do Worker também sem os valores da consulta.
+- Item 7: recusa passou a ocupar vaga (bloqueio renovável, tabela inchando) → a recusa apaga a própria batida.
+- Outros (`a5c8219`): safeReturn sempre absoluto (evita 500 no Google), IPv6 mapeado/malformado, aviso se o Turnstile não
+  carregar + "Verificando…", chave só troca depois de pedido feito, QR do balcão no "mudou", cozinha só confere Pix dos
+  últimos 30 min, state do MP em bytes, README.
+- Preview (`a5c8219`): redirecionamentos, login real, checkout/resposta perdida/mudou, 2 tablets, rajada e login do dono — ok.
+- Ficou anotado (baixo): login do painel e troca de senha ainda checam antes de gravar (Turnstile/sessão seguram);
+  `orderBurst` conta pedidos do balcão; Pix vencido há mais de 2 dias não é revisto pelo cron; React #418 no quadro.
+
+---
+
 # Correção dos 3 bugs de prioridade alta (13/nov/2026, branch `fix/bugs-revisao`)
 
 Um commit por bug + ajustes de uma revisão independente → preview testado → [x] OK do Raylan → [x] 0028 em prod → [x] merge (`d003941`)

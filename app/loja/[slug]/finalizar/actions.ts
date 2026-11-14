@@ -5,14 +5,20 @@ import { getCustomer } from "@/lib/auth/customer"
 import { addressSchema, afterOrder } from "@/lib/customer-account"
 import { quoteDistance, quoteError } from "@/lib/geo"
 import { addressPartsSchema, type QuoteView } from "@/lib/order-shared"
-import { createOrder, existingAttempt, getStoreBySlug, type CreateOrderResult } from "@/lib/orders"
-import { clientIp, rateLimit } from "@/lib/rate-limit-server"
+import { createOrder, existingAttempt, getStoreBySlug, orderBurst, type CreateOrderResult } from "@/lib/orders"
+import { clientIpKey, rateLimit } from "@/lib/rate-limit-server"
+import { verifyTurnstile } from "@/lib/turnstile"
 
 /**
  * Pedido feito pelo cliente no site público. Com conta (cookie csid): o pedido fica na conta e o endereço usado
  * é marcado (ou salvo, se for novo e o cliente pediu).
  */
-export async function placeOrder(slug: string, input: unknown, account?: { addressId?: string | null; saveAddress?: unknown }): Promise<CreateOrderResult> {
+export async function placeOrder(
+  slug: string,
+  input: unknown,
+  account?: { addressId?: string | null; saveAddress?: unknown },
+  captchaToken?: string | null,
+): Promise<CreateOrderResult> {
   const store = await getStoreBySlug(slug)
   if (!store) return { ok: false, error: "Loja não encontrada." }
 
@@ -22,8 +28,13 @@ export async function placeOrder(slug: string, input: unknown, account?: { addre
   if (again) return again
 
   // Anti-spam: até 10 pedidos a cada 10 minutos por IP em cada loja
-  if (!(await rateLimit(`order:${store.id}:${await clientIp()}`, 10, 10 * 60 * 1000))) {
+  if (!(await rateLimit(`order:${store.id}:${await clientIpKey()}`, 10, 10 * 60 * 1000))) {
     return { ok: false, error: "Muitos pedidos em sequência. Aguarde alguns minutos e tente de novo." }
+  }
+
+  // Rajada de pedidos na loja (provável robô): só então pede o Turnstile. No dia a dia o cliente nunca vê.
+  if ((await orderBurst(store.id)) && !(await verifyTurnstile(captchaToken, "pedido"))) {
+    return { ok: false, error: "A loja está recebendo muitos pedidos agora. Confirme a verificação abaixo e toque em confirmar de novo.", needsCaptcha: true }
   }
 
   const result = await createOrder(store.id, input, { requireOpen: true, pixOnline: true })
@@ -50,7 +61,7 @@ export async function quoteDeliveryAction(slug: string, rawParts: unknown): Prom
   const parts = addressPartsSchema.safeParse(rawParts)
   if (!parts.success) return { ok: false, error: parts.error.issues[0]?.message ?? "Endereço incompleto." }
   // Cada endereço novo consulta o mapa: limite por IP para ninguém usar a loja como serviço de mapas
-  if (!(await rateLimit(`quote:${await clientIp()}`, 40, 10 * 60 * 1000))) {
+  if (!(await rateLimit(`quote:${await clientIpKey()}`, 40, 10 * 60 * 1000))) {
     return { ok: false, error: "Muitas consultas em sequência. Aguarde alguns minutos." }
   }
   const q = await quoteDistance(store, parts.data)

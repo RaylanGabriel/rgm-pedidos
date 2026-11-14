@@ -3,7 +3,7 @@ import "server-only"
 import { lt } from "drizzle-orm"
 import { db } from "@/db"
 import { customerLoginCodes, customerSessions, loginAttempts, sessions } from "@/db/schema"
-import { cleanOldErrors, pendingAlert, recordError, type Alert } from "@/lib/alerts"
+import { cleanOldErrors, pendingAlert, recordError, safeErrorText, type Alert } from "@/lib/alerts"
 import { cancelOverduePix } from "@/lib/mercadopago"
 import { autoCompleteDeliveries } from "@/lib/orders"
 
@@ -20,7 +20,7 @@ export async function runMaintenance() {
       result[name] = await fn()
     } catch (err) {
       result[name] = "erro"
-      console.error(`cron: ${name} falhou:`, err instanceof Error ? err.message : err)
+      console.error(`cron: ${name} falhou:`, safeErrorText(err))
       await recordError("cron", name, err)
     }
   }

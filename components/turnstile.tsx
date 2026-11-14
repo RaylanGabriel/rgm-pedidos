@@ -40,16 +40,21 @@ export function Turnstile({
   siteKey,
   action,
   onToken,
+  onError,
 }: {
   siteKey: string
-  action: "login"
+  action: "login" | "pedido"
   onToken?: (token: string | null) => void
+  /** O widget não carregou ou deu erro (bloqueador, sem internet): quem usa avisa a pessoa em vez de travar */
+  onError?: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   // Guarda a função mais recente sem recriar o widget (atualizada fora da renderização)
   const onTokenRef = useRef(onToken)
+  const onErrorRef = useRef(onError)
   useEffect(() => {
     onTokenRef.current = onToken
+    onErrorRef.current = onError
   })
 
   useEffect(() => {
@@ -65,10 +70,16 @@ export function Turnstile({
           language: "pt-br",
           callback: (token: string) => onTokenRef.current?.(token),
           "expired-callback": () => onTokenRef.current?.(null),
-          "error-callback": () => onTokenRef.current?.(null),
+          "error-callback": () => {
+            onTokenRef.current?.(null)
+            onErrorRef.current?.()
+          },
         })
       })
-      .catch(() => onTokenRef.current?.(null))
+      .catch(() => {
+        onTokenRef.current?.(null)
+        onErrorRef.current?.()
+      })
     return () => {
       cancelled = true
       if (id) window.turnstile?.remove(id)

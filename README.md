@@ -75,10 +75,11 @@ Em produção com a primeira loja, a **Mr. Smash**.
 
 **O pedido só entra na cozinha depois de pago.**
 - Pix pendente fica numa faixa "Aguardando Pix", recolhida para não poluir a tela.
-- Pix vencido é cancelado sozinho.
+- Pix vencido é cancelado sozinho, depois de conferir no Mercado Pago que não foi pago. Se a loja estiver sem conexão
+  com o Mercado Pago (não dá para conferir), o pedido não é cancelado: fica em "Aguardando Pix" e o alerta avisa.
 - Se o Mercado Pago estiver fora do ar, o pedido cai para "Pix direto com a loja", sem perder a venda.
 
-**Sem tarefas agendadas (por enquanto).** A manutenção roda de forma preguiçosa ao ler os pedidos: fechar entregas esquecidas e cancelar Pix vencido. Um Cron Trigger da Cloudflare está planejado.
+**Tarefas agendadas (Cron Trigger da Cloudflare, a cada 5 min):** fechar entregas esquecidas, cancelar Pix vencido, limpar sessões e códigos vencidos e mandar o resumo de erros por e-mail. Backup diário do banco às 03:00.
 
 **Relatórios agregados em SQL** ([`lib/reports.ts`](lib/reports.ts)), e não somando pedidos em memória. A planilha **.xlsx é gerada sem biblioteca** ([`lib/xlsx.ts`](lib/xlsx.ts)), montando o OpenXML e o zip à mão, com números e datas de verdade.
 

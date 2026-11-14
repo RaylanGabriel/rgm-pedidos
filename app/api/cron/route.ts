@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto"
-import { recordError } from "@/lib/alerts"
+import { recordError, safeErrorText } from "@/lib/alerts"
 import { runBackup } from "@/lib/backup"
 import { runMaintenance } from "@/lib/maintenance"
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     console.log(`cron ${task}:`, JSON.stringify(summary), alerta ? `| alerta: ${alerta.subject}` : "")
     return Response.json(result)
   } catch (err) {
-    console.error(`cron ${task} falhou:`, err instanceof Error ? err.message : err)
+    console.error(`cron ${task} falhou:`, safeErrorText(err))
     await recordError("cron", task, err)
     return Response.json({ erro: true }, { status: 500 })
   }

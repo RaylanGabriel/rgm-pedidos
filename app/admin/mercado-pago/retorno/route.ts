@@ -20,7 +20,10 @@ export async function GET(req: Request) {
   const code = url.searchParams.get("code")
   const state = url.searchParams.get("state") ?? ""
   const [savedState, savedStore] = saved.split(".")
-  const same = !!savedState && savedState.length === state.length && timingSafeEqual(Buffer.from(savedState), Buffer.from(state))
+  // Compara o tamanho em BYTES (não em letras): um state com acento teria bytes diferentes e o timingSafeEqual daria erro 500
+  const a = Buffer.from(savedState)
+  const b = Buffer.from(state)
+  const same = !!savedState && a.length === b.length && timingSafeEqual(a, b)
   if (!code || !same || savedStore !== store.id) return back("erro=expirou")
 
   try {

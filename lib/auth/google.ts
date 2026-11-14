@@ -20,21 +20,23 @@ export const redirectUri = (requestOrigin: string) => `${authOrigin(requestOrigi
 
 /**
  * Para onde voltar depois de entrar: só caminho deste site ou uma loja da plataforma (https://<x>.rgm.dev.br).
- * Qualquer outra coisa vira "/" (impede usar o login para mandar o cliente a um site falso).
+ * Qualquer outra coisa vira a página inicial deste site (impede usar o login para mandar o cliente a um site falso).
+ * Sempre devolve um endereço COMPLETO: o redirecionamento do servidor não aceita só "/" (dava erro 500).
  */
 export function safeReturn(raw: string | null, requestOrigin: string) {
-  if (!raw || hasUnsafeUrlChars(raw)) return "/"
+  const home = new URL("/", requestOrigin).toString()
+  if (!raw || hasUnsafeUrlChars(raw)) return home
   if (raw.startsWith("/")) {
     const path = localPath(raw)
-    return path ? new URL(path, requestOrigin).toString() : "/"
+    return path ? new URL(path, requestOrigin).toString() : home
   }
   try {
     const u = new URL(raw)
     const host = cleanHost(u.host)
     const ours = ROOT_DOMAIN ? host === ROOT_DOMAIN || host.endsWith(`.${ROOT_DOMAIN}`) : u.origin === requestOrigin
-    return u.protocol === "https:" && ours ? u.toString() : "/"
+    return u.protocol === "https:" && ours ? u.toString() : home
   } catch {
-    return "/"
+    return home
   }
 }
 
