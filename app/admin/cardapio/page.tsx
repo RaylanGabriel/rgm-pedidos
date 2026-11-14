@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, ImageOff, Trash2 } from "lucide-react"
-import { asc, eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/db"
 import { categories, ingredients, menuItemCategories, menuItemIngredients, menuItems } from "@/db/schema"
 import { Badge } from "@/components/ui/badge"
@@ -51,7 +51,8 @@ export default async function CardapioAdminPage({ searchParams }: { searchParams
       .select({ itemId: menuItemIngredients.menuItemId, ingredientId: menuItemIngredients.ingredientId, name: ingredients.name })
       .from(menuItemIngredients)
       .innerJoin(ingredients, eq(ingredients.id, menuItemIngredients.ingredientId))
-      .where(eq(ingredients.storeId, store.id))
+      // só o que o cliente pode tirar (a ficha de estoque também usa esta tabela)
+      .where(and(eq(ingredients.storeId, store.id), eq(menuItemIngredients.removable, true)))
       .orderBy(asc(menuItemIngredients.sortOrder)),
   ])
   const catOptions = cats.map((c) => ({ id: c.id, name: c.name, extrasEnabled: c.extrasEnabled }))

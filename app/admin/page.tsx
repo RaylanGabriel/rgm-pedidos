@@ -1,11 +1,12 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Clock, ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, UtensilsCrossed, Settings, UserCog, Users, Wallet } from "lucide-react"
+import { Clock, ClipboardList, Plus, BarChart3, Bike, Building2, Flame, LogOut, ExternalLink, Package, UtensilsCrossed, Settings, UserCog, Users, Wallet } from "lucide-react"
 import { toggleStoreOpenAction } from "./actions"
 import Image from "next/image"
 import { requireStore } from "@/lib/auth/session"
 import { storeUrl } from "@/lib/site-url"
 import { storeOpenState, whenLabel } from "@/lib/hours"
+import { stockAlerts } from "@/lib/stock"
 import { Button } from "@/components/ui/button"
 
 export default async function AdminPage() {
@@ -23,6 +24,12 @@ export default async function AdminPage() {
       : isOpen
         ? "Recebendo pedidos pelo site."
         : "O site mostra o cardápio, mas não aceita pedidos."
+  const stock = canManage ? await stockAlerts(store.id) : null
+  const stockText = !stock?.tracked
+    ? "Controle o que acaba: pão, carne, bacon…"
+    : stock.out || stock.low
+      ? [stock.out ? `${stock.out} acabou` : null, stock.low ? `${stock.low} acabando` : null].filter(Boolean).join(" · ")
+      : `${stock.tracked} ingrediente${stock.tracked > 1 ? "s" : ""} em dia`
   const toggleLabel = openState.manual ? "Voltar ao horário" : store.hoursEnabled ? (isOpen ? "Fechar agora" : "Abrir agora") : isOpen ? "Fechar loja" : "Abrir loja"
 
   return (
@@ -182,6 +189,25 @@ export default async function AdminPage() {
               </CardContent>
             </Card>
           </Link>
+
+          {canManage && (
+            <Link href="/admin/estoque" className="group">
+              <Card className={`h-full transition-all hover:shadow-lg hover:scale-105 border-2 ${stock?.out ? "border-red-400" : stock?.low ? "border-amber-400" : "hover:border-accent"}`}>
+                <CardHeader>
+                  <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center mb-4 group-hover:bg-primary transition-colors">
+                    <Package className="w-6 h-6 text-accent-foreground" />
+                  </div>
+                  <CardTitle className="text-2xl">Estoque</CardTitle>
+                  <CardDescription className={stock?.out ? "font-semibold text-red-700 dark:text-red-400" : stock?.low ? "font-semibold text-amber-700 dark:text-amber-400" : ""}>
+                    {stockText}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Saldos, entradas, perdas, fichas dos lanches e o que comprar</p>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
           {canManage && (
             <Link href="/admin/configuracoes" className="group">

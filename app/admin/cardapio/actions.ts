@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, asc, count, eq, inArray, isNull, max, not } from "drizzle-orm"
+import { and, asc, count, eq, inArray, isNull, max, not, notInArray, or, sql } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { categories, ingredients, menuItemCategories, menuItemIngredients, menuItems } from "@/db/schema"
@@ -155,7 +155,7 @@ async function saveRecipe(storeId: string, itemId: string, fd: FormData) {
 /**
  * Grava os botões "sem ___" de um lanche. Cada nome vira o ingrediente **base** da loja de mesmo nome (sem
  * diferenciar maiúsculas), criado se faltar. Nunca usa um adicional: para não querer um adicional, é só não escolher.
- * A lista é pequena: apaga e grava de novo.
+ * Só mexe na marca "pode tirar": a quantidade de estoque da ficha (9b) e os ingredientes fixos (pão, carne) ficam.
  */
 async function setRemovable(storeId: string, itemId: string, rawNames: string[]) {
   const names = [...new Map(rawNames.map((n) => [nameKey(n), n])).values()].slice(0, 30)
@@ -175,9 +175,26 @@ async function setRemovable(storeId: string, itemId: string, rawNames: string[])
   }
   const wanted = [...new Set(names.map((n) => byName.get(nameKey(n))!))]
 
+  const notWanted = wanted.length ? notInArray(menuItemIngredients.ingredientId, wanted) : undefined
   await runBatch([
-    db.delete(menuItemIngredients).where(eq(menuItemIngredients.menuItemId, itemId)),
-    ...wanted.map((ingredientId, sortOrder) => db.insert(menuItemIngredients).values({ menuItemId: itemId, ingredientId, removable: true, sortOrder })),
+    // o que saiu da lista deixa de ser "pode tirar"…
+    db.update(menuItemIngredients).set({ removable: false }).where(and(eq(menuItemIngredients.menuItemId, itemId), notWanted)),
+    // …e some da ficha se não tiver quantidade de estoque
+    db
+      .delete(menuItemIngredients)
+      .where(
+        and(
+          eq(menuItemIngredients.menuItemId, itemId),
+          eq(menuItemIngredients.removable, false),
+          or(isNull(menuItemIngredients.quantity), sql`${menuItemIngredients.quantity} <= 0`),
+        ),
+      ),
+    ...wanted.map((ingredientId, sortOrder) =>
+      db
+        .insert(menuItemIngredients)
+        .values({ menuItemId: itemId, ingredientId, removable: true, sortOrder })
+        .onConflictDoUpdate({ target: [menuItemIngredients.menuItemId, menuItemIngredients.ingredientId], set: { removable: true, sortOrder } }),
+    ),
   ])
 }
 
@@ -199,7 +216,7 @@ export async function fillRemovableAction() {
       .selectDistinct({ itemId: menuItemIngredients.menuItemId })
       .from(menuItemIngredients)
       .innerJoin(menuItems, eq(menuItems.id, menuItemIngredients.menuItemId))
-      .where(eq(menuItems.storeId, storeId)),
+      .where(and(eq(menuItems.storeId, storeId), eq(menuItemIngredients.removable, true))),
   ])
   for (const item of pendingRemovable(items, cats, done.map((d) => d.itemId))) {
     await setRemovable(storeId, item.id, item.names)
