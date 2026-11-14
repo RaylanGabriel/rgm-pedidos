@@ -16,7 +16,30 @@ const KEEP_DAYS = 30
 /** Tira usuário/senha de URLs (ex.: string de conexão) e corta o tamanho. */
 const clean = (s: string, max: number) => s.replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1<oculto>@").slice(0, max)
 
-const describe = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e))
+/**
+ * Erro → texto do alerta, SEM dados de cliente: o Drizzle põe os valores da consulta numa linha "params: …" (nome,
+ * telefone, endereço digitados no pedido). A consulta em si (o SQL) fica; os valores, não.
+ */
+const describe = (e: unknown) => {
+  const text = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+  const params = text.indexOf("\nparams:")
+  return params >= 0 ? `${text.slice(0, params)} [valores omitidos]` : text
+}
+
+/**
+ * Caminho sem os tokens: /pedido/<token> e /admin/pedidos/pix/<token> abrem o pedido de alguém (o token é a chave).
+ * Qualquer trecho longo de letras/números (token, id) vira [token]; nomes curtos (lojas, páginas) ficam.
+ * Só caminhos de página ("/..."): marcadores internos como "pix-sem-conexao/<id>" ficam inteiros (o cron usa o id
+ * para saber que já avisou daquele pedido).
+ */
+function redactPath(path: string) {
+  if (!path.startsWith("/")) return path
+  return path
+    .split("?")[0]
+    .split("/")
+    .map((seg) => (/^[A-Za-z0-9_-]{16,}$/.test(seg) ? "[token]" : seg))
+    .join("/")
+}
 
 export async function recordError(source: string, path: string | null, err: unknown, digest?: string | null) {
   try {
@@ -26,7 +49,7 @@ export async function recordError(source: string, path: string | null, err: unkn
     const message = cause ? `${describe(cause)} ← em: ${describe(err)}` : describe(err)
     await db.insert(errorEvents).values({
       source,
-      path: path ? clean(path.split("?")[0], 200) : null,
+      path: path ? clean(redactPath(path), 200) : null,
       message: clean(message, 500),
       digest: digest ?? (err as { digest?: string } | null)?.digest ?? null,
     })
