@@ -193,7 +193,20 @@ export const getDeliveryConfig = cache(async (store: StoreRow): Promise<Delivery
 export type CreateOrderResult =
   /** duplicate = esta tentativa (mesma chave) já tinha criado o pedido: devolve o existente, nada novo foi criado */
   | { ok: true; orderNumber: number; publicToken: string; pixQr?: boolean; duplicate?: boolean }
-  | { ok: false; error: string; fieldErrors?: Record<string, string | undefined> }
+  /** needsCaptcha = rajada de pedidos na loja: o checkout mostra o Turnstile e o cliente confirma de novo */
+  | { ok: false; error: string; fieldErrors?: Record<string, string | undefined>; needsCaptcha?: boolean }
+
+/** Pedidos nos últimos 5 min a partir dos quais o checkout passa a pedir o Turnstile (movimento normal fica abaixo). */
+const BURST_ORDERS = 15
+
+/** A loja está recebendo uma rajada de pedidos agora (provável robô)? */
+export async function orderBurst(storeId: string) {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(and(eq(orders.storeId, storeId), gte(orders.createdAt, sql`now() - interval '5 minutes'`)))
+  return (row?.n ?? 0) >= BURST_ORDERS
+}
 
 /**
  * Esta tentativa (chave do navegador) já criou um pedido? Roda ANTES de qualquer outra checagem (limite de pedidos,

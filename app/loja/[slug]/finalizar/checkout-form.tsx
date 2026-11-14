@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, MapPin, ShieldCheck, UserCheck, UserRound } from "l
 import { addressLine } from "../conta/account-sections"
 import type { AddressValue } from "../conta/account-forms"
 import { Button } from "@/components/ui/button"
+import { Turnstile } from "@/components/turnstile"
 import { CartSummary, cartTotal } from "@/components/order/cart-summary"
 import { CartSuggestions } from "@/components/order/cart-suggestions"
 import { emptyOrderFields, OrderFields, type OrderFieldsValue } from "@/components/order/order-fields"
@@ -22,6 +23,7 @@ export function CheckoutForm({
   delivery,
   pixOnline = false,
   account = null,
+  turnstileSiteKey = null,
 }: {
   store: PublicStore
   menu: MenuView
@@ -30,6 +32,8 @@ export function CheckoutForm({
   pixOnline?: boolean
   /** Cliente logado (conta opcional): nome/WhatsApp e endereços salvos */
   account?: { email: string; name: string | null; phone: string | null; addresses: AddressValue[] } | null
+  /** Turnstile: só aparece se o servidor pedir (rajada de pedidos na loja) */
+  turnstileSiteKey?: string | null
 }) {
   const cart = useCart(store.slug, menu)
   const router = useRouter()
@@ -44,6 +48,8 @@ export function CheckoutForm({
   // `sent` = o pedido como foi enviado na 1ª vez: se o cliente mudou algo antes de repetir, avisamos em vez de esconder.
   const attempt = useRef<{ key: string; sent: string } | null>(null)
   const [received, setReceived] = useState<{ number: number; token: string } | null>(null)
+  // Verificação anti-robô: desligada até o servidor pedir. O token vale um envio (key nova a cada resposta).
+  const [captcha, setCaptcha] = useState<{ needed: boolean; token: string | null; key: number }>({ needed: false, token: null, key: 0 })
   const [remember, setRemember] = useState(true)
   const [usingSaved, setUsingSaved] = useState(false)
   // Conta: endereço salvo escolhido ("new" = digitar outro) e se o novo vai para a conta
@@ -137,13 +143,15 @@ export function CheckoutForm({
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof placeOrder>>
       try {
-        result = await placeOrder(store.slug, { ...body, idempotencyKey }, accountInfo)
+        result = await placeOrder(store.slug, { ...body, idempotencyKey }, accountInfo, captcha.token)
       } catch {
         // Sem resposta: o pedido pode ter sido criado. Mantém a chave — tocar de novo não duplica.
         setError("Não conseguimos confirmar o envio (conexão instável?). Toque em confirmar de novo: se o pedido já tiver chegado, ele não será repetido.")
         return
       }
       attempt.current = null
+      // token gasto: se a verificação estiver valendo (ou passou a valer agora), prepara outro
+      if (captcha.needed || (!result.ok && result.needsCaptcha)) setCaptcha((c) => ({ needed: true, token: null, key: c.key + 1 }))
 
       if (!result.ok) {
         setError(result.error)
@@ -184,7 +192,8 @@ export function CheckoutForm({
       {pixOnline && fields.paymentMethod === "pix" ? "Confirmar e pagar com Pix" : "Confirmar pedido"} · {formatBRL(total)}
     </>
   )
-  const canSubmit = store.isOpen && !pending && !(isDelivery && fee === null) && !belowMin
+  const waitingCaptcha = captcha.needed && !!turnstileSiteKey && !captcha.token
+  const canSubmit = store.isOpen && !pending && !(isDelivery && fee === null) && !belowMin && !waitingCaptcha
 
   const trust = (
     <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
@@ -351,6 +360,9 @@ export function CheckoutForm({
             <div ref={errorRef} role="alert" className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
               <p className="text-sm font-medium text-destructive">{error}</p>
             </div>
+          )}
+          {captcha.needed && turnstileSiteKey && (
+            <Turnstile key={captcha.key} siteKey={turnstileSiteKey} action="pedido" onToken={(token) => setCaptcha((c) => ({ ...c, token }))} />
           )}
           {received && (
             <div role="status" className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">

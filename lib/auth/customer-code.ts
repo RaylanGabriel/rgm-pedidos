@@ -7,7 +7,7 @@ import { db } from "@/db"
 import { customerLoginCodes } from "@/db/schema"
 import { createCustomerSession, upsertCustomer } from "@/lib/auth/customer"
 import { emailConfigured, loginCodeEmail, sendEmail } from "@/lib/email"
-import { clientIp, rateLimit } from "@/lib/rate-limit-server"
+import { clientIpKey, rateLimit } from "@/lib/rate-limit-server"
 
 /*
  * Entrar com código de 6 dígitos por e-mail (sem senha). Proteções:
@@ -31,7 +31,7 @@ export async function requestLoginCode(rawEmail: string, storeName: string | nul
   const email = parsed.data
   if (!emailConfigured()) return { error: "Entrar por e-mail ainda não está disponível. Use o Google ou peça sem conta." }
 
-  const ip = await clientIp()
+  const ip = await clientIpKey()
   if (
     !(await rateLimit(`code-ip:${ip}`, 10, 60 * 60 * 1000)) ||
     !(await rateLimit(`code-email:${email}`, 3, 15 * 60 * 1000)) ||
@@ -56,7 +56,7 @@ export async function verifyLoginCode(rawEmail: string, rawCode: string): Promis
   const email = emailSchema.safeParse(rawEmail)
   const code = rawCode.replace(/\D/g, "")
   if (!email.success || code.length !== 6) return { error: "Digite os 6 números do código." }
-  if (!(await rateLimit(`code-verify-ip:${await clientIp()}`, 30, 15 * 60 * 1000))) {
+  if (!(await rateLimit(`code-verify-ip:${await clientIpKey()}`, 30, 15 * 60 * 1000))) {
     return { error: "Muitas tentativas. Espere alguns minutos e tente de novo." }
   }
 

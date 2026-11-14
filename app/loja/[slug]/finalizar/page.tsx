@@ -7,6 +7,7 @@ import { CheckoutForm } from "./checkout-form"
 import { storeBase } from "@/lib/site-url"
 import { getCustomer } from "@/lib/auth/customer"
 import { getAddresses } from "@/lib/customer-account"
+import { turnstileSiteKey } from "@/lib/turnstile"
 
 export const metadata = { title: "Finalizar pedido" }
 
@@ -39,7 +40,7 @@ export default async function FinalizarPage({ params }: { params: Promise<{ slug
     <div style={brandStyle(pub.primaryColor)} className="min-h-screen flex flex-col bg-background">
       <StoreHeader store={pub} />
       <main className="flex-1">
-        <CheckoutForm store={pub} menu={menu} delivery={delivery} pixOnline={!!mp && !mp.needsReconnect} account={account} />
+        <CheckoutForm store={pub} menu={menu} delivery={delivery} pixOnline={!!mp && !mp.needsReconnect} account={account} turnstileSiteKey={turnstileSiteKey()} />
       </main>
       <StoreFooter store={pub} />
     </div>

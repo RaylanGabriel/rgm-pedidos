@@ -42,7 +42,7 @@ export function Turnstile({
   onToken,
 }: {
   siteKey: string
-  action: "login"
+  action: "login" | "pedido"
   onToken?: (token: string | null) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
