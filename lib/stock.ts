@@ -43,13 +43,16 @@ export async function reconcileStock() {
   const pend = await db.execute<{ id: string }>(sql`
     select id from orders
      where stock_applied_at is null and status <> 'cancelled' and (mp_order_id is null or payment_status = 'paid')
+       -- 2 min de folga: um Pix online nasce sem a cobrança (o QR é gerado logo depois) — não confundir com "já na cozinha"
+       and created_at < now() - interval '2 minutes'
      limit 200`)
   const back = await db.execute<{ id: string }>(sql`
     select id from orders
      where status = 'cancelled' and stock_applied_at is not null and stock_returned_at is null
      limit 200`)
-  for (const { id } of pend.rows) await db.execute(sql`select apply_order_stock(${id}::uuid)`)
-  for (const { id } of back.rows) await db.execute(sql`select return_order_stock(${id}::uuid)`)
+  // um pedido com problema não trava os outros (o erro vai para o alerta)
+  for (const { id } of pend.rows) await applyOrderStock(id)
+  for (const { id } of back.rows) await returnOrderStock(id)
   return pend.rows.length + back.rows.length
 }
 

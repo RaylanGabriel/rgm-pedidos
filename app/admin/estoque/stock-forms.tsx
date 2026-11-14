@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { ActionForm, Field, SubmitButton } from "@/components/admin/form-ui"
 import { Label } from "@/components/ui/label"
-import { fmtQty, UNIT_LABEL } from "@/lib/stock-format"
+import { fmtInput, UNIT_LABEL } from "@/lib/stock-format"
 import { saveRecipeQtyAction, stockMovementAction, trackIngredientAction } from "./actions"
 
 const selectClass =
@@ -64,7 +64,7 @@ export function TrackForm({
               label="Avisar quando tiver menos de"
               name="minStock"
               inputMode="decimal"
-              defaultValue={current?.minStock != null ? fmtQty(current.minStock) : ""}
+              defaultValue={current?.minStock != null ? fmtInput(current.minStock) : ""}
               placeholder="ex.: 20"
               error={s.fieldErrors?.minStock}
             />
@@ -73,7 +73,7 @@ export function TrackForm({
                 label="1 adicional gasta"
                 name="extraAmount"
                 inputMode="decimal"
-                defaultValue={fmtQty(current?.extraAmount ?? 1)}
+                defaultValue={fmtInput(current?.extraAmount ?? 1)}
                 hint="Ex.: bacon extra = 2 fatias"
                 error={s.fieldErrors?.extraAmount}
               />
@@ -137,7 +137,7 @@ export function RecipeQtyForm({
                 label={`${t.name} (${t.unit})`}
                 name={`q_${t.id}`}
                 inputMode="decimal"
-                defaultValue={quantities[t.id] ? fmtQty(quantities[t.id]) : ""}
+                defaultValue={quantities[t.id] ? fmtInput(quantities[t.id]) : ""}
                 placeholder="0"
                 error={s.fieldErrors?.[`q_${t.id}`]}
               />

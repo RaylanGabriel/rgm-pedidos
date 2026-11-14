@@ -30,7 +30,12 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
 
   const all = await listStockIngredients(store.id)
   const tracked = all.filter((i) => i.trackStock)
-  const untracked = all.filter((i) => !i.trackStock && i.active)
+  // Base e adicional com o mesmo nome (ex.: Bacon): oferece só o adicional — um contador para a ficha e o "+ bacon"
+  const extraNames = new Set(all.filter((i) => i.isExtra).map((i) => i.name.trim().toLowerCase()))
+  const trackedNames = new Set(tracked.map((i) => i.name.trim().toLowerCase()))
+  const untracked = all.filter(
+    (i) => !i.trackStock && i.active && !trackedNames.has(i.name.trim().toLowerCase()) && (i.isExtra || !extraNames.has(i.name.trim().toLowerCase())),
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
@@ -138,7 +143,8 @@ async function Recipes({ storeId, tracked }: { storeId: string; tracked: { id: s
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Quanto 1 unidade de cada lanche gasta. Deixe vazio o que ele não usa. &quot;Sem cebola&quot; no pedido não desconta a cebola;
-        adicionais descontam pelo que você definiu no ingrediente. Combo sem ficha própria usa a ficha dos lanches que inclui.
+        adicionais descontam pelo que você definiu no ingrediente. Combo já desconta os lanches que inclui (pelo nome na descrição):
+        na ficha do combo, coloque só o que é dele, como copo ou embalagem.
       </p>
       {items.map((it) => (
         <Card key={it.id} className={it.active ? "" : "opacity-60"}>

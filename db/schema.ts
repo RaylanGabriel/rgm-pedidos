@@ -463,6 +463,9 @@ export const orders = pgTable(
     uniqueIndex("orders_store_number_unique").on(t.storeId, t.orderNumber),
     uniqueIndex("orders_public_token_unique").on(t.publicToken),
     uniqueIndex("orders_store_idempotency_unique").on(t.storeId, t.idempotencyKey),
+    // Estoque (9b): a conferência do cron só olha os poucos pedidos pendentes de desconto/devolução
+    index("orders_stock_pending_idx").on(t.createdAt).where(sql`${t.stockAppliedAt} is null`),
+    index("orders_stock_return_idx").on(t.createdAt).where(sql`${t.status} = 'cancelled' and ${t.stockAppliedAt} is not null and ${t.stockReturnedAt} is null`),
     index("orders_mp_order_idx").on(t.mpOrderId),
     index("orders_store_status_created_idx").on(t.storeId, t.status, t.createdAt),
     index("orders_customer_created_idx").on(t.customerId, t.createdAt),

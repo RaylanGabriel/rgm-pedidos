@@ -9,6 +9,7 @@ import { isOwner } from "@/lib/auth/session"
 import { formText, type FormState } from "@/lib/form-state"
 import { nameKey } from "@/lib/recipe"
 import { STOCK_UNITS } from "@/lib/stock"
+import { parseQty } from "@/lib/stock-format"
 
 /*
  * Estoque (9b) — só o dono. Tudo filtrado pela loja da sessão.
@@ -17,16 +18,6 @@ import { STOCK_UNITS } from "@/lib/stock"
 
 const NO_PERMISSION: FormState = { error: "Só o dono da loja pode mexer no estoque." }
 const uuid = z.string().uuid()
-const MAX_QTY = 1_000_000
-
-/** "1,5" / "1.5" / "" → número (≥ 0) ou null. undefined = inválido. */
-function parseQty(raw: string): number | null | undefined {
-  const t = raw.replace(/\s/g, "").replace(",", ".")
-  if (!t) return null
-  if (!/^\d+(\.\d{1,3})?$/.test(t)) return undefined
-  const n = Number(t)
-  return n <= MAX_QTY ? n : undefined
-}
 
 function refresh(slug: string) {
   revalidatePath("/admin/estoque")
@@ -52,9 +43,10 @@ export async function trackIngredientAction(_prev: FormState, fd: FormData): Pro
     if (!uuid.safeParse(id).success) return { error: "Ingrediente inválido." }
   } else {
     if (newName.length < 2 || newName.length > 60) return { error: "Escolha um ingrediente ou digite o nome.", fieldErrors: { newName: "De 2 a 60 letras" } }
-    // mesmo nome de um ingrediente base que já existe: usa ele (não duplica "Pão")
-    const base = await db.select({ id: ingredients.id, name: ingredients.name }).from(ingredients).where(and(eq(ingredients.storeId, storeId), eq(ingredients.isExtra, false)))
-    const same = base.find((b) => nameKey(b.name) === nameKey(newName))
+    // mesmo nome de um ingrediente que já existe: usa ele (não duplica "Pão"). Se houver o adicional e o base com o
+    // mesmo nome (ex.: Bacon), fica o ADICIONAL: um contador só para a ficha e para o "+ bacon".
+    const all = await db.select({ id: ingredients.id, name: ingredients.name, isExtra: ingredients.isExtra }).from(ingredients).where(eq(ingredients.storeId, storeId))
+    const same = all.filter((b) => nameKey(b.name) === nameKey(newName)).sort((a, b) => Number(b.isExtra) - Number(a.isExtra))[0]
     if (same) id = same.id
     else {
       const [c] = await db
