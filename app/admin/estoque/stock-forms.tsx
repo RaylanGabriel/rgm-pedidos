@@ -115,35 +115,74 @@ export function MovementForm({ ingredientId, unit }: { ingredientId: string; uni
   )
 }
 
-/** Ficha de estoque de um lanche: quanto 1 unidade gasta de cada ingrediente controlado. */
+/**
+ * Ficha de estoque de um lanche: quanto 1 unidade gasta de cada ingrediente controlado DELE (`initial`: os da
+ * descrição/ficha). Outro controlado entra pelo "+ Ingrediente". Só os campos na tela são salvos.
+ */
 export function RecipeQtyForm({
   itemId,
+  itemName,
   tracked,
+  initial,
   quantities,
 }: {
   itemId: string
+  /** lista compacta ("Outros itens"): o nome vai na mesma linha */
+  itemName?: string
   tracked: { id: string; name: string; unit: string }[]
+  initial: string[]
   quantities: Record<string, number>
 }) {
+  const [shown, setShown] = useState<string[]>(initial)
+  const fields = tracked.filter((t) => shown.includes(t.id))
+  const rest = tracked.filter((t) => !shown.includes(t.id))
+  const addSelect = rest.length > 0 && (
+    <select
+      aria-label={`Incluir ingrediente${itemName ? ` em ${itemName}` : ""}`}
+      value=""
+      onChange={(e) => e.target.value && setShown((s) => [...s, e.target.value])}
+      className={`${selectClass} w-auto text-primary`}
+    >
+      <option value="">+ Ingrediente</option>
+      {rest.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.name}
+        </option>
+      ))}
+    </select>
+  )
   return (
     <ActionForm action={saveRecipeQtyAction} className="space-y-3">
       {(s) => (
         <>
           <input type="hidden" name="itemId" value={itemId} />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {tracked.map((t) => (
-              <Field
-                key={t.id}
-                label={`${t.name} (${t.unit})`}
-                name={`q_${t.id}`}
-                inputMode="decimal"
-                defaultValue={quantities[t.id] ? fmtInput(quantities[t.id]) : ""}
-                placeholder="0"
-                error={s.fieldErrors?.[`q_${t.id}`]}
-              />
-            ))}
-          </div>
-          <SubmitButton size="sm">Salvar ficha</SubmitButton>
+          {itemName && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{itemName}</span>
+              {addSelect}
+            </div>
+          )}
+          {fields.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {fields.map((t) => (
+                <Field
+                  key={t.id}
+                  label={`${t.name} (${t.unit})`}
+                  name={`q_${t.id}`}
+                  inputMode="decimal"
+                  defaultValue={quantities[t.id] ? fmtInput(quantities[t.id]) : ""}
+                  placeholder="0"
+                  error={s.fieldErrors?.[`q_${t.id}`]}
+                />
+              ))}
+            </div>
+          )}
+          {(fields.length > 0 || !itemName) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {fields.length > 0 && <SubmitButton size="sm">Salvar ficha</SubmitButton>}
+              {!itemName && addSelect}
+            </div>
+          )}
         </>
       )}
     </ActionForm>

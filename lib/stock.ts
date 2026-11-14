@@ -96,27 +96,45 @@ export async function stockAlerts(storeId: string) {
   return row ?? { out: 0, low: 0, tracked: 0 }
 }
 
-/** Fichas: cada lanche com a quantidade de cada ingrediente controlado (para a aba Fichas). */
-export async function listRecipes(storeId: string) {
+/** Nome comparável: minúsculas, sem acento, espaços simples ("Pão  Brioche" → "pao brioche"). */
+const plain = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/\s+/g, " ").trim()
+
+/**
+ * Fichas (aba Fichas): cada lanche com a quantidade de cada ingrediente controlado e QUAIS ingredientes são dele —
+ * os que aparecem na descrição, os da ficha (botões "sem ___" ou quantidade já salva). Só esses aparecem na tela;
+ * outro controlado entra pelo "+ Ingrediente".
+ */
+export async function listRecipes(storeId: string, tracked: { id: string; name: string }[]) {
   const [items, rows] = await Promise.all([
     db
-      .select({ id: menuItems.id, name: menuItems.name, active: menuItems.active })
+      .select({ id: menuItems.id, name: menuItems.name, description: menuItems.description, active: menuItems.active })
       .from(menuItems)
       .where(eq(menuItems.storeId, storeId))
       .orderBy(desc(menuItems.active), asc(menuItems.name)),
     db
-      .select({ itemId: menuItemIngredients.menuItemId, ingredientId: menuItemIngredients.ingredientId, quantity: menuItemIngredients.quantity })
+      .select({ itemId: menuItemIngredients.menuItemId, ingredientId: menuItemIngredients.ingredientId, name: ingredients.name, quantity: menuItemIngredients.quantity })
       .from(menuItemIngredients)
       .innerJoin(menuItems, eq(menuItems.id, menuItemIngredients.menuItemId))
-      .where(and(eq(menuItems.storeId, storeId), sql`${menuItemIngredients.quantity} > 0`)),
+      .innerJoin(ingredients, eq(ingredients.id, menuItemIngredients.ingredientId))
+      .where(eq(menuItems.storeId, storeId)),
   ])
-  const byItem = new Map<string, Record<string, number>>()
+  const qty = new Map<string, Record<string, number>>()
+  const linked = new Map<string, Set<string>>() // ids e nomes ligados ao lanche
   for (const r of rows) {
-    const m = byItem.get(r.itemId) ?? {}
-    m[r.ingredientId] = Number(r.quantity)
-    byItem.set(r.itemId, m)
+    const set = linked.get(r.itemId) ?? new Set<string>()
+    set.add(r.ingredientId).add(plain(r.name))
+    linked.set(r.itemId, set)
+    if (r.quantity !== null && Number(r.quantity) > 0) (qty.get(r.itemId) ?? qty.set(r.itemId, {}).get(r.itemId)!)[r.ingredientId] = Number(r.quantity)
   }
-  return items.map((i) => ({ ...i, quantities: byItem.get(i.id) ?? {} }))
+  return items.map((i) => {
+    const quantities = qty.get(i.id) ?? {}
+    const link = linked.get(i.id) ?? new Set<string>()
+    const desc = plain(i.description ?? "")
+    const mine = tracked
+      .filter((t) => quantities[t.id] || link.has(t.id) || link.has(plain(t.name)) || (plain(t.name).length >= 3 && desc.includes(plain(t.name))))
+      .map((t) => t.id)
+    return { id: i.id, name: i.name, active: i.active, quantities, mine }
+  })
 }
 
 export const MOVEMENT_LABEL = { order: "Pedido", order_return: "Pedido cancelado", purchase: "Entrada", loss: "Perda", adjust: "Ajuste" } as const

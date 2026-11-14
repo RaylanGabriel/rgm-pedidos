@@ -138,25 +138,40 @@ async function Recipes({ storeId, tracked }: { storeId: string; tracked: { id: s
   if (!tracked.length) {
     return <p className="text-sm text-muted-foreground">Primeiro escolha os ingredientes que quer controlar, na aba Saldos.</p>
   }
-  const items = await listRecipes(storeId)
+  const items = await listRecipes(storeId, tracked)
+  const withIngredients = items.filter((it) => it.mine.length)
+  const others = items.filter((it) => !it.mine.length)
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Quanto 1 unidade de cada lanche gasta. Deixe vazio o que ele não usa. &quot;Sem cebola&quot; no pedido não desconta a cebola;
-        adicionais descontam pelo que você definiu no ingrediente. Combo já desconta os lanches que inclui (pelo nome na descrição):
-        na ficha do combo, coloque só o que é dele, como copo ou embalagem.
+        Quanto 1 unidade de cada lanche gasta. Aparecem os ingredientes controlados que estão na descrição ou na ficha do lanche;
+        para outro (ex.: o pão, se a descrição não fala dele), use &quot;+ Ingrediente&quot;. &quot;Sem cebola&quot; no pedido não desconta a
+        cebola. Combo já desconta os lanches que inclui: na ficha dele, só o que é do combo (copo, embalagem).
       </p>
-      {items.map((it) => (
+      {withIngredients.map((it) => (
         <Card key={it.id} className={it.active ? "" : "opacity-60"}>
           <CardContent className="space-y-3 pt-6">
             <h2 className="font-semibold">
               {it.name}
               {!it.active && <span className="ml-2 text-xs font-normal text-muted-foreground">(oculto)</span>}
             </h2>
-            <RecipeQtyForm itemId={it.id} tracked={tracked} quantities={it.quantities} />
+            <RecipeQtyForm itemId={it.id} tracked={tracked} initial={it.mine} quantities={it.quantities} />
           </CardContent>
         </Card>
       ))}
+      {others.length > 0 && (
+        <Card>
+          <CardContent className="space-y-1 pt-6">
+            <h2 className="font-semibold">Outros itens do cardápio</h2>
+            <p className="mb-2 text-sm text-muted-foreground">Não usam nenhum ingrediente controlado. Se algum usa, inclua por aqui.</p>
+            {others.map((it) => (
+              <div key={it.id} className={`border-t py-3 ${it.active ? "" : "opacity-60"}`}>
+                <RecipeQtyForm itemId={it.id} itemName={it.name} tracked={tracked} initial={[]} quantities={it.quantities} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
