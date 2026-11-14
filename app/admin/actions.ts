@@ -8,6 +8,7 @@ import { orders, stores } from "@/db/schema"
 import { requireStore } from "@/lib/auth/session"
 import { parseHours, scheduleState, storeOpenState } from "@/lib/hours"
 import { dropPixCharge } from "@/lib/mercadopago"
+import { applyOrderStock } from "@/lib/stock"
 import { createOrder, setOrderStatus, type CreateOrderResult } from "@/lib/orders"
 
 const statusSchema = z.enum(["pending", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"])
@@ -76,6 +77,8 @@ export async function resolveCounterPixAction(orderId: string, choice: string): 
           { paymentMethod: parsed.data, mpOrderId: null, pixCode: null, pixExpiresAt: null },
     )
     .where(and(eq(orders.id, o.id), eq(orders.paymentStatus, "pending")))
+  // Pagou de outro jeito: o pedido entra na cozinha agora → desconta o estoque
+  if (parsed.data !== "cancel") await applyOrderStock(o.id)
   revalidatePath("/admin/pedidos")
   return { ok: true }
 }

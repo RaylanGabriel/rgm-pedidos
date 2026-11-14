@@ -26,6 +26,7 @@ import {
   type OrderWithItemsView,
 } from "@/lib/order-shared"
 import { includedItems } from "@/lib/recipe"
+import { applyOrderStock, returnOrderStock } from "@/lib/stock"
 
 // ---------- Loja ----------
 export type StoreRow = typeof stores.$inferSelect
@@ -105,7 +106,7 @@ export interface MenuView {
 }
 
 export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
-  const [cats, items, ings, links, recipe] = await Promise.all([
+  const [cats, items, ings, links, recipe, outOfStock] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name, extrasEnabled: categories.extrasEnabled })
       .from(categories)
@@ -131,7 +132,10 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       .innerJoin(ingredients, eq(ingredients.id, menuItemIngredients.ingredientId))
       .where(and(eq(ingredients.storeId, storeId), eq(menuItemIngredients.removable, true)))
       .orderBy(asc(menuItemIngredients.sortOrder), asc(ingredients.name)),
+    // Estoque (9b): lanches cujo ingrediente controlado não tem saldo para 1 unidade — esgotados sozinhos
+    db.execute<{ id: string }>(sql`select id from menu_items where store_id = ${storeId} and active and menu_item_out_of_stock(id)`),
   ])
+  const soldOut = new Set(outOfStock.rows.map((r) => r.id))
   const own = new Map<string, { id: string; name: string }[]>()
   for (const r of recipe) own.set(r.itemId, [...(own.get(r.itemId) ?? []), { id: r.id, name: r.name }])
   // Os do próprio item + os dos itens que ele inclui (combo), sem repetir ingrediente
@@ -156,10 +160,13 @@ export const getMenu = cache(async (storeId: string): Promise<MenuView> => {
       description: i.description,
       price: Number(i.price),
       imageUrl: i.imageUrl,
-      available: i.available,
+      available: i.available && !soldOut.has(i.id),
       removable: removable(i),
     })),
-    ingredients: ings.map((i) => ({ id: i.id, name: i.name, price: Number(i.price), groupName: i.groupName })),
+    // adicional controlado sem saldo para 1 porção não aparece (o create_order também recusa)
+    ingredients: ings
+      .filter((i) => !i.trackStock || Number(i.stock) >= Number(i.extraAmount))
+      .map((i) => ({ id: i.id, name: i.name, price: Number(i.price), groupName: i.groupName })),
   }
 })
 
@@ -282,9 +289,9 @@ export async function createOrder(
 
   // Tudo que muda o pedido (itens, taxa, troco) acontece numa única chamada ao banco. Com a chave da tentativa,
   // repetir (resposta perdida, toque duplo) devolve o pedido já criado em vez de criar outro.
-  let result: { orderNumber: number; publicToken: string; duplicate: boolean }
+  let result: { id: string; orderNumber: number; publicToken: string; duplicate: boolean }
   try {
-    const res = await db.execute<{ result: { orderNumber: number; publicToken: string; duplicate: boolean } }>(sql`
+    const res = await db.execute<{ result: { id: string; orderNumber: number; publicToken: string; duplicate: boolean } }>(sql`
       select create_order(
         ${storeId}::uuid, ${o.customerName}, ${o.customerPhone}, ${o.type}::order_type,
         ${deliveryAddress}, ${o.paymentMethod}::payment_method, ${o.notes},
@@ -300,6 +307,9 @@ export async function createOrder(
   // Pix online (site, ou balcão com "mostrar QR"): só se a loja conectou o Mercado Pago. Se falhar, o pedido segue
   // como "Pix direto com a loja" (não perde a venda). Numa repetição, devolve o QR que já existe (ou gera, se faltou).
   const pixQr = o.paymentMethod === "pix" && opts.pixOnline ? await attachPixCharge(storeId, result.publicToken) : false
+  // Estoque: sem QR (dinheiro, cartão, Pix direto com a loja) o pedido já entra na cozinha → desconta agora.
+  // Com QR, desconta quando o pagamento cair (syncPixOrder). Nunca lança erro; o cron completa se falhar.
+  if (!pixQr) await applyOrderStock(result.id)
   return { ok: true, orderNumber: result.orderNumber, publicToken: result.publicToken, pixQr, ...(result.duplicate ? { duplicate: true } : {}) }
 }
 
@@ -565,5 +575,7 @@ export async function setOrderStatus(storeId: string, orderId: string, from: Ord
       ),
     )
     .returning({ id: orders.id })
-  return updated.length > 0 ? "ok" : "stale"
+  if (!updated.length) return "stale"
+  if (status === "cancelled") await returnOrderStock(orderId) // devolve o que o pedido tinha descontado
+  return "ok"
 }

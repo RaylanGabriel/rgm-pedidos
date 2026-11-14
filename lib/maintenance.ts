@@ -6,6 +6,7 @@ import { customerLoginCodes, customerSessions, loginAttempts, sessions } from "@
 import { cleanOldErrors, pendingAlert, recordError, safeErrorText, type Alert } from "@/lib/alerts"
 import { cancelOverduePix } from "@/lib/mercadopago"
 import { autoCompleteDeliveries } from "@/lib/orders"
+import { reconcileStock } from "@/lib/stock"
 
 /**
  * Manutenção de todas as lojas, chamada pelo cron da Cloudflare a cada 5 min (worker.ts → POST /api/cron).
@@ -27,6 +28,7 @@ export async function runMaintenance() {
 
   await step("entregasFechadas", () => autoCompleteDeliveries())
   await step("pixVencidosCancelados", () => cancelOverduePix())
+  await step("estoqueConferido", () => reconcileStock())
   await step("sessoesVencidasApagadas", async () => (await db.delete(sessions).where(lt(sessions.expiresAt, new Date())).returning({ id: sessions.id })).length)
   await step("sessoesClientesVencidasApagadas", async () =>
     (await db.delete(customerSessions).where(lt(customerSessions.expiresAt, new Date())).returning({ id: customerSessions.id })).length,
