@@ -1,4 +1,9 @@
-# 9b. Controle de estoque (14/nov/2026, branch `feat/estoque`) — pronto no preview, aguardando OK para produção
+# 9b. Controle de estoque (14/nov/2026, branch `feat/estoque`) — NA PRODUÇÃO (`1fc8618`)
+
+Produção (14/nov): 0030+0031 aplicadas antes do merge; build ok; loja/finalizar/painel sem erro; create_order nova
+chamada em transação desfeita (loja sem estoque: 0 descontos); cron com "estoqueConferido" (8 pedidos antigos
+cancelados só marcados, 0 movimentos); 0 erros. Depois do preview: Fichas só com os ingredientes de cada lanche,
+"+ Ingrediente" e × (pedidos do Raylan).
 
 Decisões do Raylan (14/nov): estoque só dos ingredientes que o dono escolher; desconta quando o pedido ENTRA NA
 COZINHA (dinheiro/cartão/Pix direto: ao criar; Pix online: quando o pagamento cai) e devolve se for cancelado; ingrediente

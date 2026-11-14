@@ -287,6 +287,9 @@ a ordem é 9a → 9b.
 - Para o 9b: hoje a lista guarda só o que se pode tirar; o estoque vai precisar da ficha completa (pão, carne) e da
   quantidade por lanche.
 
+**✅ 9b. Controle de estoque (na produção em 14/nov/2026)** — tela `/admin/estoque` (Saldos, Fichas, Histórico, Consumo),
+card no painel, desconto ao entrar na cozinha, devolução ao cancelar, esgotado automático. Plano original abaixo.
+
 **9b. Controle de estoque (card no painel, só dono)**
 - Saldo por ingrediente com unidade (un, kg, fatia…), entrada de compras ("chegaram 100 pães"), ajuste/perda.
 - Cada pedido **pago** desconta pela ficha técnica (X-Bacon → 1 pão, 1 carne, 2 bacon…); "sem cebola" não desconta
