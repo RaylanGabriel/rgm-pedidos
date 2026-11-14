@@ -66,13 +66,18 @@ const UNSAFE_URL_CHARS = /[\u0000-\u001f\u007f\\]/
  * Caminho deste site para voltar depois de uma ação ("?volta=/finalizar"), ou null se não for.
  * Não basta olhar o começo do texto: "/\t/site-falso.com" começa com uma barra só, mas o navegador apaga o tab e
  * lê "//site-falso.com" (outro site). Por isso recusa caracteres de controle e confere montando a URL de verdade.
+ * E confere o RESULTADO, não só a entrada: "/.//site-falso.com" é deste site, mas o navegador apaga o "/." e devolve
+ * "//site-falso.com" — que, usado de novo como destino, é outro site. Por isso o caminho final é montado outra vez.
  */
 export function localPath(raw: string | null | undefined): string | null {
   if (!raw || !raw.startsWith("/") || UNSAFE_URL_CHARS.test(raw)) return null
   const base = "https://local.invalid"
   try {
     const u = new URL(raw, base)
-    return u.origin === base ? `${u.pathname}${u.search}${u.hash}` : null
+    if (u.origin !== base) return null
+    const path = `${u.pathname}${u.search}${u.hash}`
+    // o resultado também precisa ser um caminho deste site (nunca "//outro-site")
+    return !path.startsWith("//") && new URL(path, base).origin === base ? path : null
   } catch {
     return null
   }
