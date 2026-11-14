@@ -273,9 +273,46 @@ export const ingredients = pgTable(
     groupName: text("group_name").notNull().default("Adicionais"), // ex.: Proteína, Queijo, Molho
     isExtra: boolean("is_extra").notNull().default(true), // oferecido como adicional pago
     active: boolean("active").notNull().default(true),
+    // Estoque (9b): só os ingredientes que o dono escolheu controlar
+    trackStock: boolean("track_stock").notNull().default(false),
+    unit: text("unit").notNull().default("un"), // un, g, kg, ml, L, fatia
+    stock: numeric("stock", { precision: 12, scale: 3 }).notNull().default("0"), // saldo atual (pode ficar negativo)
+    minStock: numeric("min_stock", { precision: 12, scale: 3 }), // abaixo disso: "acabando"
+    extraAmount: numeric("extra_amount", { precision: 12, scale: 3 }).notNull().default("1"), // quanto 1 adicional gasta
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("ingredients_store_idx").on(t.storeId)],
+)
+
+export const stockMovementKind = pgEnum("stock_movement_kind", ["order", "order_return", "purchase", "loss", "adjust"])
+
+/**
+ * Histórico do estoque: cada mudança de saldo é uma linha (o saldo em ingredients.stock muda na mesma operação).
+ * order = pedido entrou na cozinha (negativo); order_return = pedido cancelado devolveu; purchase = entrada;
+ * loss = perda (negativo); adjust = contagem/ajuste (a diferença, + ou −).
+ */
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    ingredientId: uuid("ingredient_id")
+      .notNull()
+      .references(() => ingredients.id, { onDelete: "cascade" }),
+    delta: numeric("delta", { precision: 12, scale: 3 }).notNull(),
+    kind: stockMovementKind("kind").notNull(),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    note: text("note"),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("stock_movements_store_created_idx").on(t.storeId, t.createdAt),
+    index("stock_movements_ingredient_created_idx").on(t.ingredientId, t.createdAt),
+    index("stock_movements_order_idx").on(t.orderId),
+  ],
 )
 
 /**
@@ -293,6 +330,7 @@ export const menuItemIngredients = pgTable(
       .references(() => ingredients.id, { onDelete: "cascade" }),
     removable: boolean("removable").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0), // ordem dos botões "sem ___"
+    quantity: numeric("quantity", { precision: 12, scale: 3 }), // estoque (9b): quanto 1 unidade do lanche gasta
   },
   (t) => [uniqueIndex("menu_item_ingredients_pk").on(t.menuItemId, t.ingredientId), index("menu_item_ingredients_ing_idx").on(t.ingredientId)],
 )
@@ -414,6 +452,9 @@ export const orders = pgTable(
     readyAt: timestamp("ready_at", { withTimezone: true }), // quando a cozinha marcou "pronto" (tempo de preparo)
     outForDeliveryAt: timestamp("out_for_delivery_at", { withTimezone: true }), // quando saiu para entrega
     autoDelivered: boolean("auto_delivered").notNull().default(false), // fechado sozinho 1h depois de sair
+    // Estoque (9b): quando o pedido descontou os ingredientes (entrou na cozinha) e quando devolveu (cancelado)
+    stockAppliedAt: timestamp("stock_applied_at", { withTimezone: true }),
+    stockReturnedAt: timestamp("stock_returned_at", { withTimezone: true }),
     // Chave de cada tentativa de "Confirmar pedido" (gerada no navegador): repetir a mesma tentativa — resposta perdida,
     // toque duplo — devolve o pedido já criado em vez de criar outro. Nunca aparece em tela nem em link.
     idempotencyKey: uuid("idempotency_key"),

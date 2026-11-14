@@ -6,6 +6,7 @@ import { db } from "@/db"
 import { errorEvents, orders, storePaymentAccounts, stores } from "@/db/schema"
 import { recordError, safeErrorText } from "@/lib/alerts"
 import { decryptSecret, encryptSecret } from "@/lib/crypto"
+import { applyOrderStock } from "@/lib/stock"
 
 /**
  * Integração com o Mercado Pago (aplicação RGM-PEDIDOS).
@@ -253,6 +254,7 @@ export async function syncPixOrder(orderId: string): Promise<"paid" | "pending" 
       .update(orders)
       .set({ paymentStatus: "paid", paidAt: new Date() }) // a cozinha conta a espera a partir do pagamento
       .where(and(eq(orders.id, o.id), eq(orders.paymentStatus, "pending")))
+    await applyOrderStock(o.id) // pago = entrou na cozinha: desconta o estoque (uma vez só)
     return "paid"
   }
   if (isDead(mp) && o.status !== "cancelled") {
