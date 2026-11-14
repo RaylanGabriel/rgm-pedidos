@@ -47,11 +47,13 @@ revisores (segurança e bugs). Nenhuma falha crítica; isolamento entre lojas ok
 - [x] 2. (corrigido em 13/nov, `d003941`) Pedido duplicado: UPDATE do troco depois do create_order no mesmo try (lib/orders.ts) → cliente vê erro e repete;
   getCustomer em finalizar/actions.ts idem. Conferido. Troco dentro do create_order + chave de idempotência por checkout.
 - [x] 3. (corrigido em 13/nov, `d003941`) Mudança de etapa da cozinha sem "etapa esperada": tablet atrasado volta pedido cancelado/entregue.
-- [ ] 4. Redirecionamento aberto: safeReturn aceita "/<TAB>/site.com" (lib/auth/google.ts:26, conta/page.tsx). Conferido.
-- [ ] 5. Código por e-mail: attempts lido e gravado (não atômico) + verifyCodeAction sem rate limit.
+- [x] 4. (branch `fix/seguranca-login`, `778034c`: localPath recusa controle/barra invertida e confere a URL; 22 ataques
+  testados + navegador) Redirecionamento aberto: safeReturn aceita "/<TAB>/site.com" (lib/auth/google.ts:26, conta/page.tsx). Conferido.
+- [x] 5. (`76b16fa`: tentativa gasta no UPDATE antes de comparar — 20 em paralelo → 5; 30 conferências/IP/15 min;
+  10 códigos/e-mail/dia) Código por e-mail: attempts lido e gravado (não atômico) + verifyCodeAction sem rate limit.
 
 ## Média
-- [ ] 6. Produção em rgm-pedidos.raylanmiranda1.workers.dev (workers_dev/preview_urls true). Conferido (200).
+- [x] 6. (`bb4d9e0`: workers_dev/preview_urls false na produção, true no preview; conferir 404 depois do deploy) Produção em rgm-pedidos.raylanmiranda1.workers.dev (workers_dev/preview_urls true). Conferido (200).
 - [ ] 7. Rate limit não atômico + checkout sem anti-robô → pedidos falsos em dinheiro.
 - [ ] 8. Bloqueio do dono por terceiros (5 erros por e-mail bloqueiam até a senha certa).
 - [ ] 9. Dados pessoais em error_events (params do Drizzle na mensagem de fora; token no path).

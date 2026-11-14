@@ -2,6 +2,7 @@ import "server-only"
 
 import { createHash, randomBytes } from "node:crypto"
 import { cleanHost, ROOT_DOMAIN } from "@/lib/domains"
+import { hasUnsafeUrlChars, localPath } from "@/lib/links"
 
 /*
  * "Entrar com Google" do cliente (OAuth 2.0 / OpenID Connect com PKCE), sem biblioteca.
@@ -22,8 +23,11 @@ export const redirectUri = (requestOrigin: string) => `${authOrigin(requestOrigi
  * Qualquer outra coisa vira "/" (impede usar o login para mandar o cliente a um site falso).
  */
 export function safeReturn(raw: string | null, requestOrigin: string) {
-  if (!raw) return "/"
-  if (raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")) return new URL(raw, requestOrigin).toString()
+  if (!raw || hasUnsafeUrlChars(raw)) return "/"
+  if (raw.startsWith("/")) {
+    const path = localPath(raw)
+    return path ? new URL(path, requestOrigin).toString() : "/"
+  }
   try {
     const u = new URL(raw)
     const host = cleanHost(u.host)

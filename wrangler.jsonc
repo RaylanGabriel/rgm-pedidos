@@ -21,8 +21,10 @@
     { "pattern": "rgm.dev.br/*", "zone_name": "rgm.dev.br" },
     { "pattern": "*.rgm.dev.br/*", "zone_name": "rgm.dev.br" },
   ],
-  "workers_dev": true,
-  "preview_urls": true,
+  // Produção só nos domínios rgm.dev.br: o endereço *.workers.dev e os links de versão passariam por fora das regras
+  // da zona (limite de acessos, firewall). O preview liga os dois de novo (são herdados).
+  "workers_dev": false,
+  "preview_urls": false,
   // Manutenção a cada 5 min (lib/maintenance.ts) e backup diário às 06:00 UTC = 03:00 Brasília (lib/backup.ts).
   // Precisa do segredo CRON_SECRET no Worker. Herdado pelo preview (que roda no banco de testes).
   "triggers": { "crons": ["*/5 * * * *", "0 6 * * *"] },
@@ -52,6 +54,9 @@
       "name": "rgm-pedidos-preview",
       // "routes" é herdado: vazio de propósito para o preview nunca responder no domínio de produção
       "routes": [],
+      // O preview só existe em *.workers.dev (um link por branch): precisa dos dois ligados
+      "workers_dev": true,
+      "preview_urls": true,
       "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "rgm-pedidos-preview" }],
       // Bucket separado: um teste nunca apaga foto de loja real
       "r2_buckets": [
